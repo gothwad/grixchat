@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#375a7f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="GrixChat" />
+    <meta name="google-site-verification" content="W2ez42lwANlmcKz6ng6zAXdHwiwbI-h1OohQlI3mqLg" />
+    <meta name="description" content="GrixChat is the ultimate secure social messaging app. Connect with friends in real-time, share stories, watch reels, and chat privately with Grix AI. Join the next generation of social networking." />
+    <meta name="keywords" content="GrixChat, Grix AI, Girx Chat, GirxChat, Grix Chat App, secure messaging, social media app, real-time chat, reels, stories, private messaging, encryption, Gothwad Technologies, social network, messaging app 2024" />
+    <meta name="author" content="Gothwad Technologies" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="language" content="English" />
+    <meta name="distribution" content="global" />
+    <meta name="rating" content="general" />
+    <meta name="revisit-after" content="7 days" />
+    <meta name="HandheldFriendly" content="True" />
+    <meta name="MobileOptimized" content="320" />
+    <link rel="canonical" href="https://grixchat.github.io/" />
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://grixchat.github.io/" />
+    <meta property="og:title" content="GrixChat | Secure Social Messaging & AI" />
+    <meta property="og:site_name" content="GrixChat" />
+    <meta property="og:description" content="Connect, Share, and Chat securely. Enjoy reels, stories, and the power of Grix AI in one seamless experience." />
+    <meta property="og:image" content="https://grixchat.github.io/assets/favicon.png" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- JSON-LD Structured Data for Application -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "GrixChat",
+        "operatingSystem": "Android, iOS, Web",
+        "applicationCategory": "SocialNetworkingApplication",
+        "description": "GrixChat is a secure social messaging app featuring real-time chat, reels, and AI assistance.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "author": {
+          "@type": "Organization",
+          "name": "Gothwad Technologies"
+        }
+      }
+    </script>
+
+    <!-- JSON-LD Structured Data for Site Name -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "GrixChat",
+        "alternateName": ["GrixChat App", "Girx Chat"],
+        "url": "https://grixchat.github.io/"
+      }
+    </script>
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://grixchat.github.io/" />
+    <meta property="twitter:title" content="GrixChat | Connect, Share, Chat" />
+    <meta property="twitter:description" content="GrixChat is the ultimate secure social messaging app. Join us today and connect with the world." />
+    <meta property="twitter:image" content="https://grixchat.github.io/assets/favicon.png" />
+
+    <link rel="icon" type="image/png" href="/assets/favicon.png" />
+    <link rel="apple-touch-icon" href="/assets/favicon.png" />
+    <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
+    <title>GrixChat | The Ultimate Social Messaging App</title>
+    <script>
+      // Register Service Worker for PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('SW registered: ', registration);
+            })
+            .catch(registrationError => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

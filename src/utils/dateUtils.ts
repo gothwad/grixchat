@@ -1,0 +1,70 @@
+
+/**
+ * Safely converts a potential Firestore timestamp (or other date formats) to a JavaScript Date object.
+ * Handles Firestore Timestamp objects, plain objects with seconds/nanoseconds, 
+ * Date objects, numbers (ms), and ISO strings.
+ */
+export function toDate(timestamp: any): Date | null {
+  if (!timestamp) return null;
+
+  // 1. Firestore Timestamp object
+  if (typeof timestamp.toDate === 'function') {
+    return timestamp.toDate();
+  }
+
+  // 2. Plain object with seconds/nanoseconds (e.g., from localStorage/cache)
+  if (typeof timestamp.seconds === 'number') {
+    return new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
+  }
+
+  // 3. JavaScript Date object
+  if (timestamp instanceof Date) {
+    return timestamp;
+  }
+
+  // 4. Number (milliseconds)
+  if (typeof timestamp === 'number') {
+    return new Date(timestamp);
+  }
+
+  // 5. String (ISO date)
+  if (typeof timestamp === 'string') {
+    const date = new Date(timestamp);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  return null;
+}
+
+/**
+ * Formats a timestamp into a human-readable time string (e.g., "10:30").
+ */
+export function formatTime(timestamp: any): string {
+  const date = toDate(timestamp);
+  if (!date) return '';
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+/**
+ * Formats a timestamp into a human-readable last seen string.
+ */
+export function formatLastSeen(timestamp: any): string {
+  const date = toDate(timestamp);
+  if (!date) return '';
+  
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  if (isToday) {
+    return `last seen at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+  } else if (isYesterday) {
+    return 'last seen at Yesterday';
+  } else {
+    const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
+    const formattedDate = date.toLocaleDateString('en-GB', options); // e.g., "1 Oct 2024"
+    return `last seen at ${formattedDate}`;
+  }
+}

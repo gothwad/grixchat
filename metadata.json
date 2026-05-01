@@ -1,0 +1,11 @@
+{
+  "name": "GrixChat | The Social and secure communication of India | GrixChat By Grix Group of India ",
+  "description": "GrixChat - A high-performance social messaging app. Features real-time chat, reels, media sharing, and secure communication.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation",
+    "notifications"
+  ],
+  "majorCapabilities": []
+}
