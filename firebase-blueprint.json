@@ -86,9 +86,33 @@
         "audio": { "type": "string" }
       },
       "required": ["userUid", "videoUrl", "cover", "createdAt"]
+    },
+    "TubeVideo": {
+      "title": "TubeVideo",
+      "description": "A long-form video (Tube)",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userAvatar": { "type": "string" },
+        "youtubeUrl": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "views": { "type": "number" },
+        "likes": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "duration": { "type": "string" }
+      },
+      "required": ["userId", "youtubeUrl", "thumbnail", "title", "createdAt"]
     }
   },
   "firestore": {
+    "tube_videos": {
+      "schema": "TubeVideo",
+      "description": "Collection for Tube videos"
+    },
     "reels": {
       "schema": "Reel",
       "description": "Short videos collection"

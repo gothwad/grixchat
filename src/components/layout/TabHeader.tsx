@@ -88,7 +88,7 @@ export default function TabHeader() {
   const isChatsPage = location.pathname === '/chats';
   const isHubPage = location.pathname === '/hub';
   const isReelsPage = location.pathname === '/reels';
-  const isTubePage = location.pathname === '/reels/grixtube';
+  const isTubePage = location.pathname === '/tube';
   const isProfilePage = location.pathname === '/profile';
 
   return (
@@ -113,12 +113,12 @@ export default function TabHeader() {
 
 
 
-        {/* Create Reel Icon - Show on Reels */}
-        {isReelsPage && (
+        {/* Plus Icon - Show on Reels and Tube */}
+        {(isReelsPage || isTubePage) && (
           <button 
-            onClick={() => navigate('/reels/create')}
+            onClick={() => navigate(isTubePage ? '/tube/upload' : '/reels/create')}
             className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group"
-            title="Create Reel"
+            title={isTubePage ? "Upload to Tube" : "Create Reel"}
           >
             <Plus size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
           </button>

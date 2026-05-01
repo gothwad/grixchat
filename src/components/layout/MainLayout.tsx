@@ -13,7 +13,7 @@ export default function MainLayout() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   // Paths where BottomNav should be visible
-  const tabPaths = ['/', '/chats', '/hub', '/reels', '/profile', '/notifications', '/reels/grixtube'];
+  const tabPaths = ['/', '/chats', '/hub', '/reels', '/profile', '/notifications', '/tube'];
   const isChatScreen = location.pathname.startsWith('/chat/');
   const showBottomNav = tabPaths.includes(location.pathname);
   

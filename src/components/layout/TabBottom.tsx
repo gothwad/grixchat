@@ -29,7 +29,7 @@ export default function TabBottom() {
     { icon: Home, path: '/', label: 'Home', activeColor: 'text-[var(--header-text)]' },
     { icon: Clapperboard, path: '/reels', label: 'Reels', activeColor: 'text-[var(--header-text)]' },
     { icon: MessageCircle, path: '/chats', label: 'Chats', badge: unreadCount, activeColor: 'text-[var(--header-text)]' },
-    { icon: null, path: '/reels/grixtube', label: 'Tube', activeColor: 'text-[var(--header-text)]' },
+    { icon: null, path: '/tube', label: 'Tube', activeColor: 'text-[var(--header-text)]' },
     { icon: UserCircle, path: '/profile', label: 'Profile', activeColor: 'text-[var(--header-text)]' },
   ];
 

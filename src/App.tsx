@@ -44,7 +44,8 @@ const SearchUserScreen = React.lazy(() => import('./features/chat/SearchUserScre
 const GrixAIScreen = React.lazy(() => import('./features/chat/GrixAIScreen'));
 const ChatSettingsScreen = React.lazy(() => import('./features/chat/ChatSettingsScreen'));
 
-const GrixTubeScreen = React.lazy(() => import('./features/reels/grixtube/GrixTubeScreen'));
+const TubeScreen = React.lazy(() => import('./features/tube/GrixTubeScreen'));
+const TubeUploadScreen = React.lazy(() => import('./features/tube/TubeUploadScreen'));
 
 const StoryMakerScreen = React.lazy(() => import('./features/stories').then(m => ({ default: m.StoryMakerScreen })));
 const StoryWatcherScreen = React.lazy(() => import('./features/stories').then(m => ({ default: m.StoryWatcherScreen })));
@@ -249,7 +250,8 @@ export default function App() {
                       <Route path="/chats/hidden/settings" element={user ? <HideChatSettings /> : <Navigate to="/login" />} />
                       <Route path="/hub" element={user ? <HubTab /> : <Navigate to="/login" />} />
                       <Route path="/reels" element={user ? <ReelsTab /> : <Navigate to="/login" />} />
-                      <Route path="/reels/grixtube" element={user ? <GrixTubeScreen /> : <Navigate to="/login" />} />
+                      <Route path="/tube" element={user ? <TubeScreen /> : <Navigate to="/login" />} />
+                      <Route path="/tube/upload" element={user ? <TubeUploadScreen /> : <Navigate to="/login" />} />
                       <Route element={<ChatLayout />}>
                         <Route path="/chat/grix-ai" element={user ? <GrixAIScreen /> : <Navigate to="/login" />} />
                         <Route path="/chat/:id" element={user ? <ChatScreen /> : <Navigate to="/login" />} />

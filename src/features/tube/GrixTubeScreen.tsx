@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { db } from '../../../services/firebase.ts';
+import { db } from '../../services/firebase.ts';
 import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -173,7 +173,7 @@ export default function GrixTubeScreen() {
             </div>
             <div>
               <p className="font-black text-lg text-[var(--text-primary)]">No Videos Yet</p>
-              <p className="text-xs text-[var(--text-secondary)] mt-1">Be the first to upload a video to GrixTube!</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">Be the first to upload a video to Tube!</p>
             </div>
           </div>
         ) : (
