@@ -1,4 +1,4 @@
-aaa# GrixChat
+# GrixChat
 
 GrixChat is a comprehensive, high-performance social media and real-time messaging application. It combines the features of popular platforms like Instagram and WhatsApp into a single, mobile-first experience.
 
