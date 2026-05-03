@@ -6,7 +6,8 @@ import {
   Camera,
   Clapperboard,
   Upload,
-  Pencil
+  Pencil,
+  Play
 } from 'lucide-react';
 import { auth, db } from '../../services/firebase.ts';
 import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
@@ -16,7 +17,7 @@ import { motion } from 'motion/react';
 export default function ProfileTab() {
   const [userData, setUserData] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'posts' | 'saved' | 'tagged'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'reels' | 'tube' | 'saved'>('posts');
   const navigate = useNavigate();
 
   const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
@@ -39,21 +40,33 @@ export default function ProfileTab() {
     if (!auth.currentUser) return;
 
     const fetchContent = async () => {
-      if (activeTab === 'posts') {
-        const q = query(collection(db, "posts"), where("userId", "==", auth.currentUser?.uid));
-        const snapshot = await getDocs(q);
-        setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } else if (activeTab === 'saved') {
-        if (userData?.savedPosts && userData.savedPosts.length > 0) {
-          // Firestore 'in' query has limit of 10-30 depending on version
-          const savedIds = userData.savedPosts.slice(0, 10); 
-          const q = query(collection(db, "posts"), where("__name__", "in", savedIds));
+      if (!auth.currentUser) return;
+      
+      try {
+        if (activeTab === 'posts') {
+          const q = query(collection(db, "posts"), where("userId", "==", auth.currentUser.uid));
           const snapshot = await getDocs(q);
           setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        } else {
-          setPosts([]);
+        } else if (activeTab === 'reels') {
+          const q = query(collection(db, "reels"), where("userUid", "==", auth.currentUser.uid));
+          const snapshot = await getDocs(q);
+          setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), imageUrl: (doc.data() as any).cover })));
+        } else if (activeTab === 'tube') {
+          const q = query(collection(db, "tube_videos"), where("userId", "==", auth.currentUser.uid));
+          const snapshot = await getDocs(q);
+          setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), imageUrl: (doc.data() as any).thumbnail })));
+        } else if (activeTab === 'saved') {
+          if (userData?.savedPosts && userData.savedPosts.length > 0) {
+            const savedIds = userData.savedPosts.slice(0, 10); 
+            const q = query(collection(db, "posts"), where("__name__", "in", savedIds));
+            const snapshot = await getDocs(q);
+            setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          } else {
+            setPosts([]);
+          }
         }
-      } else {
+      } catch (err) {
+        console.error("Error fetching tab content:", err);
         setPosts([]);
       }
     };
@@ -131,18 +144,28 @@ export default function ProfileTab() {
             <button 
               onClick={() => setActiveTab('posts')}
               className={`flex-1 flex justify-center items-center transition-colors ${activeTab === 'posts' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
+              title="Posts"
+            >
+              <Grid size={20} />
+            </button>
+            <button 
+              onClick={() => setActiveTab('reels')}
+              className={`flex-1 flex justify-center items-center transition-colors ${activeTab === 'reels' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
+              title="Reels"
             >
               <Clapperboard size={20} />
             </button>
             <button 
-              onClick={() => setActiveTab('tagged')}
-              className={`flex-1 flex justify-center items-center transition-colors ${activeTab === 'tagged' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
+              onClick={() => setActiveTab('tube')}
+              className={`flex-1 flex justify-center items-center transition-colors ${activeTab === 'tube' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
+              title="Tube"
             >
-              <UserSquare size={20} />
+              <Play size={20} className="fill-current" />
             </button>
             <button 
               onClick={() => setActiveTab('saved')}
               className={`flex-1 flex justify-center items-center transition-colors ${activeTab === 'saved' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
+              title="Saved"
             >
               <Bookmark size={20} />
             </button>
@@ -153,7 +176,19 @@ export default function ProfileTab() {
         <div className="grid grid-cols-3 gap-0.5">
           {posts.length > 0 ? (
             posts.map((post) => (
-              <div key={post.id} className="aspect-square bg-zinc-100 relative group overflow-hidden">
+              <div 
+                key={post.id} 
+                className="aspect-square bg-zinc-100 relative group overflow-hidden cursor-pointer"
+                onClick={() => {
+                  if (activeTab === 'posts' || activeTab === 'saved') {
+                    navigate(`/user/${auth.currentUser?.uid}/posts?postId=${post.id}&tab=${activeTab}`);
+                  } else if (activeTab === 'reels') {
+                    navigate(`/user/${auth.currentUser?.uid}/reels?reelId=${post.id}`);
+                  } else if (activeTab === 'tube') {
+                    navigate(`/user/${auth.currentUser?.uid}/tube?videoId=${post.id}`);
+                  }
+                }}
+              >
                 <img 
                   src={post.imageUrl || `https://picsum.photos/seed/${post.id}/400/400`} 
                   className="w-full h-full object-cover"
@@ -164,9 +199,17 @@ export default function ProfileTab() {
           ) : (
             <div className="col-span-3 py-20 flex flex-col items-center justify-center text-[var(--text-secondary)]">
               <div className="w-16 h-16 rounded-full border-2 border-[var(--text-secondary)] flex items-center justify-center mb-4">
-                <Camera size={32} />
+                {activeTab === 'posts' && <Camera size={32} />}
+                {activeTab === 'reels' && <Clapperboard size={32} />}
+                {activeTab === 'tube' && <Play size={32} />}
+                {activeTab === 'saved' && <Bookmark size={32} />}
               </div>
-              <p className="text-sm font-bold">No posts yet</p>
+              <p className="text-sm font-bold uppercase tracking-wider">
+                {activeTab === 'posts' && 'No posts yet'}
+                {activeTab === 'reels' && 'No reels yet'}
+                {activeTab === 'tube' && 'No videos yet'}
+                {activeTab === 'saved' && 'No saved posts'}
+              </p>
             </div>
           )}
         </div>

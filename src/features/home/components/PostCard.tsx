@@ -7,11 +7,19 @@ import {
   Bookmark,
   Send,
   UserPlus,
-  UserCheck
+  UserCheck,
+  Trash2,
+  AlertTriangle,
+  Info,
+  Link as LinkIcon,
+  X,
+  UserMinus,
+  EyeOff,
+  Edit3
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { doc, updateDoc, arrayUnion, arrayRemove, collection, addDoc, serverTimestamp, onSnapshot, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove, collection, addDoc, serverTimestamp, onSnapshot, getDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '../../../services/firebase.ts';
 import { toDate } from '../../../utils/dateUtils.ts';
 
@@ -30,6 +38,25 @@ export default function PostCard({ post, currentUserData }: PostCardProps) {
   const [likeCount, setLikeCount] = useState(post.likes || 0);
   const [isFollowing, setIsFollowing] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
+  const isOwner = auth.currentUser?.uid === post.userId;
+
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this post?")) return;
+    try {
+      await deleteDoc(doc(db, "posts", post.id));
+      setShowOptions(false);
+      // Optional: Add a callback to refresh parent list or navigate away if in viewer
+    } catch (err) {
+      console.error("Error deleting post:", err);
+    }
+  };
+
+  const handleCopyLink = () => {
+    const url = `${window.location.origin}/posts/${post.id}`;
+    navigator.clipboard.writeText(url);
+    alert("Link copied to clipboard!");
+    setShowOptions(false);
+  };
 
   useEffect(() => {
     if (auth.currentUser && post.likedBy) {
@@ -170,12 +197,69 @@ export default function PostCard({ post, currentUserData }: PostCardProps) {
           </div>
         </div>
         <button 
-          onClick={() => setShowOptions(!showOptions)}
+          onClick={() => setShowOptions(true)}
           className="text-[var(--text-secondary)] p-1.5 hover:bg-[var(--text-primary)]/5 rounded-full transition-colors"
         >
           <MoreVertical size={16} />
         </button>
       </div>
+
+      {/* Options Menu Dropdown */}
+      <AnimatePresence>
+        {showOptions && (
+          <div className="absolute top-10 right-4 z-[60] w-48 bg-[var(--bg-card)] rounded-xl shadow-2xl border border-[var(--border-color)] py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="absolute inset-0 bg-black/60 sm:hidden -z-10 fixed" onClick={() => setShowOptions(false)} />
+            
+            <div className="flex flex-col py-1">
+              {isOwner ? (
+                <>
+                  <button onClick={() => { setShowOptions(false); navigate(`/posts/${post.id}/edit`); }} className="w-full px-4 py-2.5 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
+                    <Edit3 size={18} className="text-blue-500" />
+                    <span>Edit Post</span>
+                  </button>
+                  <button onClick={handleDelete} className="w-full px-4 py-2.5 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
+                    <Trash2 size={18} className="text-red-500" />
+                    <span className="text-red-500">Delete Post</span>
+                  </button>
+                  <button onClick={() => setShowOptions(false)} className="w-full px-4 py-2.5 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors border-b border-[var(--border-color)]/10 pb-3 mb-1">
+                    <EyeOff size={18} className="text-[var(--text-secondary)]" />
+                    <span>Hide Likes</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => { setShowOptions(false); alert("Report submitted."); }} className="w-full px-4 py-2.5 text-left text-[14px] font-bold text-red-500 hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
+                    <AlertTriangle size={18} />
+                    <span>Report</span>
+                  </button>
+                  <button onClick={() => { setShowOptions(false); navigate(`/user/${post.userId}/about`); }} className="w-full px-4 py-2.5 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
+                    <Info size={18} className="text-[var(--text-secondary)]" />
+                    <span>About account</span>
+                  </button>
+                  <button onClick={() => setShowOptions(false)} className="w-full px-4 py-2.5 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
+                    <EyeOff size={18} className="text-[var(--text-secondary)]" />
+                    <span>Not interested</span>
+                  </button>
+                  {isFollowing && (
+                    <button onClick={handleFollow} className="w-full px-4 py-2.5 text-left text-[14px] font-bold text-red-500 hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors border-b border-[var(--border-color)]/10 pb-3 mb-1">
+                      <UserMinus size={18} />
+                      <span>Unfollow</span>
+                    </button>
+                  )}
+                </>
+              )}
+              <button onClick={() => setShowOptions(false)} className="w-full mt-1 py-3 text-[11px] font-black text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors uppercase tracking-[0.2em] text-center border-t border-[var(--border-color)]/10">
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+      
+      {/* Click outside backdrop for absolute menu */}
+      {showOptions && (
+        <div className="fixed inset-0 z-[55] bg-transparent" onClick={() => setShowOptions(false)} />
+      )}
 
       {/* Post Content */}
       <div 

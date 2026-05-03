@@ -50,6 +50,7 @@ const TubeUploadScreen = React.lazy(() => import('./features/tube/TubeUploadScre
 const StoryMakerScreen = React.lazy(() => import('./features/stories').then(m => ({ default: m.StoryMakerScreen })));
 const StoryWatcherScreen = React.lazy(() => import('./features/stories').then(m => ({ default: m.StoryWatcherScreen })));
 const CreatePostScreen = React.lazy(() => import('./features/home').then(m => ({ default: m.CreatePostScreen })));
+const EditPostScreen = React.lazy(() => import('./features/home/EditPostScreen.tsx'));
 const NotificationsScreen = React.lazy(() => import('./features/notifications/NotificationsScreen.tsx'));
 const LikeNotificationsScreen = React.lazy(() => import('./features/notifications/LikeNotificationsScreen.tsx'));
 const CommentsScreen = React.lazy(() => import('./features/home/CommentsScreen.tsx'));
@@ -60,6 +61,9 @@ const EditProfileScreen = React.lazy(() => import('./features/profile').then(m =
 const UserProfileScreen = React.lazy(() => import('./features/profile').then(m => ({ default: m.UserProfileScreen })));
 const FollowListScreen = React.lazy(() => import('./features/profile').then(m => ({ default: m.FollowListScreen })));
 const GrixAIProfile = React.lazy(() => import('./features/profile').then(m => ({ default: m.GrixAIProfile })));
+const ProfilePostViewer = React.lazy(() => import('./features/profile/ProfilePostViewer.tsx'));
+const ProfileReelViewer = React.lazy(() => import('./features/profile/ProfileReelViewer.tsx'));
+const ProfileTubeViewer = React.lazy(() => import('./features/profile/ProfileTubeViewer.tsx'));
 
 const ReelsTab = React.lazy(() => import('./features/reels').then(m => ({ default: m.ReelsTab })));
 const ReelsScreen = React.lazy(() => import('./features/reels').then(m => ({ default: m.ReelsScreen })));
@@ -277,6 +281,7 @@ export default function App() {
                     <Route path="/posts/:postId/share" element={user ? <ShareScreen /> : <Navigate to="/login" />} />
                     <Route path="/stories/create" element={user ? <StoryMakerScreen /> : <Navigate to="/login" />} />
                     <Route path="/reels/create" element={user ? <ReelsMakerScreen /> : <Navigate to="/login" />} />
+                    <Route path="/posts/:id/edit" element={user ? <EditPostScreen /> : <Navigate to="/login" />} />
                     <Route path="/reels/watch/:id" element={user ? <ReelWatcherScreen /> : <Navigate to="/login" />} />
                     <Route path="/stories/view/:userId" element={user ? <StoryWatcherScreen /> : <Navigate to="/login" />} />
                     <Route path="/settings" element={user ? <SettingsScreen /> : <Navigate to="/login" />} />
@@ -304,6 +309,9 @@ export default function App() {
                     <Route path="/messages" element={user ? <MessagesListScreen /> : <Navigate to="/login" />} />
                     <Route path="/search-user" element={user ? <SearchUserScreen /> : <Navigate to="/login" />} />
                     <Route path="/user/:id" element={user ? <UserProfileScreen /> : <Navigate to="/login" />} />
+                    <Route path="/user/:id/posts" element={user ? <ProfilePostViewer /> : <Navigate to="/login" />} />
+                    <Route path="/user/:id/reels" element={user ? <ProfileReelViewer /> : <Navigate to="/login" />} />
+                    <Route path="/user/:id/tube" element={user ? <ProfileTubeViewer /> : <Navigate to="/login" />} />
                     <Route path="/user/:id/:type" element={user ? <FollowListScreen /> : <Navigate to="/login" />} />
                     <Route path="/chat/preview" element={user ? <ImagePreviewScreen /> : <Navigate to="/login" />} />
                     <Route path="/profile/grix-ai" element={user ? <GrixAIProfile /> : <Navigate to="/login" />} />

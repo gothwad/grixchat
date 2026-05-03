@@ -21,8 +21,9 @@ import {
   X,
   Loader2,
   Clapperboard,
-  UserSquare2,
-  Bookmark
+  Bookmark,
+  Grid,
+  Play
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { auth, db } from '../../services/firebase.ts';
@@ -41,7 +42,7 @@ export default function UserProfileScreen() {
   const [isBlocked, setIsBlocked] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('posts');
+  const [activeFilter, setActiveFilter] = useState<'posts' | 'reels' | 'tube' | 'saved'>('posts');
   const [showMenu, setShowMenu] = useState(false);
   const [posts, setPosts] = useState<any[]>([]);
 
@@ -75,18 +76,45 @@ export default function UserProfileScreen() {
     }
 
     // Fetch user posts
-    const fetchPosts = async () => {
-      const q = query(collection(db, "posts"), where("userId", "==", userId));
-      const snaps = await getDocs(q);
-      setPosts(snaps.docs.map(d => ({ id: d.id, ...d.data() })));
+    const fetchContent = async () => {
+      if (!userId) return;
+      try {
+        if (activeFilter === 'posts') {
+          const q = query(collection(db, "posts"), where("userId", "==", userId));
+          const snapshot = await getDocs(q);
+          setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        } else if (activeFilter === 'reels') {
+          const q = query(collection(db, "reels"), where("userUid", "==", userId));
+          const snapshot = await getDocs(q);
+          setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), imageUrl: (doc.data() as any).cover })));
+        } else if (activeFilter === 'tube') {
+          const q = query(collection(db, "tube_videos"), where("userId", "==", userId));
+          const snapshot = await getDocs(q);
+          setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), imageUrl: (doc.data() as any).thumbnail })));
+        } else if (activeFilter === 'saved') {
+          const userDoc = await getDoc(doc(db, "users", userId));
+          const userData = userDoc.data();
+          const savedIds = userData?.savedPosts || [];
+          if (savedIds.length > 0) {
+            const q = query(collection(db, "posts"), where("__name__", "in", savedIds.slice(0, 10)));
+            const snapshot = await getDocs(q);
+            setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          } else {
+            setPosts([]);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching content:", err);
+        setPosts([]);
+      }
     };
-    fetchPosts();
+    fetchContent();
 
     return () => {
       unsubscribeUser();
       if (unsubscribeMe) unsubscribeMe();
     };
-  }, [userId]);
+  }, [userId, activeFilter]);
 
   const handleToggleFollow = async () => {
     if (!auth.currentUser || !userId || followLoading) return;
@@ -284,23 +312,33 @@ export default function UserProfileScreen() {
               <button 
                 onClick={() => setActiveFilter('posts')}
                 className={`flex-1 flex justify-center items-center transition-colors ${activeFilter === 'posts' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
+                title="Posts"
+              >
+                <Grid size={20} />
+              </button>
+              <button 
+                onClick={() => setActiveFilter('reels')}
+                className={`flex-1 flex justify-center items-center transition-colors ${activeFilter === 'reels' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
+                title="Reels"
               >
                 <Clapperboard size={20} />
               </button>
               <button 
-                onClick={() => setActiveFilter('tagged')}
-                className={`flex-1 flex justify-center items-center transition-colors ${activeFilter === 'tagged' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
+                onClick={() => setActiveFilter('tube')}
+                className={`flex-1 flex justify-center items-center transition-colors ${activeFilter === 'tube' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
+                title="Tube"
               >
-                <UserSquare2 size={20} />
+                <Play size={20} className="fill-current" />
               </button>
               <button 
                 onClick={() => setActiveFilter('saved')}
                 className={`flex-1 flex justify-center items-center transition-colors ${activeFilter === 'saved' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
+                title="Saved"
               >
                 <Bookmark size={20} />
               </button>
             </div>
-            <ProfileContent posts={posts} activeTab={activeFilter} />
+            <ProfileContent posts={posts} activeTab={activeFilter} userId={userId} />
           </div>
         )}
 
