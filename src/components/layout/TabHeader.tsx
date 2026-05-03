@@ -113,17 +113,6 @@ export default function TabHeader() {
 
 
 
-        {/* Plus Icon - Show on Reels and Tube */}
-        {(isReelsPage || isTubePage) && (
-          <button 
-            onClick={() => navigate(isTubePage ? '/tube/upload' : '/reels/create')}
-            className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group"
-            title={isTubePage ? "Upload to Tube" : "Create Reel"}
-          >
-            <Plus size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
-          </button>
-        )}
-
         {/* Search Icon - Show on Chats, Hub, and Tube */}
         {(isChatsPage || isHubPage || isTubePage) && (
           <button 
@@ -134,22 +123,8 @@ export default function TabHeader() {
           </button>
         )}
 
-        {/* Lock Icon - Show on Profile */}
-        {isProfilePage && (
-          <button className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group">
-            <Lock size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
-          </button>
-        )}
-
-        {/* Statics Icon - Show on Profile */}
-        {isProfilePage && (
-          <button className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group">
-            <BarChart2 size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
-          </button>
-        )}
-
-        {/* Heart Icon - Show on Home */}
-        {isHomePage && (
+        {/* Heart Icon - Show on Home and Reels */}
+        {(isHomePage || isReelsPage) && (
           <Link to="/notifications/likes" className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group relative">
             <Heart size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" fill="currentColor" fillOpacity={0.1} />
             {hasUnreadLikes && (
@@ -158,14 +133,21 @@ export default function TabHeader() {
           </Link>
         )}
 
-        {/* Bell Icon - Show on Home */}
-        {isHomePage && (
+        {/* Bell Icon - Show on Home, Reels and Tube */}
+        {(isHomePage || isReelsPage || isTubePage) && (
           <Link to="/notifications" className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group relative">
             <Bell size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
             {hasUnreadNotifs && (
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[var(--header-bg)]" />
             )}
           </Link>
+        )}
+
+        {/* Analytics Icon - Show on Profile (Left of Settings) */}
+        {isProfilePage && (
+          <button className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group">
+            <BarChart2 size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
+          </button>
         )}
 
         {/* Settings Icon - Show on Profile */}

@@ -30,7 +30,6 @@ export default function ReelsMakerScreen() {
     caption: '',
     description: '',
     location: '',
-    tags: '',
     mentions: '',
     allowComments: true,
     hideLikes: false
@@ -127,7 +126,6 @@ export default function ReelsMakerScreen() {
       const videoUrl = await uploadToCloudinary(videoFile);
       setUploadProgress(80);
 
-      const tags = formData.tags.split(',').map(t => t.trim()).filter(Boolean);
       const mentions = formData.mentions.split(',').map(m => m.trim()).filter(Boolean);
 
       await addDoc(collection(db, 'reels'), {
@@ -139,7 +137,6 @@ export default function ReelsMakerScreen() {
         caption: formData.caption,
         description: formData.description,
         location: formData.location,
-        tags,
         mentions,
         likes: 0,
         likedBy: [],
@@ -238,20 +235,12 @@ export default function ReelsMakerScreen() {
           </div>
 
           {/* Metadata Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative">
               <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
               <input 
                 type="text" placeholder="Location" value={formData.location}
                 onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                className="w-full bg-[var(--bg-chat)] border border-[var(--border-color)] rounded-2xl py-3.5 pl-11 pr-4 text-sm font-medium focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div className="relative">
-              <Hash size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
-              <input 
-                type="text" placeholder="Tags" value={formData.tags}
-                onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
                 className="w-full bg-[var(--bg-chat)] border border-[var(--border-color)] rounded-2xl py-3.5 pl-11 pr-4 text-sm font-medium focus:outline-none focus:border-blue-500"
               />
             </div>

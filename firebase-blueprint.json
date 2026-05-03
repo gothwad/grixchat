@@ -75,7 +75,6 @@
         "caption": { "type": "string" },
         "description": { "type": "string" },
         "location": { "type": "string" },
-        "tags": { "type": "array", "items": { "type": "string" } },
         "mentions": { "type": "array", "items": { "type": "string" } },
         "likes": { "type": "number" },
         "likedBy": { "type": "array", "items": { "type": "string" } },

@@ -178,7 +178,7 @@ export default function ProfileTab() {
             posts.map((post) => (
               <div 
                 key={post.id} 
-                className="aspect-square bg-zinc-100 relative group overflow-hidden cursor-pointer"
+                className={`${activeTab === 'tube' ? 'aspect-video' : 'aspect-square'} bg-zinc-100 relative group overflow-hidden cursor-pointer`}
                 onClick={() => {
                   if (activeTab === 'posts' || activeTab === 'saved') {
                     navigate(`/user/${auth.currentUser?.uid}/posts?postId=${post.id}&tab=${activeTab}`);

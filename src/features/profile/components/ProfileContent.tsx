@@ -39,12 +39,12 @@ export default function ProfileContent({ posts, activeTab, userId }: ProfileCont
             posts.map((post) => (
               <div 
                 key={post.id} 
-                className="aspect-square bg-[var(--bg-main)] relative group overflow-hidden border border-[var(--border-color)]/20 shadow-sm cursor-pointer"
+                className={`${activeTab === 'tube' ? 'aspect-video' : 'aspect-square'} bg-[var(--bg-main)] relative group overflow-hidden border border-[var(--border-color)]/20 shadow-sm cursor-pointer`}
                 onClick={() => handlePostClick(post)}
               >
                 <img 
                   src={post.url || post.imageUrl} 
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  className="w-full h-full object-cover transition-transform duration-500"
                   referrerPolicy="no-referrer"
                   alt={`Post ${post.id}`}
                 />

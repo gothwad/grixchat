@@ -32,12 +32,13 @@ export default function TubeUploadScreen() {
     description: '',
     youtubeUrl: '',
     category: 'All',
-    duration: '',
-    tags: ''
+    duration: ''
   });
   
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [isFetchingMeta, setIsFetchingMeta] = useState(false);
+  const [isAutoThumbnail, setIsAutoThumbnail] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -46,6 +47,7 @@ export default function TubeUploadScreen() {
     if (file) {
       setThumbnailFile(file);
       setThumbnailPreview(URL.createObjectURL(file));
+      setIsAutoThumbnail(false);
     }
   };
 
@@ -72,24 +74,60 @@ export default function TubeUploadScreen() {
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
+  // Auto-fetch metadata when URL changes
+  const handleUrlChange = async (url: string) => {
+    setFormData(prev => ({ ...prev, youtubeUrl: url }));
+    const videoId = extractYoutubeId(url);
+    
+    if (videoId) {
+      setIsFetchingMeta(true);
+      // Set thumbnail immediately as fallback/first step
+      if (!thumbnailFile) {
+        setThumbnailPreview(`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`);
+        setIsAutoThumbnail(true);
+      }
+
+      try {
+        // Fetch Title via YouTube oEmbed (CORS allowed)
+        const response = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.title) {
+            setFormData(prev => ({ ...prev, title: data.title }));
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching YouTube metadata:", err);
+      } finally {
+        setIsFetchingMeta(false);
+      }
+    }
+  };
+
   const handleUpload = async () => {
     if (!user) return;
     if (!formData.title.trim()) {
       alert("Please enter a title");
       return;
     }
-    if (!formData.youtubeUrl.trim() || !extractYoutubeId(formData.youtubeUrl)) {
+    const videoId = extractYoutubeId(formData.youtubeUrl);
+    if (!formData.youtubeUrl.trim() || !videoId) {
       alert("Please enter a valid YouTube URL");
       return;
     }
-    if (!thumbnailFile) {
-      alert("Please upload a thumbnail image");
+    if (!thumbnailPreview) {
+      alert("Please provide a thumbnail (auto-fetched or manual)");
       return;
     }
 
     setIsUploading(true);
     try {
-      const thumbnailUrl = await uploadToImgBB(thumbnailFile);
+      let thumbnailUrl = thumbnailPreview;
+
+      // If user uploaded a custom file, we need to upload it to storage/imgbb
+      if (thumbnailFile) {
+        thumbnailUrl = await uploadToImgBB(thumbnailFile);
+      }
       
       const videoData = {
         userId: user.uid,
@@ -103,8 +141,7 @@ export default function TubeUploadScreen() {
         views: 0,
         likes: 0,
         createdAt: serverTimestamp(),
-        duration: formData.duration || '0:00',
-        tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean)
+        duration: formData.duration || '0:00'
       };
 
       await addDoc(collection(db, 'tube_videos'), videoData);
@@ -149,6 +186,11 @@ export default function TubeUploadScreen() {
                 <span className="text-xs opacity-60">High quality image for your video cover</span>
               </div>
             )}
+            {isAutoThumbnail && (
+              <div className="absolute top-2 right-2 bg-blue-500 text-white text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg">
+                Auto-Fetched
+              </div>
+            )}
             <input 
               type="file" 
               ref={thumbnailInputRef} 
@@ -162,24 +204,30 @@ export default function TubeUploadScreen() {
           <div className="space-y-4">
             {/* YouTube URL */}
             <div className="bg-[var(--bg-card)] rounded-2xl p-4 border border-[var(--border-color)]">
-              <div className="flex items-center gap-3 mb-2">
-                <Youtube size={20} className="text-red-500" />
-                <span className="text-sm font-bold">YouTube URL</span>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="flex items-center gap-3">
+                  <Youtube size={20} className="text-red-500" />
+                  <span className="text-sm font-bold">YouTube URL</span>
+                </div>
+                {isFetchingMeta && <Loader2 size={16} className="animate-spin text-blue-500" />}
               </div>
               <input 
                 type="text"
                 placeholder="https://www.youtube.com/watch?v=..."
                 value={formData.youtubeUrl}
-                onChange={(e) => setFormData({...formData, youtubeUrl: e.target.value})}
+                onChange={(e) => handleUrlChange(e.target.value)}
                 className="w-full bg-transparent text-[var(--text-primary)] focus:outline-none placeholder:text-[var(--text-secondary)]/40 font-medium"
               />
             </div>
 
             {/* Title */}
             <div className="bg-[var(--bg-card)] rounded-2xl p-4 border border-[var(--border-color)]">
-              <div className="flex items-center gap-3 mb-2">
-                <Type size={20} className="text-blue-500" />
-                <span className="text-sm font-bold">Video Title</span>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="flex items-center gap-3">
+                  <Type size={20} className="text-blue-500" />
+                  <span className="text-sm font-bold">Video Title</span>
+                </div>
+                {isFetchingMeta && <span className="text-[10px] font-black text-blue-500 uppercase animate-pulse">Auto-Fetching...</span>}
               </div>
               <input 
                 type="text"
@@ -234,21 +282,6 @@ export default function TubeUploadScreen() {
                   className="w-full bg-transparent text-[var(--text-primary)] focus:outline-none placeholder:text-[var(--text-secondary)]/40 font-medium"
                 />
               </div>
-            </div>
-
-            {/* Tags */}
-            <div className="bg-[var(--bg-card)] rounded-2xl p-4 border border-[var(--border-color)]">
-              <div className="flex items-center gap-3 mb-2">
-                <Hash size={20} className="text-pink-500" />
-                <span className="text-sm font-bold">Tags (comma separated)</span>
-              </div>
-              <input 
-                type="text"
-                placeholder="vlog, music, technology"
-                value={formData.tags}
-                onChange={(e) => setFormData({...formData, tags: e.target.value})}
-                className="w-full bg-transparent text-[var(--text-primary)] focus:outline-none placeholder:text-[var(--text-secondary)]/40 font-medium"
-              />
             </div>
           </div>
 
