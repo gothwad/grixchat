@@ -51,15 +51,35 @@ export const useConversations = (activeFilter: string) => {
         }
       }
 
-      const chatList = convDocs.map((conv: any) => {
+      const chatList = await Promise.all(convDocs.map(async (conv: any) => {
+        const isGroup = conv.type === 'group';
+        const unreadCount = conv[`unreadCount_${auth.currentUser?.uid}`] || 0;
+        
+        if (isGroup) {
+          return {
+            id: conv.id,
+            type: 'group',
+            user: conv.name || 'Unnamed Group',
+            username: 'Group',
+            fullName: conv.name || 'Unnamed Group',
+            lastMsg: conv.lastMessage,
+            time: toDate(conv.lastMessageTimestamp) ? formatTime(toDate(conv.lastMessageTimestamp)) : 'Recently',
+            avatar: conv.icon || `https://cdn-icons-png.flaticon.com/512/166/166258.png`,
+            unread: unreadCount > 0,
+            unreadCount,
+            isOnline: false,
+            otherUserId: conv.id // Use internal ID as the routing target
+          };
+        }
+
         const otherUserId = conv.participants.find((p: string) => p !== auth.currentUser?.uid);
         if (!otherUserId || otherUserId === 'gx-ai' || otherUserId === 'flow-ai' || otherUserId === 'grix-ai') return null;
 
         const userData = userMap.get(otherUserId);
-        const unreadCount = conv[`unreadCount_${auth.currentUser?.uid}`] || 0;
 
         return {
           id: conv.id,
+          type: 'direct',
           otherUserId,
           user: userData?.fullName || userData?.username || 'Unknown User',
           username: userData?.username || '',
@@ -71,9 +91,9 @@ export const useConversations = (activeFilter: string) => {
           unreadCount,
           isOnline: userData?.isOnline || false
         };
-      }).filter(Boolean);
+      }));
 
-      setConversations(chatList);
+      setConversations(chatList.filter(Boolean));
       setLoading(false);
     });
 

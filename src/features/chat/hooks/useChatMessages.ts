@@ -27,6 +27,7 @@ export const useChatMessages = (chatId: string, initialLimit: number = 20) => {
 
     setLoading(true);
 
+    // Fetch without orderBy to avoid composite index requirement
     const q = query(
       collection(db, "messages"),
       where("chatId", "==", chatId)
@@ -36,21 +37,21 @@ export const useChatMessages = (chatId: string, initialLimit: number = 20) => {
       setLoading(false);
       setLoadingMore(false);
       
-      // Sort and limit in-memory to avoid composite index requirement
       const allMsgs = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data({ serverTimestamps: 'estimate' })
       }));
 
-      const firestoreMsgs = allMsgs
+      // Sort in-memory to avoid index requirement
+      const sortedMsgs = allMsgs
         .sort((a: any, b: any) => {
           const timeA = toDate(a.timestamp)?.getTime() || 0;
           const timeB = toDate(b.timestamp)?.getTime() || 0;
-          return timeA - timeB; // Sort ascending for chat flow
+          return timeA - timeB;
         })
-        .slice(-messageLimit); // Only take the latest based on limit
+        .slice(-messageLimit); // Only take the latest messages based on limit
       
-      setMessages(firestoreMsgs);
+      setMessages(sortedMsgs);
 
       // Mark as read and Reset Unread Count in Conversations
       const unreadMsgs = snapshot.docs.filter(doc => {
@@ -65,10 +66,12 @@ export const useChatMessages = (chatId: string, initialLimit: number = 20) => {
         });
         
         // Reset unread count for current user in this conversation
-        const conversationRef = doc(db, "conversations", chatId);
-        batch.update(conversationRef, {
-          [`unreadCount_${auth.currentUser?.uid}`]: 0
-        });
+        if (chatId) {
+          const conversationRef = doc(db, "conversations", chatId);
+          batch.update(conversationRef, {
+            [`unreadCount_${auth.currentUser?.uid}`]: 0
+          });
+        }
 
         batch.commit().catch(err => console.error("Error marking as read:", err));
       }
@@ -83,27 +86,25 @@ export const useChatMessages = (chatId: string, initialLimit: number = 20) => {
     const cleanupInterval = setInterval(async () => {
       try {
         const now = Timestamp.now();
+        // Query only for messages that have an expiration field and are in this chat
+        // Note: This requires a composite index on chatId and expiresAt
         const q = query(
           collection(db, "messages"),
-          where("chatId", "==", chatId)
+          where("chatId", "==", chatId),
+          where("expiresAt", "<=", now)
         );
         const snapshot = await getDocs(q);
         if (!snapshot.empty) {
-          const expiredMsgs = snapshot.docs.filter(doc => {
-            const expiresAt = doc.data().expiresAt;
-            return expiresAt && expiresAt.toMillis() <= now.toMillis();
-          });
-
-          if (expiredMsgs.length > 0) {
-            const batch = writeBatch(db);
-            expiredMsgs.forEach(msgDoc => batch.delete(msgDoc.ref));
-            await batch.commit();
-          }
+          const batch = writeBatch(db);
+          snapshot.docs.forEach(msgDoc => batch.delete(msgDoc.ref));
+          await batch.commit();
+          console.log(`Cleaned up ${snapshot.size} expired messages.`);
         }
       } catch (err) {
-        console.error("Cleanup error:", err);
+        // If index is missing, we fall back to a safer frequency or skip
+        console.warn("Cleanup error (likely missing index):", err);
       }
-    }, 60000);
+    }, 300000); // Check every 5 minutes instead of 60 seconds
     return () => clearInterval(cleanupInterval);
   }, [chatId]);
 

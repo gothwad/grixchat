@@ -113,12 +113,16 @@ export default function ReelsScreen() {
                   playsInline
                 />
               ) : reel.youtubeId ? (
-                <iframe
-                  src={`https://www.youtube.com/embed/${reel.youtubeId}?autoplay=1&controls=0&loop=1&playlist=${reel.youtubeId}&modestbranding=1&rel=0&iv_load_policy=3&showinfo=0&mute=${muted ? 1 : 0}`}
-                  className="w-full h-full border-0 pointer-events-none scale-[1.3]"
-                  allow="autoplay; encrypted-media"
-                  title="Reel Video"
-                />
+                <div className="absolute inset-0 w-full h-full bg-black flex items-center justify-center overflow-hidden">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${reel.youtubeId}?autoplay=1&controls=0&loop=1&playlist=${reel.youtubeId}&modestbranding=1&rel=0&iv_load_policy=3&showinfo=0&mute=${muted ? 1 : 0}&playsinline=1`}
+                    className="absolute w-[100%] h-[100%] scale-[2.5] lg:scale-[1.8] border-0"
+                    allow="autoplay; encrypted-media; picture-in-picture"
+                    title="Reel Video"
+                  />
+                  {/* Invisible overlay to prevent interaction with YouTube UI while allowing scrolling */}
+                  <div className="absolute inset-0 z-10 bg-transparent" />
+                </div>
               ) : (
                 <img src={reel.cover} className="w-full h-full object-cover opacity-50 blur-sm" alt="Thumbnail" />
               )}

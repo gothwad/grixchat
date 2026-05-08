@@ -12,7 +12,8 @@ import {
   Loader2,
   Play,
   Pause,
-  RotateCcw
+  RotateCcw,
+  PictureInPicture
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../../services/firebase';
@@ -99,55 +100,88 @@ export default function ReelWatcherScreen() {
 
   // YouTube Initialize Player
   useEffect(() => {
-    if (!reel || !reel.youtubeId || !window.YT || playerRef.current) return;
+    if (!reel || !reel.youtubeId || playerRef.current) return;
+
+    let checkInterval: any;
 
     const initPlayer = () => {
-      playerRef.current = new window.YT.Player('youtube-player', {
-        videoId: reel.youtubeId,
-        playerVars: {
-          autoplay: 1,
-          controls: 0,
-          loop: 1,
-          modestbranding: 1,
-          rel: 0,
-          iv_load_policy: 3,
-          showinfo: 0,
-          mute: muted ? 1 : 0,
-          playsinline: 1
-        },
-        events: {
-          onReady: (event: any) => {
-            setPlayerReady(true);
-            setDuration(event.target.getDuration());
-            setIsPlaying(true);
-            event.target.playVideo();
+      if (!window.YT || !window.YT.Player) return false;
+      
+      try {
+        playerRef.current = new window.YT.Player('youtube-player', {
+          videoId: reel.youtubeId,
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            loop: 1,
+            modestbranding: 1,
+            rel: 0,
+            iv_load_policy: 3,
+            showinfo: 0,
+            mute: muted ? 1 : 0,
+            playsinline: 1,
+            enablejsapi: 1,
+            origin: window.location.origin
           },
-          onStateChange: (event: any) => {
-            if (event.data === window.YT.PlayerState.PLAYING) {
+          events: {
+            onReady: (event: any) => {
+              setPlayerReady(true);
+              setDuration(event.target.getDuration());
               setIsPlaying(true);
-            } else if (event.data === window.YT.PlayerState.PAUSED) {
-              setIsPlaying(false);
-            } else if (event.data === window.YT.PlayerState.ENDED) {
-              event.target.playVideo(); // Loop
+              event.target.playVideo();
+            },
+            onStateChange: (event: any) => {
+              if (event.data === window.YT.PlayerState.PLAYING) {
+                setIsPlaying(true);
+              } else if (event.data === window.YT.PlayerState.PAUSED) {
+                setIsPlaying(false);
+              } else if (event.data === window.YT.PlayerState.ENDED) {
+                event.target.playVideo(); // Loop
+              }
+            },
+            onError: (e: any) => {
+              console.error("YouTube Player Error:", e.data);
+              // Handle error (maybe show thumbnail)
             }
           }
-        }
-      });
+        });
+        return true;
+      } catch (err) {
+        console.error("Error creating YouTube player:", err);
+        return false;
+      }
     };
 
-    if (window.YT.Player) {
+    if (window.YT && window.YT.Player) {
       initPlayer();
     } else {
-      window.onYouTubeIframeAPIReady = initPlayer;
+      // Create a fallback global function
+      const previousOnReady = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        if (previousOnReady) previousOnReady();
+        initPlayer();
+      };
+      
+      // Also poll as a backup because onYouTubeIframeAPIReady might have already fired
+      checkInterval = setInterval(() => {
+        if (window.YT && window.YT.Player) {
+          if (initPlayer()) {
+            clearInterval(checkInterval);
+          }
+        }
+      }, 500);
     }
 
     return () => {
+      if (checkInterval) clearInterval(checkInterval);
       if (playerRef.current) {
-        playerRef.current.destroy();
+        try {
+          playerRef.current.destroy();
+        } catch (e) {}
         playerRef.current = null;
       }
     };
-  }, [reel, muted]);
+  }, [reel?.id, reel?.youtubeId, muted]);
 
   // YouTube Progress Tracking
   useEffect(() => {
@@ -195,6 +229,19 @@ export default function ReelWatcherScreen() {
       playerRef.current.unMute();
     } else {
       playerRef.current.mute();
+    }
+  };
+  
+  const togglePip = async () => {
+    try {
+      if (!nativeVideoRef.current) return;
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        await nativeVideoRef.current.requestPictureInPicture();
+      }
+    } catch (error) {
+      console.error("PiP Error:", error);
     }
   };
 
@@ -402,6 +449,17 @@ export default function ReelWatcherScreen() {
             >
               <RotateCcw size={20} />
             </button>
+
+            {/* PiP (Only for native video) */}
+            {reel.videoUrl && (
+              <button 
+                onClick={togglePip}
+                className="p-2.5 text-[var(--header-text)]/60 hover:text-[var(--header-text)] transition-all"
+                title="Picture in Picture"
+              >
+                <PictureInPicture size={20} />
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-1">

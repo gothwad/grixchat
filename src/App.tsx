@@ -90,6 +90,9 @@ const BlockedAccountsScreen = React.lazy(() => import('./features/settings/Block
 const LanguageSettingsScreen = React.lazy(() => import('./features/settings/LanguageSettingsScreen'));
 const MutedAccountsScreen = React.lazy(() => import('./features/settings/MutedAccountsScreen'));
 const AccessibilitySettingsScreen = React.lazy(() => import('./features/settings/AccessibilitySettingsScreen'));
+const AnalyticsScreen = React.lazy(() => import('./features/analytics/AnalyticsScreen'));
+const NewGroupScreen = React.lazy(() => import('./features/chat/NewGroupScreen'));
+const GroupSettingsScreen = React.lazy(() => import('./features/chat/GroupSettingsScreen'));
 
 const LoginScreen = React.lazy(() => import('./features/auth').then(m => ({ default: m.LoginScreen })));
 const SignupScreen = React.lazy(() => import('./features/auth').then(m => ({ default: m.SignupScreen })));
@@ -320,8 +323,10 @@ export default function App() {
                     <Route path="/language-settings" element={user ? <LanguageSettingsScreen /> : <Navigate to="/login" />} />
                     <Route path="/muted-accounts" element={user ? <MutedAccountsScreen /> : <Navigate to="/login" />} />
                     <Route path="/accessibility-settings" element={user ? <AccessibilitySettingsScreen /> : <Navigate to="/login" />} />
+                    <Route path="/analytics" element={user ? <AnalyticsScreen /> : <Navigate to="/login" />} />
+                    <Route path="/new-group" element={user ? <NewGroupScreen /> : <Navigate to="/login" />} />
+                    <Route path="/group-settings/:id" element={user ? <GroupSettingsScreen /> : <Navigate to="/login" />} />
                     <Route path="/login" element={!user ? <LoginScreen /> : <Navigate to="/" />} />
-                    <Route path="/signup" element={!user ? <SignupScreen /> : <Navigate to="/" />} />
                     <Route path="/forgot-password" element={!user ? <ForgotPasswordScreen /> : <Navigate to="/" />} />
                     <Route path="/privacy-policy" element={<PrivacyPolicyScreen />} />
                     <Route path="/terms" element={<TermsAndConditionsScreen />} />

@@ -2,7 +2,7 @@ import React from 'react';
 import { auth } from '../../services/firebase.ts';
 import { useSearch } from '../../contexts/SearchContext.tsx';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, Phone, Video, ArrowUpRight, ArrowDownLeft, PhoneMissed, Info, Lock } from 'lucide-react';
+import { MessageCircle, Phone, Video, ArrowUpRight, ArrowDownLeft, PhoneMissed, Info, Lock, Users } from 'lucide-react';
 import { useLayout } from '../../contexts/LayoutContext.tsx';
 import { motion } from 'motion/react';
 import { useConversations } from './hooks/useConversations.ts';
@@ -178,7 +178,7 @@ export default function ChatsTab() {
                     <div className="relative shrink-0">
                       <img 
                         src={chat.avatar} 
-                        className="w-[52px] h-[52px] rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform"
+                        className="w-[52px] h-[52px] object-cover shadow-sm group-hover:scale-105 transition-transform rounded-full"
                         referrerPolicy="no-referrer"
                       />
                       {chat.isOnline && (

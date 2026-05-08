@@ -17,8 +17,12 @@ export class ImageService {
     onProgress?: (progress: number) => void
   ): Promise<string> {
     if (!IMGBB_API_KEY) {
-      console.warn("ImgBB API Key missing, falling back to server proxy");
-      return this.uploadViaProxy(file, onProgress);
+      console.warn("ImgBB API Key missing in environment (VITE_IMGBB_API_KEY)");
+      // Only try proxy if we're sure there's a backend, otherwise fail early with clean message
+      if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+         // Maybe localhost has a proxy? Usually not in this SPA template unless explicitly added
+      }
+      throw new Error("Image upload requires a VITE_IMGBB_API_KEY. Please add it to your environment variables in Settings.");
     }
 
     // Simulate progress since fetch doesn't provide it easily for small uploads

@@ -72,7 +72,7 @@ export default function TabHeader() {
   }, []);
 
   const menuOptions = [
-    { label: 'New group', icon: Users },
+    { label: 'New group', icon: Users, path: '/new-group' },
     { label: 'New broadcast', icon: UserPlus },
     { label: 'Linked devices', icon: Laptop },
     { label: 'Starred messages', icon: Star },
@@ -111,8 +111,6 @@ export default function TabHeader() {
           </button>
         )}
 
-
-
         {/* Search Icon - Show on Chats, Hub, and Tube */}
         {(isChatsPage || isHubPage || isTubePage) && (
           <button 
@@ -145,7 +143,10 @@ export default function TabHeader() {
 
         {/* Analytics Icon - Show on Profile (Left of Settings) */}
         {isProfilePage && (
-          <button className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group">
+          <button 
+            onClick={() => navigate('/analytics')}
+            className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group"
+          >
             <BarChart2 size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
           </button>
         )}
@@ -165,7 +166,7 @@ export default function TabHeader() {
           <div className="relative" ref={menuRef}>
             <button 
               onClick={() => setShowMenu(!showMenu)}
-              className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+              className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer"
             >
               <MoreVertical size={22} className="text-[var(--header-text)]" />
             </button>

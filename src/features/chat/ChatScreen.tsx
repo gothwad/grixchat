@@ -40,7 +40,8 @@ import {
   updateDoc,
   arrayUnion,
   arrayRemove,
-  serverTimestamp
+  serverTimestamp,
+  getDoc
 } from 'firebase/firestore';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -55,6 +56,7 @@ export default function ChatScreen() {
   const location = useLocation();
   
   const [receiver, setReceiver] = useState<any>(null);
+  const [convType, setConvType] = useState<'direct' | 'group'>('direct');
   const [showOptions, setShowOptions] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -88,9 +90,50 @@ export default function ChatScreen() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const chatId = [auth.currentUser?.uid, receiverId].sort().join('_');
+  // Determine chatId based on whether receiverId is a group ID or user UID
+  // Direct chats use sorted UIDs, groups use the convId directly
+  const [chatId, setChatId] = useState<string>('');
 
-  // Hooks
+  useEffect(() => {
+    if (!receiverId || !auth.currentUser) {
+      setChatId('');
+      return;
+    }
+    
+    // For now, let's assume if it contains an underscore, it's a direct chat being accessed directly,
+    // but better: check the conversations collection or users collection.
+    // Simplifying for this architecture: groups are doc IDs from conversations.
+    // Direct chats are always uid1_uid2.
+    const checkId = async () => {
+      if (!receiverId || !auth.currentUser) return;
+      
+      const rId = receiverId;
+      if (rId === 'gx-ai' || rId === 'grix-ai') {
+        const id = [auth.currentUser?.uid, 'gx-ai'].sort().join('_');
+        setChatId(id);
+        setConvType('direct');
+        return;
+      }
+
+      // Check if receiverId is a user UID or group ID
+      try {
+        const userSnap = await getDoc(doc(db, "users", rId));
+        if (userSnap.exists()) {
+          const id = [auth.currentUser?.uid, rId].sort().join('_');
+          setChatId(id);
+          setConvType('direct');
+        } else {
+          setChatId(rId);
+          setConvType('group');
+        }
+      } catch (err) {
+        console.error("Error checking ID type:", err);
+      }
+    };
+    checkId();
+  }, [receiverId, auth.currentUser?.uid]);
+
+  // Hooks (using chatId from state)
   const { 
     messages, 
     loading, 
@@ -147,39 +190,58 @@ export default function ChatScreen() {
   }, []);
 
   useEffect(() => {
-    if (receiverId === 'gx-ai' || receiverId === 'flow-ai' || receiverId === 'grix-ai') {
-      navigate('/chat/grix-ai', { replace: true });
-      return;
-    }
     if (!receiverId || !auth.currentUser) return;
 
-    const cachedReceiver = CacheService.getUser(receiverId);
-    if (cachedReceiver) setReceiver(cachedReceiver);
+    if (convType === 'direct' && receiverId && receiverId.trim() !== "") {
+      const cachedReceiver = CacheService.getUser(receiverId);
+      if (cachedReceiver) setReceiver(cachedReceiver);
 
-    const receiverUnsubscribe = onSnapshot(doc(db, "users", receiverId), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setReceiver(data);
-        CacheService.saveUser(receiverId, data);
-      }
-    });
+      const userDocRef = doc(db, "users", receiverId);
+      const receiverUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setReceiver(data);
+          CacheService.saveUser(receiverId, data);
+        }
+      });
 
-    const statusRef = rtdbRef(rtdb, `/status/${receiverId}`);
-    const statusUnsubscribe = onValue(statusRef, (snapshot) => {
-      const val = snapshot.val();
-      if (val) {
-        setReceiverStatus(val.state);
-        setReceiverActiveChatId(val.activeChatId || null);
-        setReceiverLastSeen(val.last_changed || null);
-      } else {
-        setReceiverStatus('offline');
-        setReceiverActiveChatId(null);
-        setReceiverLastSeen(null);
-      }
-    });
+      const statusRef = rtdbRef(rtdb, `/status/${receiverId}`);
+      const statusUnsubscribe = onValue(statusRef, (snapshot) => {
+        const val = snapshot.val();
+        if (val) {
+          setReceiverStatus(val.state);
+          setReceiverActiveChatId(val.activeChatId || null);
+          setReceiverLastSeen(val.last_changed || null);
+        } else {
+          setReceiverStatus('offline');
+          setReceiverActiveChatId(null);
+          setReceiverLastSeen(null);
+        }
+      });
+      return () => {
+        receiverUnsubscribe();
+        statusUnsubscribe();
+      };
+    } else if (receiverId && receiverId.trim() !== "") {
+      const groupDocRef = doc(db, "conversations", receiverId);
+      const groupUnsubscribe = onSnapshot(groupDocRef, (snap) => {
+        if (snap.exists()) {
+          setReceiver(snap.data());
+        }
+      });
+      return () => groupUnsubscribe();
+    }
+  }, [receiverId, convType]);
+
+  // Other side effects...
+  useEffect(() => {
+    if (!receiverId || !auth.currentUser) return;
 
     // Fetch chat settings for current user's preferences for this receiver
-    const settingsUnsubscribe = onSnapshot(doc(db, "users", auth.currentUser.uid, "chatSettings", receiverId), (snap) => {
+    if (!receiverId || !auth.currentUser) return;
+
+    const chatSettingsRef = doc(db, "users", auth.currentUser.uid, "chatSettings", receiverId);
+    const settingsUnsubscribe = onSnapshot(chatSettingsRef, (snap) => {
       if (snap.exists()) {
         setChatSettings(snap.data());
       } else {
@@ -200,8 +262,6 @@ export default function ChatScreen() {
     }
 
     return () => {
-      receiverUnsubscribe();
-      statusUnsubscribe();
       settingsUnsubscribe();
       userUnsubscribe();
       if (auth.currentUser) {
@@ -213,7 +273,9 @@ export default function ChatScreen() {
 
   // Watch Together Sync Effect
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "conversations", chatId), (snap) => {
+    if (!chatId || chatId.trim() === "") return;
+    const chatRef = doc(db, "conversations", chatId);
+    const unsub = onSnapshot(chatRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setWatchData(data);
@@ -226,7 +288,7 @@ export default function ChatScreen() {
   }, [chatId]);
 
   const updateWatchState = async (updates: any) => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || !chatId) return;
     try {
       const chatRef = doc(db, "conversations", chatId);
       const newState: any = {
@@ -244,6 +306,7 @@ export default function ChatScreen() {
   };
 
   const toggleWatchMode = async () => {
+    if (!chatId) return;
     const newMode = !isWatchMode;
     setIsWatchMode(newMode);
     try {
@@ -435,6 +498,7 @@ export default function ChatScreen() {
         receiverActiveChatId={receiverActiveChatId}
         currentUserId={auth.currentUser?.uid}
         onWatchTogether={toggleWatchMode}
+        type={convType}
       />
 
       <AnimatePresence>
@@ -557,6 +621,12 @@ export default function ChatScreen() {
                           : 'bg-[var(--bubble-other)] text-[var(--bubble-text-other)]'
                       }`}
                     >
+                      {/* Group Sender Name */}
+                      {convType === 'group' && !isMe && !isSameSender && (
+                        <p className="text-[10px] font-black text-rose-500 mb-0.5 uppercase tracking-widest leading-none">
+                          {msg.senderName || 'User'}
+                        </p>
+                      )}
                       {/* Reaction Picker on Click */}
                       {showReactionPicker?.id === msg.id && (
                         <ChatMessageReactions 

@@ -57,12 +57,15 @@ export default function ChatHeader({
   isTyping,
   receiverStatus,
   receiverActiveChatId,
-  currentUserId
-}: ChatHeaderProps) {
+  currentUserId,
+  type = 'direct'
+}: ChatHeaderProps & { type?: 'direct' | 'group' }) {
   const navigate = useNavigate();
   const isOnline = receiverStatus === 'online';
+  const isGroup = type === 'group';
 
   const getStatusText = () => {
+    if (isGroup) return 'tap here for group info';
     if (isTyping) return 'online - typing';
     if (!isOnline) return formatLastSeen(receiver?.lastSeen);
     
@@ -76,9 +79,18 @@ export default function ChatHeader({
   };
   
   const startCall = (callType: 'voice' | 'video') => {
-    // Generate a unique session ID for this specific call attempt
     const sessionCallId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     navigate(`/call/${receiverId}?type=${callType}&callId=${sessionCallId}`);
+  };
+
+  const handleHeaderClick = () => {
+    if (receiverId === 'gx-ai') {
+      navigate('/profile/gx-ai');
+    } else if (isGroup) {
+      navigate(`/group-settings/${receiverId}`);
+    } else {
+      navigate(`/chat/${receiverId}/settings`);
+    }
   };
   
   return (
@@ -89,30 +101,30 @@ export default function ChatHeader({
         </button>
         <div 
           className="flex items-center gap-2 cursor-pointer min-w-0" 
-          onClick={() => receiverId === 'gx-ai' ? navigate('/profile/gx-ai') : navigate(`/chat/${receiverId}/settings`)}
+          onClick={handleHeaderClick}
         >
           <div className="relative shrink-0">
             <img 
-              src={receiverId === 'gx-ai' ? '/assets/favicon.png' : (receiver?.photoURL || `https://cdn-icons-png.flaticon.com/512/149/149071.png`)} 
+              src={receiverId === 'gx-ai' || receiverId === 'grix-ai' ? '/assets/favicon.png' : (receiver?.photoURL || receiver?.icon || `https://cdn-icons-png.flaticon.com/512/149/149071.png`)} 
               className="w-9 h-9 rounded-full object-cover border border-[var(--border-color)] shadow-sm"
               referrerPolicy="no-referrer"
             />
-            {(isOnline || receiverId === 'gx-ai') && (
+            {(isOnline || receiverId === 'gx-ai') && !isGroup && (
               <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-[var(--header-bg)] rounded-full"></div>
             )}
           </div>
           <div className="flex flex-col min-w-0">
             <h2 className="text-[14px] font-bold text-[var(--header-text)] leading-tight truncate">
-              {receiverId === 'gx-ai' || receiverId === 'flow-ai' || receiverId === 'grix-ai' ? 'Grix AI' : (receiver?.fullName || 'GrixChat User')}
+              {isGroup ? (receiver?.name || 'Group') : (receiverId === 'gx-ai' || receiverId === 'flow-ai' || receiverId === 'grix-ai' ? 'Grix AI' : (receiver?.fullName || 'GrixChat User'))}
             </h2>
             <span className="text-[10px] text-[var(--header-text)] opacity-80 font-medium truncate">
-              {receiverId === 'gx-ai' ? 'online' : getStatusText()}
+              {getStatusText()}
             </span>
           </div>
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        {receiverId !== 'gx-ai' && (
+        {receiverId !== 'gx-ai' && !isGroup && (
           <>
             <button 
               onClick={() => startCall('video')}
