@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, orderBy, limit, getDocs, where, doc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../../services/firebase.ts';
-import { Search, X, ArrowLeft, UserPlus, Check, Loader2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Search, X, ArrowLeft, Loader2, Play, Clapperboard, Users } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface UserProfile {
   uid: string;
@@ -12,6 +12,8 @@ interface UserProfile {
   photoURL: string;
   isOnline?: boolean;
 }
+
+type SearchTab = 'users' | 'videos' | 'reels';
 
 const UserItem = ({ 
   user, 
@@ -25,7 +27,6 @@ const UserItem = ({
   isFollowing: boolean;
   onToggleFollow: (userId: string, isFollowing: boolean) => void;
   followLoading: boolean;
-  key?: any;
 }) => (
   <div 
     onClick={() => navigate(`/user/${user.uid}`)}
@@ -69,58 +70,76 @@ const UserItem = ({
   </div>
 );
 
+const VideoGridItem = ({ video, onClick }: { video: any, onClick: () => void }) => (
+  <div onClick={onClick} className="relative aspect-video bg-black rounded-xl overflow-hidden shadow-md group cursor-pointer border border-[var(--border-color)]/20">
+    <img src={video.thumbnail} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt={video.title} />
+    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-3">
+      <h4 className="text-[11px] font-bold text-white line-clamp-1">{video.title}</h4>
+      <p className="text-[9px] text-white/70 line-clamp-1">{video.userName}</p>
+    </div>
+    <div className="absolute top-2 right-2 px-1 py-0.5 bg-black/60 text-white text-[9px] font-bold rounded">
+      {video.duration || '0:00'}
+    </div>
+    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+        <Play className="text-white fill-current" size={20} />
+      </div>
+    </div>
+  </div>
+);
+
+const ReelGridItem = ({ reel, onClick }: { reel: any, onClick: () => void }) => (
+  <div onClick={onClick} className="relative aspect-[9/16] bg-black rounded-xl overflow-hidden shadow-md group cursor-pointer border border-[var(--border-color)]/20">
+    <img src={reel.videoUrl} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt={reel.caption} />
+    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-2">
+      <div className="flex items-center gap-1.5 overflow-hidden">
+        <Play size={10} className="text-white fill-current" />
+        <span className="text-[10px] font-bold text-white truncate">{reel.likes || 0}</span>
+      </div>
+    </div>
+  </div>
+);
+
 export default function SearchUserScreen() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
-  const [newUsers, setNewUsers] = useState<UserProfile[]>([]);
-  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+  const [activeTab, setActiveTab] = useState<SearchTab>('users');
   const [loading, setLoading] = useState(true);
+  
+  const [userResults, setUserResults] = useState<UserProfile[]>([]);
+  const [videoResults, setVideoResults] = useState<any[]>([]);
+  const [reelResults, setReelResults] = useState<any[]>([]);
+  
+  const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [followLoadingId, setFollowLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!auth.currentUser) return;
 
-    // Listen to current user's following list
     const unsub = onSnapshot(doc(db, 'users', auth.currentUser.uid), (snap) => {
       if (snap.exists()) {
         setFollowingIds(snap.data().following || []);
       }
     });
 
-    fetchInitialUsers();
+    fetchInitialData();
     return () => unsub();
   }, []);
 
-  const fetchInitialUsers = async () => {
+  const fetchInitialData = async () => {
     try {
       setLoading(true);
-      // Fetch New Users (New on GrixChat)
-      const newUsersQuery = query(
-        collection(db, 'users'),
-        orderBy('createdAt', 'desc'),
-        limit(10)
-      );
-      const newUsersSnap = await getDocs(newUsersQuery);
-      const newUsersList = newUsersSnap.docs
-        .map(doc => doc.data() as UserProfile)
-        .filter(u => u.uid !== auth.currentUser?.uid);
-      setNewUsers(newUsersList);
+      const usersSnap = await getDocs(query(collection(db, 'users'), limit(15)));
+      setSuggestedUsers(usersSnap.docs.map(doc => doc.data() as UserProfile).filter(u => u.uid !== auth.currentUser?.uid));
 
-      // Fetch Suggested Users
-      const suggestedQuery = query(
-        collection(db, 'users'),
-        limit(20)
-      );
-      const suggestedSnap = await getDocs(suggestedQuery);
-      const suggestedList = suggestedSnap.docs
-        .map(doc => doc.data() as UserProfile)
-        .filter(u => u.uid !== auth.currentUser?.uid)
-        .slice(0, 10);
-      setSuggestedUsers(suggestedList);
+      const videosSnap = await getDocs(query(collection(db, 'tube_videos'), orderBy('createdAt', 'desc'), limit(12)));
+      setVideoResults(videosSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+      const reelsSnap = await getDocs(query(collection(db, 'reels'), orderBy('createdAt', 'desc'), limit(12)));
+      setReelResults(reelsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('Error fetching discovery data:', error);
     } finally {
       setLoading(false);
     }
@@ -131,157 +150,133 @@ export default function SearchUserScreen() {
       if (searchTerm.trim()) {
         handleSearch();
       } else {
-        setSearchResults([]);
+        fetchInitialData();
       }
     }, 300);
-
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
+  }, [searchTerm, activeTab]);
 
   const handleSearch = async () => {
+    const term = searchTerm.toLowerCase();
+    setLoading(true);
     try {
-      const q = query(
-        collection(db, 'users'),
-        where('username', '>=', searchTerm.toLowerCase()),
-        where('username', '<=', searchTerm.toLowerCase() + '\uf8ff'),
-        limit(20)
-      );
-      const snap = await getDocs(q);
-      const results = snap.docs
-        .map(doc => doc.data() as UserProfile)
-        .filter(u => u.uid !== auth.currentUser?.uid);
-      setSearchResults(results);
+      if (activeTab === 'users') {
+        const q = query(collection(db, 'users'), where('username', '>=', term), where('username', '<=', term + '\uf8ff'), limit(20));
+        const snap = await getDocs(q);
+        setUserResults(snap.docs.map(doc => doc.data() as UserProfile).filter(u => u.uid !== auth.currentUser?.uid));
+      } else if (activeTab === 'videos') {
+        const q = query(collection(db, 'tube_videos'), where('title', '>=', searchTerm), where('title', '<=', searchTerm + '\uf8ff'), limit(20));
+        const snap = await getDocs(q);
+        setVideoResults(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }
     } catch (error) {
-      console.error('Error searching users:', error);
+      console.error('Error searching:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleToggleFollow = async (targetUserId: string, currentlyFollowing: boolean) => {
     if (!auth.currentUser || followLoadingId) return;
     setFollowLoadingId(targetUserId);
-
     try {
-      const myDocRef = doc(db, 'users', auth.currentUser.uid);
-      const targetDocRef = doc(db, 'users', targetUserId);
-
-      await updateDoc(myDocRef, {
-        following: currentlyFollowing ? arrayRemove(targetUserId) : arrayUnion(targetUserId)
-      });
-
-      await updateDoc(targetDocRef, {
-        followers: currentlyFollowing ? arrayRemove(auth.currentUser.uid) : arrayUnion(auth.currentUser.uid)
-      });
-    } catch (error) {
-      console.error('Error toggling follow:', error);
-    } finally {
-      setFollowLoadingId(null);
-    }
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), { following: currentlyFollowing ? arrayRemove(targetUserId) : arrayUnion(targetUserId) });
+      await updateDoc(doc(db, 'users', targetUserId), { followers: currentlyFollowing ? arrayRemove(auth.currentUser.uid) : arrayUnion(auth.currentUser.uid) });
+    } catch (error) { console.error('Error following:', error); } finally { setFollowLoadingId(null); }
   };
 
   return (
-    <div className="h-full flex flex-col bg-[var(--bg-card)] overflow-hidden">
-      {/* Search Header */}
-      <div className="bg-[var(--header-bg)] px-4 h-14 flex items-center gap-3 z-50 shrink-0 border-b border-[var(--border-color)] shadow-sm rounded-b-2xl">
-        <button 
-          onClick={() => navigate(-1)}
-          className="p-2 hover:bg-white/10 rounded-full transition-colors text-[var(--header-text)]"
-        >
-          <ArrowLeft size={22} />
-        </button>
-        
-        <div className="flex-1 relative">
-          <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-            <Search size={18} className="text-[var(--header-text)] opacity-60" />
+    <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden font-sans">
+      <div className="bg-[var(--bg-card)] px-4 pt-4 pb-2 z-50 shrink-0 border-b border-[var(--border-color)]">
+        <div className="flex items-center gap-3 mb-4">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-black/5 rounded-full transition-colors text-[var(--text-primary)]">
+            <ArrowLeft size={22} />
+          </button>
+          <div className="flex-1 relative">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-60" />
+            <input 
+              type="text" placeholder={`Search ${activeTab}...`} value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl py-2.5 pl-10 pr-4 text-sm text-[var(--text-primary)] focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+            />
+            {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]"><X size={18} /></button>}
           </div>
-          <input 
-            type="text"
-            placeholder="Search users..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            autoFocus
-            className="w-full bg-white/10 border-none rounded-xl py-2 pl-10 pr-4 text-sm text-[var(--header-text)] placeholder:text-[var(--header-text)]/50 focus:ring-2 focus:ring-white/20 transition-all outline-none"
-          />
-          {searchTerm && (
-            <button 
-              onClick={() => setSearchTerm('')}
-              className="absolute inset-y-0 right-3 flex items-center text-[var(--header-text)] opacity-60"
-            >
-              <X size={18} />
-            </button>
-          )}
         </div>
 
-        <button 
-          onClick={() => navigate(-1)}
-          className="text-sm font-bold text-[var(--header-text)] px-2"
-        >
-          Cancel
-        </button>
+        <div className="flex items-center gap-1">
+          {(['users', 'videos', 'reels'] as SearchTab[]).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-2 transition-all relative group`}
+            >
+              <div className={`p-1.5 rounded-lg transition-colors ${activeTab === tab ? 'bg-blue-500/10 text-blue-500' : 'text-[var(--text-secondary)] group-hover:bg-black/5'}`}>
+                {tab === 'users' && <Users size={18} />}
+                {tab === 'videos' && <Play size={18} />}
+                {tab === 'reels' && <Clapperboard size={18} />}
+              </div>
+              <span className={`text-[10px] font-black uppercase tracking-widest ${activeTab === tab ? 'text-blue-500' : 'text-[var(--text-secondary)]/60'}`}>
+                {tab}
+              </span>
+              {activeTab === tab && <motion.div layoutId="searchTab" className="absolute bottom-[-8px] left-0 right-0 h-0.5 bg-blue-500" />}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto no-scrollbar">
-        {loading ? (
+        {loading && !searchTerm ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <div className="w-8 h-8 border-4 border-[var(--primary)]/20 border-t-[var(--primary)] rounded-full animate-spin" />
-            <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">Loading Users...</p>
-          </div>
-        ) : searchTerm ? (
-          <div className="flex flex-col">
-            <div className="px-4 py-3 bg-[var(--bg-main)]/50">
-              <h3 className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-widest">Search Results</h3>
-            </div>
-            {searchResults.length > 0 ? (
-              searchResults.map(user => (
-                <UserItem 
-                  key={user.uid} 
-                  user={user} 
-                  navigate={navigate} 
-                  isFollowing={followingIds.includes(user.uid)}
-                  onToggleFollow={handleToggleFollow}
-                  followLoading={followLoadingId === user.uid}
-                />
-              ))
-            ) : (
-              <div className="py-20 text-center">
-                <p className="text-sm text-[var(--text-secondary)] font-medium">No users found for "{searchTerm}"</p>
-              </div>
-            )}
+            <Loader2 className="animate-spin text-blue-500" size={32} />
+            <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em]">Searching Paradise...</p>
           </div>
         ) : (
-          <div className="flex flex-col">
-            {/* Suggested For You */}
-            <div className="px-4 py-3 bg-[var(--bg-main)]/50 flex justify-between items-center">
-              <h3 className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-widest">Suggested For You</h3>
-            </div>
-            <div className="flex flex-col divide-y divide-[var(--border-color)]/30">
-              {suggestedUsers.map(user => (
-                <UserItem 
-                  key={user.uid} 
-                  user={user} 
-                  navigate={navigate} 
-                  isFollowing={followingIds.includes(user.uid)}
-                  onToggleFollow={handleToggleFollow}
-                  followLoading={followLoadingId === user.uid}
-                />
-              ))}
-            </div>
+          <div className="p-4">
+            {activeTab === 'users' && (
+              <div className="space-y-1 flex flex-col">
+                <h3 className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-3 px-4">
+                  {searchTerm ? 'Search Results' : 'Suggested For You'}
+                </h3>
+                {(searchTerm ? userResults : suggestedUsers).map(user => (
+                  <UserItem 
+                    key={user.uid} user={user} navigate={navigate} 
+                    isFollowing={followingIds.includes(user.uid)}
+                    onToggleFollow={handleToggleFollow}
+                    followLoading={followLoadingId === user.uid}
+                  />
+                ))}
+              </div>
+            )}
 
-            {/* New on GrixChat */}
-            <div className="px-4 py-3 bg-[var(--bg-main)]/50 mt-4">
-              <h3 className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-widest">New on GrixChat</h3>
-            </div>
-            <div className="flex flex-col divide-y divide-[var(--border-color)]/30">
-              {newUsers.map(user => (
-                <UserItem 
-                  key={user.uid} 
-                  user={user} 
-                  navigate={navigate} 
-                  isFollowing={followingIds.includes(user.uid)}
-                  onToggleFollow={handleToggleFollow}
-                  followLoading={followLoadingId === user.uid}
-                />
-              ))}
-            </div>
+            {activeTab === 'videos' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="col-span-full">
+                  <h3 className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-3">
+                    {searchTerm ? `Results for "${searchTerm}"` : 'Trending on GrixTube'}
+                  </h3>
+                </div>
+                {videoResults.map(video => (
+                  <VideoGridItem 
+                    key={video.id} video={video} 
+                    onClick={() => navigate(`/tube/watch/${video.id}`)} 
+                  />
+                ))}
+              </div>
+            )}
+
+            {activeTab === 'reels' && (
+              <div className="space-y-4">
+                <h3 className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em]">Discover Reels</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {reelResults.map(reel => (
+                    <ReelGridItem 
+                      key={reel.id} reel={reel} 
+                      onClick={() => navigate(`/reels/watch/${reel.id}`)} 
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

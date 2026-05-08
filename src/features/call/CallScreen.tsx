@@ -55,6 +55,7 @@ export default function CallScreen() {
   const pc = useRef<RTCPeerConnection>(new RTCPeerConnection(servers));
   const localStream = useRef<MediaStream | null>(null);
   const remoteStream = useRef<MediaStream | null>(null);
+  const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -134,7 +135,7 @@ export default function CallScreen() {
       if (isReceiver) {
         await handleIncomingCall();
       } else {
-        await startCall();
+        await startNewCall();
       }
 
       // 5. Global Listener for Call Document
@@ -161,7 +162,30 @@ export default function CallScreen() {
     };
   }, [otherUserId, isReceiver, type, callId]);
 
-  const startCall = async () => {
+  const addMessageToChat = async (status: 'started' | 'ended' | 'missed') => {
+    if (!auth.currentUser || !otherUserId) return;
+    const chatId = [auth.currentUser.uid, otherUserId].sort().join('_');
+    try {
+      const text = status === 'started' ? `📞 Started a ${type} call` : 
+                   status === 'missed' ? `📥 Missed ${type} call` : 
+                   `🏁 ${type.charAt(0).toUpperCase() + type.slice(1)} call ended`;
+      
+      await addDoc(collection(db, "messages"), {
+        chatId,
+        senderId: auth.currentUser.uid,
+        receiverId: otherUserId,
+        text,
+        timestamp: serverTimestamp(),
+        isRead: false,
+        type: 'system',
+        callId: callId
+      });
+    } catch (e) {
+      console.warn("Error adding call message:", e);
+    }
+  };
+
+  const startNewCall = async () => {
     setCallStatus('ringing');
     const callDoc = doc(db, "calls", callId);
     const offerCandidates = collection(callDoc, "offerCandidates");
@@ -194,23 +218,38 @@ export default function CallScreen() {
       const data = snapshot.data();
       if (!pc.current.currentRemoteDescription && data?.answer) {
         const answerDescription = new RTCSessionDescription(data.answer);
-        pc.current.setRemoteDescription(answerDescription);
+        pc.current.setRemoteDescription(answerDescription).then(() => {
+          // Add any pending candidates
+          pendingCandidates.current.forEach(candidate => {
+            pc.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error("Error adding queued ice candidate:", e));
+          });
+          pendingCandidates.current = [];
+        });
       }
     });
 
     onSnapshot(answerCandidates, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
-          const candidate = new RTCIceCandidate(change.doc.data());
-          pc.current.addIceCandidate(candidate).catch(e => console.error("Error adding ice candidate:", e));
+          const candidate = change.doc.data() as RTCIceCandidateInit;
+          if (pc.current.currentRemoteDescription) {
+            pc.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error("Error adding ice candidate:", e));
+          } else {
+            pendingCandidates.current.push(candidate);
+          }
         }
       });
     });
 
     // Auto-hangup after 60 seconds if not answered
-    setTimeout(() => {
+    setTimeout(async () => {
       if (pc.current.iceConnectionState !== 'connected') {
-        endCall();
+        const snap = await getDoc(callDoc);
+        if (snap.exists() && snap.data().status === 'ringing') {
+          await updateDoc(callDoc, { status: 'ended', isMissed: true });
+          await addMessageToChat('missed');
+        }
+        endCallLocally();
       }
     }, 60000);
   };
@@ -247,12 +286,17 @@ export default function CallScreen() {
     };
 
     await updateDoc(callDoc, { answer, status: 'accepted' });
+    await addMessageToChat('started');
 
     onSnapshot(offerCandidates, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
-          const data = change.doc.data();
-          pc.current.addIceCandidate(new RTCIceCandidate(data)).catch(e => console.error("Error adding ice candidate:", e));
+          const data = change.doc.data() as RTCIceCandidateInit;
+          if (pc.current.currentRemoteDescription) {
+            pc.current.addIceCandidate(new RTCIceCandidate(data)).catch(e => console.error("Error adding ice candidate:", e));
+          } else {
+            pendingCandidates.current.push(data);
+          }
         }
       });
     });
@@ -261,6 +305,7 @@ export default function CallScreen() {
   const endCall = async () => {
     try {
       await updateDoc(doc(db, "calls", callId), { status: 'ended' });
+      await addMessageToChat('ended');
     } catch (e) {
       console.warn("Error updating call status to ended:", e);
     }

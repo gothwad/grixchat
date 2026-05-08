@@ -23,6 +23,7 @@ import { toDate } from '../../utils/dateUtils.ts';
 
 import PostCard from './components/PostCard.tsx';
 import VideoPostCard from './components/VideoPostCard.tsx';
+import CommentSheet from './components/CommentSheet.tsx';
 
 export default function HomeTab() {
   const navigate = useNavigate();
@@ -33,6 +34,8 @@ export default function HomeTab() {
   const [showStoryMenu, setShowStoryMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
+  const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  const [activeCommentCollection, setActiveCommentCollection] = useState<'posts' | 'tube_videos'>('posts');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
@@ -321,7 +324,7 @@ export default function HomeTab() {
           feedItems.map((item) => (
             <div 
               key={item.id} 
-              ref={el => itemRefs.current[item.id] = el}
+              ref={el => { itemRefs.current[item.id] = el; }}
               data-id={item.id}
               data-type={item.feedType}
             >
@@ -330,11 +333,19 @@ export default function HomeTab() {
                   video={item} 
                   currentUserData={currentUserData} 
                   isActive={activeVideoId === item.id}
+                  onCommentClick={(videoId) => {
+                    setActiveCommentCollection('tube_videos');
+                    setActiveCommentPostId(videoId);
+                  }}
                 />
               ) : (
                 <PostCard 
                   post={item} 
                   currentUserData={currentUserData} 
+                  onCommentClick={(postId) => {
+                    setActiveCommentCollection('posts');
+                    setActiveCommentPostId(postId);
+                  }}
                 />
               )}
             </div>
@@ -355,6 +366,15 @@ export default function HomeTab() {
           </div>
         )}
       </div>
+
+      {/* Global Comments Sheet */}
+      <CommentSheet 
+        postId={activeCommentPostId || ''}
+        isOpen={!!activeCommentPostId}
+        onClose={() => setActiveCommentPostId(null)}
+        currentUserData={currentUserData}
+        collectionName={activeCommentCollection}
+      />
     </div>
   );
 }

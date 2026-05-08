@@ -31,6 +31,17 @@ export interface UserProfile {
     secretCode: string | null;
     showMenuEntry: boolean;
   };
+  settings?: {
+    notifications?: {
+      conversationTones?: boolean;
+      highPriority?: boolean;
+      reactionNotifications?: boolean;
+      groupHighPriority?: boolean;
+      vibrate?: boolean;
+    };
+  };
+  fcmTokens?: string[];
+  isPrivate?: boolean;
 }
 
 export interface ChatMessage {

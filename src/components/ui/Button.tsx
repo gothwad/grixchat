@@ -42,7 +42,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ) : Icon && (
           <Icon size={size === 'sm' ? 16 : 20} className={children ? "mr-2" : ""} />
         )}
-        {children}
+        {children as React.ReactNode}
       </motion.button>
     );
   }

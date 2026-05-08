@@ -15,7 +15,8 @@ import {
   UserX,
   AlertTriangle,
   LogOut,
-  Camera
+  Camera,
+  Play
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { auth, db } from '../../services/firebase.ts';
@@ -39,8 +40,12 @@ export default function ChatSettingsScreen() {
   const [nickname, setNickname] = useState('');
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [customPhotoUrl, setCustomPhotoUrl] = useState('');
+  const [showWatchUrlModal, setShowWatchUrlModal] = useState(false);
+  const [watchUrl, setWatchUrl] = useState('');
 
   const currentUserId = auth.currentUser?.uid;
+
+  const chatId = [currentUserId, receiverId].sort().join('_');
 
   useEffect(() => {
     if (!receiverId || !currentUserId) return;
@@ -67,8 +72,19 @@ export default function ChatSettingsScreen() {
     );
 
     fetchReceiver();
-    return () => unsubscribeSettings();
-  }, [receiverId, currentUserId]);
+
+    // Fetch shared conversation data for watchTogetherUrl
+    const unsubscribeConversation = onSnapshot(doc(db, "conversations", chatId), (snap) => {
+      if (snap.exists()) {
+        setWatchUrl(snap.data().watchTogetherUrl || '');
+      }
+    });
+
+    return () => {
+      unsubscribeSettings();
+      unsubscribeConversation();
+    };
+  }, [receiverId, currentUserId, chatId]);
 
   const updateSettings = async (updates: any) => {
     if (!currentUserId || !receiverId) return;
@@ -87,6 +103,18 @@ export default function ChatSettingsScreen() {
   const handlePhotoSave = async () => {
     await updateSettings({ customPhotoUrl });
     setShowPhotoModal(false);
+  };
+
+  const handleWatchUrlSave = async () => {
+    if (!chatId) return;
+    try {
+      await updateDoc(doc(db, "conversations", chatId), {
+        watchTogetherUrl: watchUrl
+      });
+      setShowWatchUrlModal(false);
+    } catch (error) {
+      console.error("Error saving watch URL:", error);
+    }
   };
 
   if (loading) {
@@ -186,6 +214,12 @@ export default function ChatSettingsScreen() {
             label="Custom Profile Photo"
             sub={customPhotoUrl ? "Change custom photo" : "Set a custom photo for this chat only"}
             onClick={() => setShowPhotoModal(true)}
+          />
+          <SettingsItem 
+            icon={<Play size={18} className="text-red-500" />}
+            label="Watch Together URL"
+            sub={watchUrl || "Enter YouTube URL to watch together"}
+            onClick={() => setShowWatchUrlModal(true)}
           />
         </div>
 
@@ -304,6 +338,53 @@ export default function ChatSettingsScreen() {
                   className="flex-1 py-3 font-bold text-white bg-[var(--primary)] rounded-xl shadow-lg shadow-[var(--primary)]/20 active:scale-95 transition-all"
                 >
                   Save
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Watch together URL Modal */}
+      <AnimatePresence>
+        {showWatchUrlModal && (
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setShowWatchUrlModal(false)}
+            />
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              className="relative w-full max-w-sm bg-[var(--bg-card)] rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-[var(--border-color)]"
+            >
+              <h3 className="text-xl font-bold mb-4 text-red-500 flex items-center gap-2">
+                <Play className="fill-current" size={20} /> Watch Together
+              </h3>
+              <p className="text-sm text-[var(--text-secondary)] mb-4">Paste a YouTube video URL to watch it together with your friend in chat.</p>
+              <input 
+                type="text"
+                value={watchUrl}
+                onChange={(e) => setWatchUrl(e.target.value)}
+                placeholder="https://youtube.com/watch?v=..."
+                className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-3 mb-6 focus:outline-none focus:ring-2 focus:ring-red-500/20 font-medium text-[13px]"
+                autoFocus
+              />
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowWatchUrlModal(false)}
+                  className="flex-1 py-3 font-bold text-[var(--text-secondary)] bg-[var(--bg-main)] rounded-xl active:scale-95 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleWatchUrlSave}
+                  className="flex-1 py-3 font-bold text-white bg-red-500 rounded-xl shadow-lg shadow-red-500/20 active:scale-95 transition-all"
+                >
+                  Save URL
                 </button>
               </div>
             </motion.div>

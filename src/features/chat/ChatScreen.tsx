@@ -18,6 +18,7 @@ import {
   Mic
 } from 'lucide-react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import WatchTogether from './components/WatchTogether.tsx';
 import { useTheme } from '../../contexts/ThemeContext';
 import ChatHeader from '../../components/layout/ChatHeader.tsx';
 import ChatBottom from '../../components/layout/ChatBottom.tsx';
@@ -37,7 +38,9 @@ import {
   doc, 
   onSnapshot,
   updateDoc,
-  arrayUnion 
+  arrayUnion,
+  arrayRemove,
+  serverTimestamp
 } from 'firebase/firestore';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -64,7 +67,7 @@ export default function ChatScreen() {
   const [lastTap, setLastTap] = useState<{id: string, time: number}>({id: '', time: 0});
   const [receiverStatus, setReceiverStatus] = useState<'online' | 'offline'>('offline');
   const [isSending, setIsSending] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | Blob | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
@@ -72,6 +75,9 @@ export default function ChatScreen() {
   const [receiverActiveChatId, setReceiverActiveChatId] = useState<string | null>(null);
   const [receiverLastSeen, setReceiverLastSeen] = useState<any>(null);
   const [chatSettings, setChatSettings] = useState<any>(null);
+  const [currentUserData, setCurrentUserData] = useState<any>(null);
+  const [watchData, setWatchData] = useState<any>(null);
+  const [isWatchMode, setIsWatchMode] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -181,6 +187,13 @@ export default function ChatScreen() {
       }
     });
 
+    // Fetch current user data for hidden/archived chats check
+    const userUnsubscribe = onSnapshot(doc(db, "users", auth.currentUser.uid), (snap) => {
+      if (snap.exists()) {
+        setCurrentUserData(snap.data());
+      }
+    });
+
     if (auth.currentUser) {
       const myStatusRef = rtdbRef(rtdb, `/status/${auth.currentUser.uid}`);
       update(myStatusRef, { activeChatId: receiverId });
@@ -190,12 +203,61 @@ export default function ChatScreen() {
       receiverUnsubscribe();
       statusUnsubscribe();
       settingsUnsubscribe();
+      userUnsubscribe();
       if (auth.currentUser) {
         const myStatusRef = rtdbRef(rtdb, `/status/${auth.currentUser.uid}`);
         update(myStatusRef, { activeChatId: null });
       }
     };
   }, [receiverId, chatId, navigate]);
+
+  // Watch Together Sync Effect
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "conversations", chatId), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setWatchData(data);
+        if (data.watchState?.isWatchActive !== undefined) {
+          setIsWatchMode(data.watchState.isWatchActive);
+        }
+      }
+    }, (err) => console.error("Sync error:", err));
+    return () => unsub();
+  }, [chatId]);
+
+  const updateWatchState = async (updates: any) => {
+    if (!auth.currentUser) return;
+    try {
+      const chatRef = doc(db, "conversations", chatId);
+      const newState: any = {
+        "watchState.updatedBy": auth.currentUser.uid,
+        "watchState.timestamp": serverTimestamp()
+      };
+      
+      if (updates.isPlaying !== undefined) newState["watchState.isPlaying"] = updates.isPlaying;
+      if (updates.currentTime !== undefined) newState["watchState.currentTime"] = updates.currentTime;
+      
+      await updateDoc(chatRef, newState);
+    } catch (err) {
+      console.error("Error updating watch state:", err);
+    }
+  };
+
+  const toggleWatchMode = async () => {
+    const newMode = !isWatchMode;
+    setIsWatchMode(newMode);
+    try {
+      await updateDoc(doc(db, "conversations", chatId), {
+        "watchState.isWatchActive": newMode,
+        "watchState.updatedBy": auth.currentUser?.uid,
+        "watchState.timestamp": serverTimestamp(),
+        "watchState.isPlaying": true,
+        "watchState.currentTime": 0
+      });
+    } catch (err) {
+      console.error("Error toggling watch mode:", err);
+    }
+  };
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
@@ -318,29 +380,34 @@ export default function ChatScreen() {
 
   const hideChat = async () => {
     if (!auth.currentUser) return;
+    const isHidden = currentUserData?.hiddenChats?.includes(chatId);
     try {
       await updateDoc(doc(db, "users", auth.currentUser.uid), {
-        hiddenChats: arrayUnion(chatId)
+        hiddenChats: isHidden ? arrayRemove(chatId) : arrayUnion(chatId)
       });
-      navigate('/chats');
+      if (!isHidden) navigate('/chats');
     } catch (error) {
-      console.error("Error hiding chat:", error);
+      console.error("Error toggling hide chat:", error);
     }
   };
 
   const archiveChat = async () => {
     if (!auth.currentUser) return;
+    const isArchived = currentUserData?.archivedChats?.includes(chatId);
     try {
       await updateDoc(doc(db, "users", auth.currentUser.uid), {
-        archivedChats: arrayUnion(chatId)
+        archivedChats: isArchived ? arrayRemove(chatId) : arrayUnion(chatId)
       });
-      navigate('/chats');
+      if (!isArchived) navigate('/chats');
     } catch (error) {
-      console.error("Error archiving chat:", error);
+      console.error("Error toggling archive chat:", error);
     }
   };
 
   const { theme, setTheme, chatBackground, resolvedTheme } = useTheme();
+
+  const isHidden = currentUserData?.hiddenChats?.includes(chatId);
+  const isArchived = currentUserData?.archivedChats?.includes(chatId);
 
   return (
     <div className="flex flex-col h-full w-full max-w-full bg-[var(--bg-main)] overflow-hidden relative">
@@ -360,12 +427,28 @@ export default function ChatScreen() {
         deleteChat={deleteChat}
         hideChat={hideChat}
         archiveChat={archiveChat}
+        isHidden={isHidden}
+        isArchived={isArchived}
         optionsRef={optionsRef}
         isTyping={isOtherTyping}
         receiverStatus={receiverStatus}
         receiverActiveChatId={receiverActiveChatId}
         currentUserId={auth.currentUser?.uid}
+        onWatchTogether={toggleWatchMode}
       />
+
+      <AnimatePresence>
+        {isWatchMode && watchData?.watchTogetherUrl && (
+          <WatchTogether 
+            url={watchData.watchTogetherUrl}
+            chatId={chatId}
+            currentUserId={auth.currentUser?.uid || ''}
+            watchState={watchData.watchState}
+            updateWatchState={updateWatchState}
+            onClose={toggleWatchMode}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Messages */}
       <div 
@@ -405,6 +488,18 @@ export default function ChatScreen() {
               const prevMsg = index > 0 ? currentMessages[index - 1] : null;
               const isSameSender = prevMsg?.senderId === msg.senderId;
               
+              if (msg.type === 'system') {
+                return (
+                  <div key={msg.id} className="flex justify-center my-4 w-full">
+                    <div className="bg-black/5 backdrop-blur-sm px-4 py-1.5 rounded-full border border-black/5 shadow-sm">
+                      <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                        {msg.text}
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                   <div 
                     key={msg.id} 
@@ -675,7 +770,7 @@ export default function ChatScreen() {
         filePreviewUrl={filePreviewUrl}
         isUploading={isUploading}
         uploadProgress={uploadProgress}
-        setSelectedFile={setSelectedFile}
+        setSelectedFile={(file: any) => setSelectedFile(file)}
         setFilePreviewUrl={setFilePreviewUrl}
         textareaRef={textareaRef}
         handleTyping={handleTyping}

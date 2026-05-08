@@ -27,11 +27,12 @@ interface VideoPostCardProps {
   video: any;
   currentUserData: any;
   isActive: boolean;
+  onCommentClick?: (videoId: string) => void;
 }
 
 const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
-export default function VideoPostCard({ video, currentUserData, isActive }: VideoPostCardProps) {
+export default function VideoPostCard({ video, currentUserData, isActive, onCommentClick }: VideoPostCardProps) {
   const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(video.likes || 0);
@@ -55,6 +56,7 @@ export default function VideoPostCard({ video, currentUserData, isActive }: Vide
   const handleLike = async () => {
     if (!auth.currentUser) return;
     const videoRef = doc(db, "tube_videos", video.id);
+    
     try {
       if (isLiked) {
         setLikeCount(prev => Math.max(0, prev - 1));
@@ -70,9 +72,57 @@ export default function VideoPostCard({ video, currentUserData, isActive }: Vide
           likes: (video.likes || 0) + 1,
           likedBy: arrayUnion(auth.currentUser.uid)
         });
+
+        // Add Notification
+        if (video.userId !== auth.currentUser.uid) {
+          await addDoc(collection(db, "notifications"), {
+            userId: video.userId,
+            fromUserId: auth.currentUser.uid,
+            fromUserName: currentUserData?.fullName || 'User',
+            fromUserAvatar: currentUserData?.photoURL || '',
+            type: 'like',
+            postId: video.id, // Reusing postId field for videoId in notifications
+            text: 'liked your video',
+            read: false,
+            createdAt: serverTimestamp()
+          });
+        }
       }
     } catch (err) {
       console.error("Error liking video:", err);
+      // Revert UI on error
+      setIsLiked(!isLiked);
+      setLikeCount(prev => isLiked ? prev + 1 : Math.max(0, prev - 1));
+    }
+  };
+
+  const handleSave = async () => {
+    if (!auth.currentUser) return;
+    const userRef = doc(db, "users", auth.currentUser.uid);
+    
+    try {
+      if (isSaved) {
+        setIsSaved(false);
+        await updateDoc(userRef, {
+          savedVideos: arrayRemove(video.id)
+        });
+      } else {
+        setIsSaved(true);
+        await updateDoc(userRef, {
+          savedVideos: arrayUnion(video.id)
+        });
+      }
+    } catch (err) {
+      console.error("Error saving video:", err);
+    }
+  };
+
+  const handleCommentOpen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onCommentClick) {
+      onCommentClick(video.id);
+    } else {
+      navigate(`/tube/watch/${video.id}`);
     }
   };
 
@@ -161,37 +211,79 @@ export default function VideoPostCard({ video, currentUserData, isActive }: Vide
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-5">
-          <button onClick={handleLike} className={`${isLiked ? 'text-red-500' : 'text-[var(--text-primary)]'} transition-transform active:scale-125`}>
-            <Heart size={26} fill={isLiked ? "currentColor" : "none"} />
+      <div className="flex items-center justify-between px-4 py-2">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={handleLike} 
+            className={`${isLiked ? 'text-red-500' : 'text-[var(--text-primary)]'} transition-transform active:scale-125`}
+          >
+            <Heart size={24} fill={isLiked ? "currentColor" : "none"} />
           </button>
-          <button onClick={() => navigate(`/tube/watch/${video.id}`)} className="text-[var(--text-primary)]">
-            <MessageCircle size={26} />
+          <button 
+            onClick={handleCommentOpen} 
+            className="text-[var(--text-primary)] hover:opacity-70 transition-opacity"
+          >
+            <MessageCircle size={24} />
           </button>
-          <button className="text-[var(--text-primary)]">
-            <Share2 size={26} />
+          <button 
+            onClick={() => navigate(`/posts/${video.id}/share`)}
+            className="text-[var(--text-primary)] hover:opacity-70 transition-opacity"
+          >
+            <Send size={24} />
           </button>
         </div>
-        <button className="text-[var(--text-primary)]">
-          <Bookmark size={26} />
+        <button 
+          onClick={handleSave}
+          className={`transition-all active:scale-125 text-[var(--text-primary)]`}
+        >
+          <Bookmark size={24} fill={isSaved ? "currentColor" : "none"} />
         </button>
       </div>
 
       {/* Meta */}
-      <div className="px-4 space-y-1">
-        <div className="flex items-center gap-2">
-          <p className="text-[14px] font-black text-[var(--text-primary)] truncate flex-1">{video.title}</p>
-          <span className="text-[11px] font-bold text-[var(--text-secondary)] whitespace-nowrap">
-            {video.views?.toLocaleString() || 0} views
-          </span>
+      <div className="px-4 space-y-0.5">
+        {likeCount > 0 && (
+          <p className="text-[13px] font-bold text-[var(--text-primary)] mb-0.5">
+            {likeCount.toLocaleString()} {likeCount === 1 ? 'like' : 'likes'}
+          </p>
+        )}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[13px] font-bold text-[var(--text-primary)] whitespace-nowrap">{video.userName}</span>
+          <p className="text-[13px] font-bold text-[var(--text-primary)] truncate flex-1">{video.title}</p>
         </div>
-        <p className="text-[13px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
+        
+        <p className="text-[13px] text-[var(--text-primary)] line-clamp-2 leading-relaxed opacity-90">
           {video.description}
         </p>
-        <p className="text-[10px] font-bold text-[var(--text-secondary)]/50 uppercase tracking-widest pt-1">
-          {video.createdAt ? formatDistanceToNow(video.createdAt.toDate(), { addSuffix: true }) : 'just now'}
-        </p>
+
+        <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-secondary)]">
+          <span className="uppercase tracking-tighter">
+            {video.createdAt ? formatDistanceToNow(video.createdAt.toDate(), { addSuffix: true }) : 'just now'}
+          </span>
+        </div>
+
+        {video.comments > 0 && (
+          <button 
+            onClick={handleCommentOpen}
+            className="text-[13px] text-[var(--text-secondary)] mt-1 font-medium hover:underline block"
+          >
+            View all {video.comments} comments
+          </button>
+        )}
+      </div>
+
+      {/* Quick Comment Input */}
+      <div className="px-4 mt-2 flex items-center gap-2 opacity-80">
+        <img 
+          src={currentUserData?.photoURL || DEFAULT_LOGO} 
+          className="w-5 h-5 rounded-full object-cover border border-[var(--border-color)]/10" 
+        />
+        <button 
+          onClick={handleCommentOpen}
+          className="flex-1 text-left text-[12px] text-[var(--text-secondary)] py-1"
+        >
+          Add a comment...
+        </button>
       </div>
 
       {/* Options Context Menu */}

@@ -74,9 +74,25 @@
     @apply antialiased overflow-x-hidden w-full h-[100dvh] fixed inset-0;
     font-family: var(--font-sans);
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
     touch-action: manipulation;
     overscroll-behavior: none;
   }
+
+  /* Allow text selection in specific elements */
+  input, textarea, [contenteditable="true"] {
+    -webkit-user-select: text;
+    -khtml-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
+
 
   html {
     @apply overflow-hidden w-full h-[100dvh] fixed inset-0;

@@ -76,7 +76,7 @@ export default function ProfileReelViewer() {
             {reels.map((reel) => (
               <div 
                 key={reel.id} 
-                ref={el => reelRefs.current[reel.id] = el}
+                ref={el => { reelRefs.current[reel.id] = el; }}
                 className="h-screen w-full snap-start relative bg-zinc-900"
                 onClick={() => navigate(`/reels/watch/${reel.id}`)}
               >

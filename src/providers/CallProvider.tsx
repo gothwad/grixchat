@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db, auth } from '../services/firebase';
+import { db } from '../services/firebase';
 import { useNavigate } from 'react-router-dom';
-import { Video, Phone, PhoneOff, Check } from 'lucide-react';
 import { useAuth } from './AuthProvider';
 
 interface CallContextType {
@@ -72,38 +71,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <CallContext.Provider value={{ incomingCall, caller }}>
       {children}
-      {incomingCall && caller && (
-        <div className="fixed inset-x-4 top-4 z-[200]">
-          <div className="bg-zinc-900 border border-white/10 rounded-3xl p-4 shadow-2xl flex items-center gap-4">
-            <img 
-              src={caller.photoURL || "https://cdn-icons-png.flaticon.com/512/149/149071.png"} 
-              className="w-12 h-12 rounded-full object-cover border border-white/10"
-              referrerPolicy="no-referrer"
-            />
-            <div className="flex-1">
-              <h4 className="text-white text-sm font-black uppercase tracking-tight">{caller.fullName || 'Incoming Call'}</h4>
-              <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
-                {incomingCall.type === 'video' ? <Video size={10} /> : <Phone size={10} />}
-                GrixChat {incomingCall.type} Call...
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={rejectCall}
-                className="p-3 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-              >
-                <PhoneOff size={18} />
-              </button>
-              <button 
-                onClick={acceptCall}
-                className="p-3 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors animate-pulse"
-              >
-                <Check size={18} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </CallContext.Provider>
   );
 };

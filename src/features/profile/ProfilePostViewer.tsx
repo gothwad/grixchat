@@ -131,7 +131,7 @@ export default function ProfilePostViewer() {
             {posts.map((post) => (
               <div 
                 key={post.id} 
-                ref={el => postRefs.current[post.id] = el}
+                ref={el => { postRefs.current[post.id] = el; }}
                 className="pt-2"
               >
                 <PostCard post={post} currentUserData={currentUserData} />

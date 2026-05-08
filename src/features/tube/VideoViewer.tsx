@@ -12,6 +12,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase.ts';
 import { formatDistanceToNow } from 'date-fns';
 import { motion } from 'motion/react';
+import LiveChat from './components/LiveChat.tsx';
 
 interface Video {
   id: string;
@@ -157,6 +158,9 @@ export default function VideoViewer() {
               {video.description}
             </p>
           </div>
+
+          {/* Live Chat Section */}
+          <LiveChat videoId={video.id} />
         </div>
       </div>
     </div>

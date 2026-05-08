@@ -143,7 +143,7 @@ export default function ProfileTubeViewer() {
               return (
                 <motion.div 
                   key={video.id} 
-                  ref={el => videoRefs.current[video.id] = el}
+                  ref={el => { videoRefs.current[video.id] = el; }}
                   data-video-id={video.id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}

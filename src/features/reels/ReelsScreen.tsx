@@ -104,7 +104,7 @@ export default function ReelsScreen() {
               {/* Media Content */}
               {reel.videoUrl ? (
                 <video
-                  ref={el => videoRefs.current[reel.id] = el}
+                  ref={el => { videoRefs.current[reel.id] = el; }}
                   src={reel.videoUrl}
                   className="w-full h-full object-cover"
                   loop

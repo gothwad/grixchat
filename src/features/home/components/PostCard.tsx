@@ -26,12 +26,13 @@ import { toDate } from '../../../utils/dateUtils.ts';
 interface PostCardProps {
   post: any;
   currentUserData: any;
+  onCommentClick?: (postId: string) => void;
   key?: any;
 }
 
 const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
-export default function PostCard({ post, currentUserData }: PostCardProps) {
+export default function PostCard({ post, currentUserData, onCommentClick }: PostCardProps) {
   const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -168,6 +169,15 @@ export default function PostCard({ post, currentUserData }: PostCardProps) {
     }
   };
 
+  const handleCommentOpen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onCommentClick) {
+      onCommentClick(post.id);
+    } else {
+      navigate(`/posts/${post.id}/comments`);
+    }
+  };
+
   return (
     <div className="flex flex-col border-b border-[var(--border-color)]/20 pb-4">
       {/* Post Header */}
@@ -284,7 +294,7 @@ export default function PostCard({ post, currentUserData }: PostCardProps) {
             <Heart size={24} fill={isLiked ? "red" : "none"} />
           </button>
           <button 
-            onClick={() => navigate(`/posts/${post.id}/comments`)}
+            onClick={handleCommentOpen}
             className="text-[var(--text-primary)] hover:opacity-70 transition-opacity"
           >
             <MessageCircle size={24} />
@@ -319,7 +329,7 @@ export default function PostCard({ post, currentUserData }: PostCardProps) {
         </div>
         {post.comments > 0 && (
           <button 
-            onClick={() => navigate(`/posts/${post.id}/comments`)}
+            onClick={handleCommentOpen}
             className="text-[13px] text-[var(--text-secondary)] mt-0.5 font-medium hover:underline block"
           >
             View all {post.comments} comments
@@ -339,7 +349,7 @@ export default function PostCard({ post, currentUserData }: PostCardProps) {
           className="w-5 h-5 rounded-full object-cover border border-[var(--border-color)]/10" 
         />
         <button 
-          onClick={() => navigate(`/posts/${post.id}/comments`)}
+          onClick={handleCommentOpen}
           className="flex-1 text-left text-[12px] text-[var(--text-secondary)] py-1"
         >
           Add a comment...
