@@ -43,6 +43,7 @@ interface ChatBottomProps {
   emojiPickerRef: React.RefObject<HTMLDivElement | null>;
   isSending: boolean;
   selectedFile: File | Blob | null;
+  placeholder?: string;
 }
 
 export default function ChatBottom({
@@ -78,7 +79,8 @@ export default function ChatBottom({
   setShowEmojiPicker,
   emojiPickerRef,
   isSending,
-  selectedFile
+  selectedFile,
+  placeholder = "Message"
 }: ChatBottomProps) {
   const navigate = useNavigate();
   const [isRecording, setIsRecording] = useState(false);
@@ -269,7 +271,7 @@ export default function ChatBottom({
 
                 <textarea 
                   ref={textareaRef}
-                  placeholder="Message"
+                  placeholder={placeholder}
                   value={newMessage}
                   onChange={(e) => {
                     setNewMessage(e.target.value);

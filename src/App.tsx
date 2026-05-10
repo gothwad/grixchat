@@ -87,9 +87,7 @@ const AppInfoScreen = React.lazy(() => import('./features/settings').then(m => (
 const TimeSpentScreen = React.lazy(() => import('./features/settings/TimeSpentScreen'));
 const FavoritesScreen = React.lazy(() => import('./features/settings/FavoritesScreen'));
 const BlockedAccountsScreen = React.lazy(() => import('./features/settings/BlockedAccountsScreen'));
-const LanguageSettingsScreen = React.lazy(() => import('./features/settings/LanguageSettingsScreen'));
 const MutedAccountsScreen = React.lazy(() => import('./features/settings/MutedAccountsScreen'));
-const AccessibilitySettingsScreen = React.lazy(() => import('./features/settings/AccessibilitySettingsScreen'));
 const AnalyticsScreen = React.lazy(() => import('./features/analytics/AnalyticsScreen'));
 const NewGroupScreen = React.lazy(() => import('./features/chat/NewGroupScreen'));
 const GroupSettingsScreen = React.lazy(() => import('./features/chat/GroupSettingsScreen'));
@@ -145,9 +143,6 @@ export default function App() {
       '/app-lock': 'App Lock',
       '/privacy-policy': 'Privacy Policy',
       '/terms': 'Terms & Conditions',
-      '/account-settings': 'Account',
-      '/accessibility-settings': 'Accessibility',
-      '/language-settings': 'Language',
       '/app-preferences': 'Preferences',
       '/app-info': 'About GrixChat',
       '/help': 'Help Center'
@@ -168,7 +163,7 @@ export default function App() {
     if (pageTitle && path !== '/') {
       document.title = `${pageTitle} • ${suffix}`;
     } else {
-      document.title = `${suffix} | Secure Social Messaging`;
+      document.title = suffix;
     }
   }, [location]);
 
@@ -318,9 +313,7 @@ export default function App() {
                     <Route path="/time-spent" element={user ? <TimeSpentScreen /> : <Navigate to="/login" />} />
                     <Route path="/favorites" element={user ? <FavoritesScreen /> : <Navigate to="/login" />} />
                     <Route path="/blocked-accounts" element={user ? <BlockedAccountsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/language-settings" element={user ? <LanguageSettingsScreen /> : <Navigate to="/login" />} />
                     <Route path="/muted-accounts" element={user ? <MutedAccountsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/accessibility-settings" element={user ? <AccessibilitySettingsScreen /> : <Navigate to="/login" />} />
                     <Route path="/analytics" element={user ? <AnalyticsScreen /> : <Navigate to="/login" />} />
                     <Route path="/new-group" element={user ? <NewGroupScreen /> : <Navigate to="/login" />} />
                     <Route path="/group-settings/:id" element={user ? <GroupSettingsScreen /> : <Navigate to="/login" />} />

@@ -322,6 +322,9 @@ app.get("/api/github/auth-url", (req, res) => {
     appUrl = `${protocol}://${host}`;
   }
   
+  // Ensure appUrl doesn't end with a slash for consistency
+  appUrl = appUrl.replace(/\/$/, "");
+  
   const redirectUri = `${appUrl}/auth/github/callback`;
   const url = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=repo,user,workflow`;
   res.json({ url });
@@ -346,14 +349,22 @@ app.get(["/auth/github/callback", "/auth/github/callback/"], async (req, res) =>
       <html>
         <body>
           <script>
+            const token = '${accessToken}';
+            localStorage.setItem('github_token', token);
             if (window.opener) {
-              window.opener.postMessage({ type: 'GITHUB_AUTH_SUCCESS', token: '${accessToken}' }, '*');
-              window.close();
+              window.opener.postMessage({ type: 'GITHUB_AUTH_SUCCESS', token: token }, '*');
+              setTimeout(() => window.close(), 100);
             } else {
-              window.location.href = '/hub';
+              window.location.href = '/hub/github';
             }
           </script>
-          <p>Success! Closing window...</p>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
+            <div style="width:40px;height:40px;border:4px solid #eee;border-top-color:#10b981;border-radius:50%;animation:spin 1s linear infinite;"></div>
+            <p style="margin-top:20px;font-weight:bold;color:#333;">Authenticating with GitHub...</p>
+          </div>
+          <style>
+            @keyframes spin { to { transform: rotate(360deg); } }
+          </style>
         </body>
       </html>
     `);

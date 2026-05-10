@@ -8,10 +8,12 @@ export default function AccountSettingsScreen() {
 
   const accountItems = [
     { icon: Shield, label: 'Security notifications', sub: 'Get notified of security changes', color: 'text-primary' },
-    { icon: Key, label: 'Passkeys', sub: 'A simple way to sign in safely', color: 'text-emerald-500' },
-    { icon: Smartphone, label: 'Change number', sub: 'Migrate your account info, groups & settings', color: 'text-indigo-500' },
-    { icon: FileText, label: 'Request account info', sub: 'Create a report of your account info', color: 'text-zinc-500' },
-    { icon: UserX, label: 'Delete account', sub: 'Permanently remove your account', color: 'text-red-500' },
+    { icon: UserX, label: 'Delete account', sub: 'Permanently remove your account', color: 'text-red-500', onClick: () => {
+      if (confirm("Are you sure you want to delete your account? This action is irreversible.")) {
+        // Logic for deletion would go here, for now we just log out as safety measure or prompt
+        alert("Account deletion request received. Please contact support for final confirmation.");
+      }
+    }},
   ];
 
   return (

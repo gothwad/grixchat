@@ -27,8 +27,19 @@ export default function GithubScreen() {
       }
     };
 
+    const handleFocus = () => {
+      const newToken = storage.getItem('github_token');
+      if (newToken && newToken !== token) {
+        setToken(newToken);
+      }
+    };
+
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [token]);
 
   const fetchData = async () => {

@@ -73,9 +73,6 @@ export default function TabHeader() {
 
   const menuOptions = [
     { label: 'New group', icon: Users, path: '/new-group' },
-    { label: 'New broadcast', icon: UserPlus },
-    { label: 'Linked devices', icon: Laptop },
-    { label: 'Starred messages', icon: Star },
     { label: 'Archived', icon: Archive, path: '/chats/archived' },
     { label: 'GrixHub', icon: LayoutGrid, path: '/hub' },
     ...(userData?.hiddenChatSettings?.showMenuEntry !== false ? [

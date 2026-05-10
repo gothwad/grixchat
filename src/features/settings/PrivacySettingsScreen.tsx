@@ -58,32 +58,11 @@ export default function PrivacySettingsScreen() {
 
   const settings = [
     {
-      id: 'hideFromSearch',
-      icon: EyeOff,
-      label: 'Hide from search',
-      sub: "Others won't find you in search results",
-      color: 'text-primary'
-    },
-    {
-      id: 'hidePhoto',
-      icon: UserCircle,
-      label: 'Private Photo',
-      sub: 'Only you can see your profile picture',
-      color: 'text-emerald-500'
-    },
-    {
       id: 'appLock',
       icon: Lock,
       label: 'App Lock',
       sub: 'Require PIN to open GrixChat',
       color: 'text-indigo-500'
-    },
-    {
-      id: 'dontSaveChat',
-      icon: Trash2,
-      label: "Ghost Mode",
-      sub: 'Chat history is not saved on servers',
-      color: 'text-red-500'
     }
   ];
 

@@ -73,66 +73,27 @@ export default function SettingsScreen() {
       items: [
         { icon: Star, label: 'Favorites', color: 'bg-blue-500/10 text-blue-500', onClick: () => navigate('/favorites') },
         { icon: VolumeX, label: 'Muted accounts', color: 'bg-blue-500/10 text-blue-500', onClick: () => navigate('/muted-accounts') },
-        { icon: EyeOff, label: 'Suggested content', color: 'bg-blue-500/10 text-blue-500' },
-        { icon: Heart, label: 'Like counts', color: 'bg-blue-500/10 text-blue-500' },
       ]
     },
     {
       title: 'Who can see your content',
       items: [
         { icon: Lock, label: 'Account privacy', sub: userData?.isPrivate ? 'Private' : 'Public', color: 'bg-blue-500/10 text-blue-500', onClick: () => navigate('/privacy-settings') },
-        { icon: Star, label: 'Close Friends', color: 'bg-blue-500/10 text-blue-500' },
         { icon: UserMinus, label: 'Blocked', color: 'bg-blue-500/10 text-blue-500', onClick: () => navigate('/blocked-accounts') },
-        { icon: EyeOff, label: 'Hide story and live', color: 'bg-blue-500/10 text-blue-500' },
-      ]
-    },
-    {
-      title: 'How others can interact with you',
-      items: [
-        { icon: MessageCircle, label: 'Messages and story replies', color: 'bg-blue-500/10 text-blue-500' },
-        { icon: AtSign, label: 'Tags and mentions', color: 'bg-blue-500/10 text-blue-500' },
-        { icon: MessageSquare, label: 'Comments', color: 'bg-blue-500/10 text-blue-500' },
-        { icon: Share2, label: 'Sharing and remixes', color: 'bg-blue-500/10 text-blue-500' },
-        { icon: UserCheck, label: 'Restricted accounts', color: 'bg-blue-500/10 text-blue-500' },
-        { icon: EyeOff, label: 'Hidden words', color: 'bg-blue-500/10 text-blue-500' },
       ]
     },
     {
       title: 'Your app and media',
       items: [
-        { icon: Download, label: 'Archiving and downloading', color: 'bg-blue-500/10 text-blue-500' },
-        { icon: Accessibility, label: 'Accessibility', color: 'bg-blue-500/10 text-blue-500', onClick: () => navigate('/accessibility-settings') },
-        { icon: Languages, label: 'Language', color: 'bg-blue-500/10 text-blue-500', onClick: () => navigate('/language-settings') },
         { icon: Smartphone, label: 'App Preferences', sub: 'Theme, cache, and more', color: 'bg-blue-500/10 text-blue-500', onClick: () => navigate('/app-preferences') },
-        { icon: Database, label: 'Data usage and media quality', color: 'bg-blue-500/10 text-blue-500' },
-        { icon: Globe, label: 'Website permissions', color: 'bg-blue-500/10 text-blue-500' },
-      ]
-    },
-    {
-      title: 'For families',
-      items: [
-        { icon: Users, label: 'Supervision', color: 'bg-blue-500/10 text-blue-500' },
-      ]
-    },
-    {
-      title: 'For professionals',
-      items: [
-        { icon: Monitor, label: 'Account type and tools', color: 'bg-blue-500/10 text-blue-500' },
-      ]
-    },
-    {
-      title: 'Your orders and payments',
-      items: [
-        { icon: CreditCard, label: 'Orders and payments', color: 'bg-blue-500/10 text-blue-500' },
       ]
     },
     {
       title: 'More info and support',
       items: [
         { icon: HelpCircle, label: 'Help', color: 'bg-blue-500/10 text-blue-500', onClick: () => navigate('/help') },
-        { icon: Shield, label: 'Privacy Center', color: 'bg-blue-500/10 text-blue-500' },
-        { icon: UserCircle, label: 'Account Status', color: 'bg-blue-500/10 text-blue-500' },
         { icon: Info, label: 'About', color: 'bg-blue-500/10 text-blue-500', onClick: () => navigate('/app-info') },
+        { icon: UserCheck, label: 'Analytics', sub: 'View your activity stats', color: 'bg-blue-500/10 text-blue-500', onClick: () => navigate('/analytics') },
       ]
     }
   ];
