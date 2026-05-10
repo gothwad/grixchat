@@ -148,6 +148,7 @@ export default function ChatsTab() {
                     src="/assets/favicon.png" 
                     className="w-[52px] h-[52px] rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform"
                     referrerPolicy="no-referrer"
+                    alt="Grix AI"
                   />
                   <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full"></div>
                 </div>
@@ -180,6 +181,7 @@ export default function ChatsTab() {
                         src={chat.avatar} 
                         className="w-[52px] h-[52px] object-cover shadow-sm group-hover:scale-105 transition-transform rounded-full"
                         referrerPolicy="no-referrer"
+                        alt={chat.user}
                       />
                       {chat.isOnline && (
                         <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full"></div>

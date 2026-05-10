@@ -8,7 +8,7 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#ffffff",
-  "theme_color": "#375a7f",
+  "theme_color": "#ffffff",
   "categories": ["social", "communication"],
   "shortcuts": [
     {

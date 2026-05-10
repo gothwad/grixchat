@@ -103,60 +103,57 @@ export default function LoginScreen() {
 
   return (
     <div className="h-full overflow-y-auto bg-[var(--bg-main)] flex flex-col items-center relative font-sans">
-      <div className="w-full px-8 pt-16 pb-12 z-10 flex flex-col min-h-full relative">
-        {/* Branding Overlay - Absolute to not push content down */}
-        <div className="absolute top-6 left-0 right-0 flex items-center justify-center gap-2">
-          <div className="bg-[var(--bg-card)] px-3 py-1.5 rounded-full border border-[var(--border-color)] flex items-center gap-2 shadow-sm">
+      <div className="w-full px-8 pt-12 pb-12 z-10 flex flex-col items-center min-h-full relative max-w-md mx-auto">
+        {/* Header Section */}
+        <div className="w-full relative flex items-center justify-center mb-8">
+          <div className="w-16 h-16 bg-[var(--bg-card)] rounded-[20px] shadow-sm flex items-center justify-center border border-[var(--border-color)] p-3">
             <img 
               src={APP_CONFIG.LOGO_URL} 
               alt="Logo" 
-              className="w-4 h-4 object-contain"
+              className="w-full h-full object-contain"
               referrerPolicy="no-referrer"
             />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-primary)]">GrixChat</span>
           </div>
         </div>
 
         {/* Header Area */}
-        <div className="text-center mb-10">
-          <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Welcome back</h2>
-          <p className="text-[var(--text-secondary)] text-xs leading-relaxed max-w-[240px] mx-auto">
-            Connect with friends, share your world, and chat in real-time with GrixChat.
+        <div className="text-center mb-8">
+          <h2 className="text-[28px] font-bold text-[var(--text-primary)] mb-2">Welcome Back</h2>
+          <p className="text-[var(--text-secondary)] text-xs leading-relaxed max-w-[200px] mx-auto opacity-80">
+            Connecting you to your world, one message at a time.
           </p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-[var(--text-primary)] ml-1">Email, Username or Phone</label>
+        <form onSubmit={handleLogin} className="w-full space-y-4">
+          <div className="relative group">
+            <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
             <input 
               type="text" 
-              placeholder="Enter email, username or phone"
+              placeholder="Enter your email or username"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              className="w-full px-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#375a7f]/20 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
+              className="w-full pl-12 pr-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
               required
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-[var(--text-primary)] ml-1">Password</label>
-            <div className="relative">
-              <input 
-                type={showPassword ? "text" : "password"} 
-                placeholder="Enter you password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#375a7f]/20 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
-                required
-              />
-              <button 
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
+          <div className="relative group">
+            <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
+            <input 
+              type={showPassword ? "text" : "password"} 
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full pl-12 pr-12 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
+              required
+            />
+            <button 
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
 
           <div className="flex justify-between items-center px-1">
@@ -164,80 +161,62 @@ export default function LoginScreen() {
               <input 
                 type="checkbox" 
                 id="remember" 
-                className="w-4 h-4 rounded border-[var(--border-color)] text-[#375a7f] focus:ring-[#375a7f] accent-[#375a7f] bg-[var(--bg-card)]" 
+                className="w-4 h-4 rounded border-[var(--border-color)] text-[var(--primary)] focus:ring-[var(--primary)] accent-[var(--primary)] bg-[var(--bg-card)]" 
               />
-              <label htmlFor="remember" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">Remember me</label>
+              <label htmlFor="remember" className="text-[11px] font-medium text-[var(--text-secondary)] cursor-pointer">Remember me</label>
             </div>
-            <Link to="/forgot-password" title="Forgot password?" className="text-xs font-bold text-red-500 hover:text-red-600">Forgot password?</Link>
+            <Link to="/forgot-password" title="Forgot password?" className="text-[11px] font-bold text-[var(--primary)] hover:underline">Forgot Password</Link>
           </div>
           
           <button 
             type="submit"
-            disabled={loading || googleLoading || !identifier || password.length < 6}
-            style={{ backgroundColor: '#375a7f' }}
-            className="w-full text-white text-sm font-bold py-4 rounded-2xl transition-all disabled:opacity-70 flex items-center justify-center gap-2 active:scale-[0.98] shadow-sm"
+            disabled={loading || googleLoading || githubLoading || !identifier || password.length < 6}
+            className="w-full bg-[var(--primary)] text-white text-sm font-bold py-4 rounded-xl transition-all disabled:opacity-70 active:scale-[0.98] shadow-sm shadow-[var(--primary)]/20 mt-2"
           >
-            <span>{loading ? 'Signing in...' : 'Sign in'}</span>
+            <span>{loading ? 'Logging in...' : 'Login'}</span>
           </button>
 
           {error && (
             <motion.p 
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-red-500 text-xs font-bold text-center bg-red-500/10 py-2 rounded-lg"
+              className="text-red-500 text-[10px] font-bold text-center bg-red-500/5 py-2 rounded-lg"
             >
               {error}
             </motion.p>
           )}
 
-          <div className="text-center py-2">
+          <div className="flex items-center gap-4 py-2">
+            <div className="h-[1px] bg-[var(--border-color)] flex-1"></div>
+            <span className="text-[10px] text-[var(--text-secondary)] font-medium">or</span>
+            <div className="h-[1px] bg-[var(--border-color)] flex-1"></div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
             <button 
               type="button"
-              onClick={() => setShowSocial(!showSocial)}
-              className="text-[11px] font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors tracking-tight"
+              onClick={handleGoogleSignIn}
+              disabled={loading || googleLoading || githubLoading}
+              className="w-full flex items-center justify-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] py-3.5 rounded-xl text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] transition-all active:scale-[0.98]"
             >
-              {showSocial ? (
-                <>I'm not using grixchat on web browser <span className="text-blue-600">click here</span></>
-              ) : (
-                <>I'm using grixchat on web browser <span className="text-blue-600">click here</span></>
-              )}
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" />
+              <span>Log in with Google</span>
+            </button>
+
+            <button 
+              type="button"
+              onClick={handleGithubSignIn}
+              disabled={loading || googleLoading || githubLoading}
+              className="w-full flex items-center justify-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] py-3.5 rounded-xl text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] transition-all active:scale-[0.98]"
+            >
+              <Github size={20} className="text-[var(--text-primary)]" />
+              <span>Log in with GitHub</span>
             </button>
           </div>
 
-          <AnimatePresence>
-            {showSocial && (
-              <motion.div 
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="space-y-3 overflow-hidden"
-              >
-                <button 
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={loading || googleLoading || githubLoading}
-                  className="w-full flex items-center justify-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] py-4 rounded-2xl text-sm font-bold text-[var(--text-primary)] hover:bg-zinc-50/10 transition-all active:scale-[0.98]"
-                >
-                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" />
-                  <span>{googleLoading ? 'Connecting...' : 'Continue with Google'}</span>
-                </button>
-
-                <button 
-                  type="button"
-                  onClick={handleGithubSignIn}
-                  disabled={loading || googleLoading || githubLoading}
-                  className="w-full flex items-center justify-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] py-4 rounded-2xl text-sm font-bold text-[var(--text-primary)] hover:bg-zinc-50/10 transition-all active:scale-[0.98]"
-                >
-                  <Github size={20} />
-                  <span>{githubLoading ? 'Connecting...' : 'Continue with GitHub'}</span>
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div className="text-center pt-8">
-            <span className="text-xs font-bold text-[var(--text-secondary)]">Don't have an account? </span>
-            <Link to="/signup" className="text-xs font-bold text-[var(--text-primary)] hover:underline">Sign up</Link>
+          <div className="text-center pt-6 pb-2">
+            <span className="text-[12px] font-medium text-[var(--text-secondary)]">Don't have an account? </span>
+            <Link to="/signup" className="text-[12px] font-bold text-[var(--primary)] hover:underline">Sign up</Link>
           </div>
         </form>
       </div>

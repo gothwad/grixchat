@@ -82,7 +82,7 @@ export default function ProfileTab() {
           <div className="flex items-center gap-6 mb-6">
             {/* Profile Picture */}
             <div className="relative shrink-0">
-              <div className="w-20 h-20 rounded-full p-0.5 bg-[#375a7f]">
+              <div className="w-20 h-20 rounded-full p-0.5 bg-[var(--primary)]">
                 <div className="w-full h-full rounded-full border-2 border-[var(--bg-main)] overflow-hidden bg-zinc-100">
                   <img 
                     src={userData?.photoURL || DEFAULT_LOGO} 

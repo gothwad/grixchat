@@ -209,7 +209,7 @@ export default function HomeTab() {
           ref={menuRef}
         >
           <div className="relative" onClick={() => setShowStoryMenu(!showStoryMenu)}>
-            <div className="w-[68px] h-[68px] rounded-full p-[3px] bg-[#375a7f]">
+            <div className="w-[68px] h-[68px] rounded-full p-[3px] bg-[var(--primary)]">
               <div className="w-full h-full rounded-full border-2 border-[var(--bg-main)] overflow-hidden">
                 <img 
                   src={currentUserData?.photoURL || DEFAULT_LOGO} 

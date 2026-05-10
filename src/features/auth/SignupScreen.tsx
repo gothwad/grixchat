@@ -5,7 +5,7 @@ import { auth, db, googleProvider, githubProvider } from '../../services/firebas
 import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { User as UserIcon, AtSign, Lock, Eye, EyeOff, Mail, ArrowRight, Github, HelpCircle, Phone } from 'lucide-react';
+import { User as UserIcon, AtSign, Lock, Eye, EyeOff, Mail, ArrowRight, Github, HelpCircle, Phone, ArrowLeft } from 'lucide-react';
 
 export default function SignupScreen() {
   const [email, setEmail] = useState('');
@@ -124,205 +124,176 @@ export default function SignupScreen() {
 
   return (
     <div className="h-full overflow-y-auto bg-[var(--bg-main)] flex flex-col items-center relative font-sans">
-      <div className="w-full px-8 pt-16 pb-12 z-10 flex flex-col min-h-full relative">
-        {/* Branding Overlay - Absolute to not push content down */}
-        <div className="absolute top-6 left-0 right-0 flex items-center justify-center gap-2">
-          <div className="bg-[var(--bg-card)] px-3 py-1.5 rounded-full border border-[var(--border-color)] flex items-center gap-2 shadow-sm">
+      <div className="w-full px-8 pt-12 pb-12 z-10 flex flex-col items-center min-h-full relative max-w-md mx-auto">
+        {/* Header Section */}
+        <div className="w-full relative flex items-center justify-center mb-8">
+          <button 
+            onClick={() => navigate(-1)}
+            className="absolute left-0 w-10 h-10 flex items-center justify-center bg-[var(--bg-card)] rounded-full border border-[var(--border-color)] text-[var(--text-primary)] active:scale-95 transition-all"
+          >
+            <ArrowLeft size={20} />
+          </button>
+
+          <div className="w-16 h-16 bg-[var(--bg-card)] rounded-[20px] shadow-sm flex items-center justify-center border border-[var(--border-color)] p-3">
             <img 
               src={APP_CONFIG.LOGO_URL} 
               alt="Logo" 
-              className="w-4 h-4 object-contain"
+              className="w-full h-full object-contain"
               referrerPolicy="no-referrer"
             />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-primary)]">GrixChat</span>
           </div>
         </div>
 
         {/* Header Area */}
-        <div className="text-center mb-10">
-          <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Sign up Account</h2>
-          <p className="text-[var(--text-secondary)] text-xs leading-relaxed max-w-[240px] mx-auto">
-            Create an account to start chatting, sharing stories, and connecting with GrixChat.
+        <div className="text-center mb-6">
+          <h2 className="text-[26px] font-bold text-[var(--text-primary)] mb-2">Join GrixChat families</h2>
+          <p className="text-[var(--text-secondary)] text-xs leading-relaxed max-w-[280px] mx-auto opacity-80">
+            Create your account to start chatting, sharing stories, and connecting with GrixChat.
           </p>
         </div>
 
-        <form onSubmit={handleSignup} className="space-y-5">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-[var(--text-primary)] ml-1">Name</label>
+        <form onSubmit={handleSignup} className="w-full space-y-3">
+          <div className="relative group">
+            <UserIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
             <input 
               type="text" 
-              placeholder="Enter you name"
+              placeholder="Full Name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full px-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#375a7f]/20 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
+              className="w-full pl-12 pr-5 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
               required
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-[var(--text-primary)] ml-1">Email</label>
+          <div className="relative group">
+            <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
             <input 
               type="email" 
-              placeholder="Enter you email"
+              placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#375a7f]/20 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
+              className="w-full pl-12 pr-5 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
               required
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-[var(--text-primary)] ml-1">Phone Number</label>
+          <div className="relative group">
+            <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
             <input 
               type="tel" 
-              placeholder="Enter your phone number"
+              placeholder="Phone number"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
-              className="w-full px-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#375a7f]/20 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
+              className="w-full pl-12 pr-5 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
               required
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-[var(--text-primary)] ml-1">Username</label>
-            <div className="relative">
-              <input 
-                type="text" 
-                placeholder="Choose a username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
-                className="w-full px-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#375a7f]/20 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
-                required
-              />
-              <div className="group absolute right-5 top-1/2 -translate-y-1/2">
-                <HelpCircle size={18} className="text-[var(--text-secondary)] cursor-help" />
-                <span className="hidden group-hover:block absolute right-0 bottom-full mb-2 w-48 p-2 bg-zinc-800 text-white text-[10px] rounded-lg shadow-xl z-50">
-                  Only small letters (a-z), numbers (0-9), and underscores (_) allowed. No spaces.
-                </span>
-              </div>
+          <div className="relative group">
+            <AtSign size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Choose username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
+              className="w-full pl-12 pr-12 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
+              required
+            />
+            <div className="group absolute right-4 top-1/2 -translate-y-1/2">
+              <HelpCircle size={14} className="text-[var(--text-secondary)] cursor-help" />
+              <span className="hidden group-hover:block absolute right-0 bottom-full mb-2 w-48 p-2 bg-zinc-800 text-white text-[10px] rounded-lg shadow-xl z-50">
+                Only small letters (a-z), numbers (0-9), and underscores (_) allowed.
+              </span>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-[var(--text-primary)] ml-1">Password</label>
-            <div className="relative">
-              <input 
-                type={showPassword ? "text" : "password"} 
-                placeholder="Enter you password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#375a7f]/20 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
-                required
-              />
-              <button 
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
+          <div className="relative group">
+            <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
+            <input 
+              type={showPassword ? "text" : "password"} 
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full pl-12 pr-12 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
+              required
+            />
+            <button 
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-[var(--text-primary)] ml-1">Confirm Password</label>
-            <div className="relative">
-              <input 
-                type={showConfirmPassword ? "text" : "password"} 
-                placeholder="Confirm your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#375a7f]/20 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
-                required
-              />
-              <button 
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              >
-                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex justify-between items-center px-1">
-            <div className="flex items-center gap-2">
-              <input 
-                type="checkbox" 
-                id="remember" 
-                className="w-4 h-4 rounded border-[var(--border-color)] text-[#375a7f] focus:ring-[#375a7f] accent-[#375a7f] bg-[var(--bg-card)]" 
-              />
-              <label htmlFor="remember" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">Remember me</label>
-            </div>
+          <div className="relative group">
+            <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
+            <input 
+              type={showConfirmPassword ? "text" : "password"} 
+              placeholder="Confirm password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full pl-12 pr-12 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
+              required
+            />
+            <button 
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
           </div>
           
           <button 
             type="submit"
-            disabled={loading || googleLoading || githubLoading || !email || !username || !phoneNumber || password.length < 6 || password !== confirmPassword}
-            style={{ backgroundColor: '#375a7f' }}
-            className="w-full text-white text-sm font-bold py-4 rounded-2xl transition-all disabled:opacity-70 flex items-center justify-center gap-2 active:scale-[0.98] shadow-sm"
+            disabled={loading || googleLoading || githubLoading || !fullName || !email || !username || !phoneNumber || password.length < 6 || password !== confirmPassword}
+            className="w-full bg-[var(--primary)] text-white text-sm font-bold py-3.5 rounded-xl transition-all disabled:opacity-70 active:scale-[0.98] shadow-sm shadow-[var(--primary)]/20 mt-2 flex items-center justify-center gap-2"
           >
-            <span>{loading ? 'Creating account...' : 'Sign up'}</span>
+            <span>{loading ? 'Creating account...' : 'Sign Up'}</span>
           </button>
 
           {error && (
             <motion.p 
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-red-500 text-xs font-bold text-center bg-red-500/10 py-2 rounded-lg"
+              className="text-red-500 text-[10px] font-bold text-center bg-red-500/5 py-2 rounded-lg"
             >
               {error}
             </motion.p>
           )}
 
-          <div className="text-center py-2">
+          <div className="flex items-center gap-4 py-1">
+            <div className="h-[1px] bg-[var(--border-color)] flex-1"></div>
+            <span className="text-[10px] text-[var(--text-secondary)] font-medium">or</span>
+            <div className="h-[1px] bg-[var(--border-color)] flex-1"></div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2.5">
             <button 
               type="button"
-              onClick={() => setShowSocial(!showSocial)}
-              className="text-[11px] font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors tracking-tight"
+              onClick={handleGoogleSignUp}
+              disabled={loading || googleLoading || githubLoading}
+              className="w-full flex items-center justify-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] py-3 rounded-xl text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] transition-all active:scale-[0.98]"
             >
-              {showSocial ? (
-                <>I'm not using grixchat on web browser <span className="text-blue-600">click here</span></>
-              ) : (
-                <>I'm using grixchat on web browser <span className="text-blue-600">click here</span></>
-              )}
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" />
+              <span>Log in with Google</span>
+            </button>
+
+            <button 
+              type="button"
+              onClick={handleGithubSignUp}
+              disabled={loading || googleLoading || githubLoading}
+              className="w-full flex items-center justify-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] py-3 rounded-xl text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] transition-all active:scale-[0.98]"
+            >
+              <Github size={20} className="text-[var(--text-primary)]" />
+              <span>Log in with GitHub</span>
             </button>
           </div>
 
-          <AnimatePresence>
-            {showSocial && (
-              <motion.div 
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="space-y-3 overflow-hidden"
-              >
-                <button 
-                  type="button"
-                  onClick={handleGoogleSignUp}
-                  disabled={loading || googleLoading || githubLoading}
-                  className="w-full flex items-center justify-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] py-4 rounded-2xl text-sm font-bold text-[var(--text-primary)] hover:bg-zinc-50/10 transition-all active:scale-[0.98]"
-                >
-                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" />
-                  <span>{googleLoading ? 'Connecting...' : 'Continue with Google'}</span>
-                </button>
-
-                <button 
-                  type="button"
-                  onClick={handleGithubSignUp}
-                  disabled={loading || googleLoading || githubLoading}
-                  className="w-full flex items-center justify-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] py-4 rounded-2xl text-sm font-bold text-[var(--text-primary)] hover:bg-zinc-50/10 transition-all active:scale-[0.98]"
-                >
-                  <Github size={20} />
-                  <span>{githubLoading ? 'Connecting...' : 'Continue with GitHub'}</span>
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div className="text-center pt-8">
-            <span className="text-xs font-bold text-[var(--text-secondary)]">Already have an account? </span>
-            <Link to="/login" className="text-xs font-bold text-[var(--text-primary)] hover:underline">Sign in</Link>
+          <div className="text-center pt-4 pb-2">
+            <span className="text-[12px] font-medium text-[var(--text-secondary)]">Already have an account? </span>
+            <Link to="/login" className="text-[12px] font-bold text-[var(--primary)] hover:underline">Login</Link>
           </div>
         </form>
       </div>

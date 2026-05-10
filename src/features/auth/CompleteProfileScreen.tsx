@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../services/firebase.ts';
 import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { updateProfile, updatePassword } from 'firebase/auth';
-import { User, AtSign, Lock, Check, Eye, EyeOff } from 'lucide-react';
+import { User, AtSign, Lock, Check, Eye, EyeOff, HelpCircle } from 'lucide-react';
+import { motion } from 'motion/react';
 
 export default function CompleteProfileScreen() {
   const [username, setUsername] = useState('');
@@ -66,123 +67,116 @@ export default function CompleteProfileScreen() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-[var(--bg-main)] flex flex-col items-center relative">
-      <div className="w-full px-6 pt-12 pb-12 z-10 flex flex-col items-center min-h-full">
-        {/* Branding Area */}
-        <div className="flex flex-col items-center mb-10 text-[var(--text-primary)]">
-          <img 
-            src={APP_CONFIG.LOGO_URL} 
-            alt={`${APP_CONFIG.NAME} Logo`} 
-            className="w-16 h-16 mb-4 object-contain"
-            referrerPolicy="no-referrer"
-          />
-          <h1 className="text-2xl font-black tracking-tighter italic">GrixChat</h1>
+    <div className="h-full overflow-y-auto bg-[var(--bg-main)] flex flex-col items-center relative font-sans">
+      <div className="w-full px-8 pt-12 pb-12 z-10 flex flex-col items-center min-h-full relative max-w-md mx-auto">
+        {/* Header Section */}
+        <div className="w-full relative flex items-center justify-center mb-8">
+          <div className="w-16 h-16 bg-[var(--bg-card)] rounded-[20px] shadow-sm flex items-center justify-center border border-[var(--border-color)] p-3">
+            <img 
+              src={APP_CONFIG.LOGO_URL} 
+              alt="Logo" 
+              className="w-full h-full object-contain"
+              referrerPolicy="no-referrer"
+            />
+          </div>
         </div>
 
-        {/* Main Card */}
-        <div className="w-full bg-[var(--bg-card)] rounded-[40px] shadow-2xl border border-[var(--border-color)] px-8 py-10 flex flex-col">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Complete Your Profile.</h2>
-            <p className="text-[var(--text-secondary)] text-sm font-medium">Set up your identity to continue.</p>
+        {/* Header Area */}
+        <div className="text-center mb-8">
+          <h2 className="text-[28px] font-bold text-[var(--text-primary)] mb-2">Complete Profile</h2>
+          <p className="text-[var(--text-secondary)] text-xs leading-relaxed max-w-[280px] mx-auto opacity-80">
+            Set up your identity to join the GrixChat community.
+          </p>
+        </div>
+
+        <form onSubmit={handleComplete} className="w-full space-y-4">
+          <div className="relative group">
+            <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Full Name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="w-full pl-12 pr-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
+              required
+            />
           </div>
 
-          <form onSubmit={handleComplete} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[var(--text-primary)] ml-1">Full Name</label>
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-indigo-500 transition-colors">
-                  <User size={18} />
-                </div>
-                <input 
-                  type="text" 
-                  placeholder="Enter your full name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
-                  required
-                />
-              </div>
+          <div className="relative group">
+            <AtSign size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Choose username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
+              className="w-full pl-12 pr-12 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
+              required
+            />
+            <div className="group absolute right-4 top-1/2 -translate-y-1/2">
+              <HelpCircle size={14} className="text-[var(--text-secondary)] cursor-help" />
+              <span className="hidden group-hover:block absolute right-0 bottom-full mb-2 w-48 p-2 bg-zinc-800 text-white text-[10px] rounded-lg shadow-xl z-50">
+                Only small letters (a-z), numbers (0-9), and underscores (_) allowed.
+              </span>
             </div>
+          </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[var(--text-primary)] ml-1">Username</label>
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-indigo-500 transition-colors">
-                  <AtSign size={18} />
-                </div>
-                <input 
-                  type="text" 
-                  placeholder="Choose a username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[var(--text-primary)] ml-1">Set Password</label>
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-indigo-500 transition-colors">
-                  <Lock size={18} />
-                </div>
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  placeholder="New Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-12 py-3.5 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
-                  required
-                />
-                <button 
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[var(--text-primary)] ml-1">Confirm Password</label>
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-indigo-500 transition-colors">
-                  <Lock size={18} />
-                </div>
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  placeholder="Confirm Password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
-                  required
-                />
-              </div>
-            </div>
-
-            {error && <p className="text-red-500 text-xs font-bold text-center bg-red-500/10 py-2 rounded-lg">{error}</p>}
-
+          <div className="relative group">
+            <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
+            <input 
+              type={showPassword ? "text" : "password"} 
+              placeholder="New Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full pl-12 pr-12 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
+              required
+            />
             <button 
-              type="submit"
-              disabled={loading || !username || !password}
-              className="w-full bg-indigo-600 text-white text-sm font-bold py-4 rounded-2xl hover:bg-indigo-700 transition-all disabled:opacity-70 flex items-center justify-center gap-2 shadow-lg active:scale-[0.98]"
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
             >
-              {loading ? 'Saving...' : (
-                <>
-                  <span>Complete Setup</span>
-                  <Check size={18} />
-                </>
-              )}
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
-          </form>
-        </div>
+          </div>
 
-        {/* Footer */}
+          <div className="relative group">
+            <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
+            <input 
+              type={showPassword ? "text" : "password"} 
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full pl-12 pr-4 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
+              required
+            />
+          </div>
+
+          {error && (
+            <motion.p 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-red-500 text-[10px] font-bold text-center bg-red-500/5 py-2 rounded-lg"
+            >
+              {error}
+            </motion.p>
+          )}
+
+          <button 
+            type="submit"
+            disabled={loading || !username || !password}
+            className="w-full bg-[var(--primary)] text-white text-sm font-bold py-4 rounded-xl transition-all disabled:opacity-70 active:scale-[0.98] shadow-sm shadow-[var(--primary)]/20 mt-2 flex items-center justify-center gap-2"
+          >
+            {loading ? 'Saving...' : (
+              <>
+                <span>Complete Setup</span>
+                <Check size={18} />
+              </>
+            )}
+          </button>
+        </form>
+
         <div className="mt-auto pt-10 pb-6 flex flex-col items-center gap-1">
-          <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest">© 2026 GrixChat</span>
-          <span className="text-[9px] font-medium text-[var(--text-secondary)]/50 uppercase tracking-[0.2em]">from Gothwad technologies</span>
+          <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest opacity-50">© 2026 GrixChat</span>
         </div>
       </div>
     </div>

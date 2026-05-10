@@ -327,6 +327,7 @@ export default function App() {
                     <Route path="/new-group" element={user ? <NewGroupScreen /> : <Navigate to="/login" />} />
                     <Route path="/group-settings/:id" element={user ? <GroupSettingsScreen /> : <Navigate to="/login" />} />
                     <Route path="/login" element={!user ? <LoginScreen /> : <Navigate to="/" />} />
+                    <Route path="/signup" element={!user ? <SignupScreen /> : <Navigate to="/" />} />
                     <Route path="/forgot-password" element={!user ? <ForgotPasswordScreen /> : <Navigate to="/" />} />
                     <Route path="/privacy-policy" element={<PrivacyPolicyScreen />} />
                     <Route path="/terms" element={<TermsAndConditionsScreen />} />
@@ -340,6 +341,7 @@ export default function App() {
                     <Route path="/chat/preview" element={user ? <ImagePreviewScreen /> : <Navigate to="/login" />} />
                     <Route path="/profile/grix-ai" element={user ? <GrixAIProfile /> : <Navigate to="/login" />} />
                     <Route path="/hub/github" element={user ? <GithubScreen /> : <Navigate to="/login" />} />
+                    <Route path="*" element={<Navigate to="/" />} />
                   </Routes>
                 </React.Suspense>
               </div>

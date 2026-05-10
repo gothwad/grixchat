@@ -187,6 +187,7 @@ export default function PostCard({ post, currentUserData, onCommentClick }: Post
             src={post.userAvatar || DEFAULT_LOGO} 
             className="w-8 h-8 rounded-full object-cover border border-[var(--border-color)]/20" 
             referrerPolicy="no-referrer"
+            alt={`${post.userName || 'User'}'s avatar`}
           />
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
@@ -281,6 +282,7 @@ export default function PostCard({ post, currentUserData, onCommentClick }: Post
           className="w-full h-full object-cover" 
           referrerPolicy="no-referrer"
           loading="lazy"
+          alt={post.caption || "GrixChat post content"}
         />
       </div>
 
