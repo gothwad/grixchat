@@ -165,12 +165,10 @@ export default function App() {
     }
     
     const suffix = 'GrixChat';
-    if (pageTitle) {
-      document.title = `${pageTitle} | ${suffix}`;
-    } else if (path === '/') {
-      document.title = `${suffix} | The Ultimate Social Messaging App`;
+    if (pageTitle && path !== '/') {
+      document.title = `${pageTitle} • ${suffix}`;
     } else {
-      document.title = suffix;
+      document.title = `${suffix} | Secure Social Messaging`;
     }
   }, [location]);
 

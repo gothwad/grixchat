@@ -23,6 +23,7 @@ GrixChat is a comprehensive, high-performance social media and real-time messagi
   - **Cloud Firestore**: Real-time database for messages, posts, and user data.
   - **Firebase Realtime Database**: Presence tracking and real-time sync.
   - **Express**: Node.js server for API extensions and static hosting.
+- **Deployment**: Hosted on **Cloudflare Workers** (https://grixchat.gothwad.workers.dev).
 - **Animations**: Motion (Framer Motion) for fluid transitions.
 - **Icons**: Lucide React.
 

@@ -8,7 +8,11 @@ import {
   doc, 
   getDoc,
   getDocs,
-  where
+  where,
+  addDoc,
+  setDoc,
+  serverTimestamp,
+  increment
 } from 'firebase/firestore';
 import { auth, db } from '../../services/firebase.ts';
 import { ArrowLeft, Search, Send, CheckCircle2 } from 'lucide-react';
@@ -24,6 +28,36 @@ export default function ShareScreen() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [contentMetadata, setContentMetadata] = useState<any>(null);
+
+  useEffect(() => {
+    if (!postId) return;
+
+    const fetchContent = async () => {
+      // Try posts
+      let snap = await getDoc(doc(db, "posts", postId));
+      if (snap.exists()) {
+        setContentMetadata({ ...snap.data(), id: snap.id, type: 'post' });
+        return;
+      }
+
+      // Try reels
+      snap = await getDoc(doc(db, "reels", postId));
+      if (snap.exists()) {
+        setContentMetadata({ ...snap.data(), id: snap.id, type: 'reel' });
+        return;
+      }
+
+      // Try tube_videos
+      snap = await getDoc(doc(db, "tube_videos", postId));
+      if (snap.exists()) {
+        setContentMetadata({ ...snap.data(), id: snap.id, type: 'video' });
+        return;
+      }
+    };
+
+    fetchContent();
+  }, [postId]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -54,18 +88,52 @@ export default function ShareScreen() {
   };
 
   const handleShare = async () => {
-    if (selectedUsers.length === 0 || !postId) return;
+    if (selectedUsers.length === 0 || !postId || !contentMetadata || !auth.currentUser) return;
     setSending(true);
 
     try {
-      // In a real app, this would send a message to each user with the post link
-      // For now, we simulate sending
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const batch = [];
       
-      // Navigate back
+      for (const userId of selectedUsers) {
+        const chatId = [auth.currentUser.uid, userId].sort().join('_');
+        
+        const messageData = {
+          chatId,
+          senderId: auth.currentUser.uid,
+          senderName: auth.currentUser.displayName || 'User',
+          senderAvatar: auth.currentUser.photoURL || '',
+          text: `Shared a ${contentMetadata.type}: ${contentMetadata.caption || contentMetadata.title || ''}`,
+          timestamp: serverTimestamp(),
+          isRead: false,
+          type: 'share',
+          sharedContent: {
+            id: contentMetadata.id,
+            type: contentMetadata.type,
+            imageUrl: contentMetadata.imageUrl || contentMetadata.thumbnail || '',
+            title: contentMetadata.title || contentMetadata.caption || '',
+            userName: contentMetadata.userName || ''
+          }
+        };
+
+        // Add message
+        batch.push(addDoc(collection(db, "messages"), messageData));
+
+        // Update/Create conversation
+        const convRef = doc(db, "conversations", chatId);
+        batch.push(setDoc(convRef, {
+          lastMessage: `Shared a ${contentMetadata.type}`,
+          lastMessageTimestamp: serverTimestamp(),
+          lastSenderId: auth.currentUser.uid,
+          participants: [auth.currentUser.uid, userId],
+          [`unreadCount_${userId}`]: increment(1)
+        }, { merge: true }));
+      }
+
+      await Promise.all(batch);
       navigate(-1);
     } catch (err) {
       console.error("Error sharing post:", err);
+      alert("Failed to share.");
     } finally {
       setSending(false);
     }

@@ -488,14 +488,10 @@ export default function ReelWatcherScreen() {
             </div>
 
             {/* Share */}
-            <button className="p-2.5 text-[var(--header-text)]" onClick={() => {
-              if (navigator.share) {
-                navigator.share({
-                  title: reel.caption,
-                  url: window.location.href,
-                });
-              }
-            }}>
+            <button 
+              className="p-2.5 text-[var(--header-text)]" 
+              onClick={() => navigate(`/posts/${reel.id}/share`)}
+            >
               <Share2 size={24} strokeWidth={2.5} />
             </button>
 

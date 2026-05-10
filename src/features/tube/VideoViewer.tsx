@@ -138,7 +138,10 @@ export default function VideoViewer() {
               <ThumbsUp size={16} /> 
               <span>{video.views > 1000 ? (video.views/1000).toFixed(1) + 'K' : video.views}</span>
             </button>
-            <button className="flex items-center gap-2 bg-[var(--bg-card)] border border-[var(--border-color)] px-5 py-2.5 rounded-full text-xs font-bold shrink-0 active:bg-black/5 transition-colors">
+            <button 
+              onClick={() => navigate(`/posts/${video.id}/share`)}
+              className="flex items-center gap-2 bg-[var(--bg-card)] border border-[var(--border-color)] px-5 py-2.5 rounded-full text-xs font-bold shrink-0 active:bg-black/5 transition-colors"
+            >
               <Share2 size={16} /> 
               <span>Share</span>
             </button>

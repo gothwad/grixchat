@@ -131,10 +131,10 @@ app.get("/sitemap.xml", (req, res) => {
   res.setHeader("Content-Type", "application/xml");
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://grixchat.com/</loc><priority>1.0</priority><changefreq>daily</changefreq></url>
-  <url><loc>https://grixchat.com/hub</loc><priority>0.8</priority><changefreq>weekly</changefreq></url>
-  <url><loc>https://grixchat.com/chats</loc><priority>0.9</priority><changefreq>always</changefreq></url>
-  <url><loc>https://grixchat.com/reels</loc><priority>0.8</priority><changefreq>always</changefreq></url>
+  <url><loc>https://grixchat.gothwad.workers.dev/</loc><priority>1.0</priority><changefreq>daily</changefreq></url>
+  <url><loc>https://grixchat.gothwad.workers.dev/hub</loc><priority>0.8</priority><changefreq>weekly</changefreq></url>
+  <url><loc>https://grixchat.gothwad.workers.dev/chats</loc><priority>0.9</priority><changefreq>always</changefreq></url>
+  <url><loc>https://grixchat.gothwad.workers.dev/reels</loc><priority>0.8</priority><changefreq>always</changefreq></url>
 </urlset>`);
 });
 
@@ -301,7 +301,7 @@ app.get("/api/github/debug", (req, res) => {
     hasClientId: !!GITHUB_CLIENT_ID,
     hasClientSecret: !!GITHUB_CLIENT_SECRET,
     appUrl: process.env.APP_URL || "Not Set",
-    isVercel: !!process.env.VERCEL,
+    platform: "Cloudflare/GCP",
     env: process.env.NODE_ENV
   });
 });
@@ -449,8 +449,8 @@ app.post("/api/github/push-batch", async (req, res) => {
 });
 
 // Vite / Static handling
-if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
-  // Dynamic import to avoid crashing on Vercel
+if (process.env.NODE_ENV !== "production") {
+  // Dynamic import for development
   import("vite").then(({ createServer }) => {
     createServer({
       server: { middlewareMode: true },
@@ -467,12 +467,10 @@ if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
   });
 }
 
-// Start server locally
-if (!process.env.VERCEL) {
-  const PORT = 3000;
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-}
+// Start server
+const PORT = 3000;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
 export default app;

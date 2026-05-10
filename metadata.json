@@ -1,6 +1,6 @@
 {
-  "name": "GrixChat | The Social and secure communication of India | GrixChat By Grix Group of India ",
-  "description": "GrixChat - A high-performance social messaging app. Features real-time chat, reels, media sharing, and secure communication.",
+  "name": "GrixChat",
+  "description": "GrixChat is the next-generation secure social messaging platform of India. Experience real-time chat, HD reels, and private communication powered by Grix Group.",
   "requestFramePermissions": [
     "camera",
     "microphone",
