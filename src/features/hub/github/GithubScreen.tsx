@@ -63,11 +63,24 @@ export default function GithubScreen() {
   };
 
   const handleConnect = async () => {
+    // Open a blank window immediately to avoid popup blockers triggered by async delay
+    const authWindow = window.open('about:blank', 'github_oauth', 'width=600,height=700');
+    if (!authWindow) {
+      alert('Please allow popups for GrixChat to connect your GitHub account.');
+      return;
+    }
+
     try {
       const url = await githubApi.getAuthUrl();
-      window.open(url, 'github_oauth', 'width=600,height=700');
+      if (url) {
+        authWindow.location.href = url;
+      } else {
+        throw new Error("Empty Auth URL");
+      }
     } catch (error) {
       console.error("Failed to get auth URL:", error);
+      authWindow.close();
+      alert('Failed to connect with GitHub. Please check if GitHub Client ID is configured.');
     }
   };
 

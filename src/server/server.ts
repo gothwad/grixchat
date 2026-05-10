@@ -315,7 +315,7 @@ app.get("/api/github/auth-url", (req, res) => {
   // Better fallback logic for APP_URL
   let appUrl = process.env.APP_URL;
   
-  // If APP_URL is missing or looks like a hash instead of a URL
+  // If APP_URL is missing or looks like a placeholder, try to derive it
   if (!appUrl || !appUrl.startsWith('http')) {
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || 'https';
@@ -326,8 +326,8 @@ app.get("/api/github/auth-url", (req, res) => {
   appUrl = appUrl.replace(/\/$/, "");
   
   const redirectUri = `${appUrl}/auth/github/callback`;
-  const url = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=repo,user,workflow`;
-  res.json({ url });
+  const url = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=repo,user,workflow&state=${Math.random().toString(36).substring(7)}`;
+  res.json({ url, redirectUri });
 });
 
 // GitHub Callback
@@ -347,23 +347,45 @@ app.get(["/auth/github/callback", "/auth/github/callback/"], async (req, res) =>
 
     res.send(`
       <html>
-        <body>
+        <head>
+          <title>Authenticating...</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+        </head>
+        <body style="margin:0; background:#f4f4f5;">
           <script>
             const token = '${accessToken}';
-            localStorage.setItem('github_token', token);
+            try {
+              localStorage.setItem('github_token', token);
+            } catch (e) {
+              console.error("Local storage error:", e);
+            }
+
+            const message = { type: 'GITHUB_AUTH_SUCCESS', token: token };
+            
             if (window.opener) {
-              window.opener.postMessage({ type: 'GITHUB_AUTH_SUCCESS', token: token }, '*');
-              setTimeout(() => window.close(), 100);
+              window.opener.postMessage(message, '*');
+              // Close after a short delay to ensure message is sent
+              setTimeout(() => {
+                window.close();
+                // Fallback if window.close() is blocked
+                document.getElementById('status').innerText = 'Authenticated! You can close this window.';
+              }, 500);
             } else {
-              window.location.href = '/hub/github';
+              // If no opener, don't just redirect inside the popup as it fails outside iframe
+              document.getElementById('status').innerText = 'Authenticated! Please return to GrixChat.';
+              document.getElementById('loader').style.display = 'none';
+              document.getElementById('success-icon').style.display = 'block';
             }
           </script>
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
-            <div style="width:40px;height:40px;border:4px solid #eee;border-top-color:#10b981;border-radius:50%;animation:spin 1s linear infinite;"></div>
-            <p style="margin-top:20px;font-weight:bold;color:#333;">Authenticating with GitHub...</p>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:20px;text-align:center;">
+            <div id="loader" style="width:48px;height:48px;border:4px solid #e4e4e7;border-top-color:#10b981;border-radius:50%;animation:spin 1s linear infinite;"></div>
+            <div id="success-icon" style="display:none;width:60px;height:60px;background:#10b981;border-radius:50%;color:white;display:none;align-items:center;justify-content:center;font-size:30px;margin-bottom:20px;">✓</div>
+            <p id="status" style="margin-top:24px;font-weight:600;color:#18181b;font-size:16px;">Authenticating with GitHub...</p>
+            <p style="margin-top:8px;color:#71717a;font-size:14px;">Securely connecting your accounts</p>
           </div>
           <style>
             @keyframes spin { to { transform: rotate(360deg); } }
+            #success-icon { display: none; }
           </style>
         </body>
       </html>
