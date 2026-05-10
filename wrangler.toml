@@ -1,6 +1,7 @@
 name = "grixchat"
 main = "src/server/server.ts"
 compatibility_date = "2024-03-24"
+compatibility_flags = ["nodejs_compat"]
 
 # If you are using Cloudflare Pages, this file might not be needed.
 # But for a Worker-based SSR or API, this is the configuration.
