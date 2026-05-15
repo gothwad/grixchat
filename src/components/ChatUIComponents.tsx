@@ -11,12 +11,14 @@ import {
   Reply,
   Forward,
   Edit2,
+  Copy,
   Smile,
   Camera,
   Play,
   Pause
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -190,37 +192,89 @@ export const ChatMessageMenu: React.FC<{
   currentUserUid: string | undefined;
   setShowReactionPicker: (msg: any) => void;
 }> = ({ activeMessageMenu, setActiveMessageMenu, setReplyingTo, startEdit, deleteMessage, currentUserUid, setShowReactionPicker }) => {
-  if (!activeMessageMenu) return null;
-  const isMe = activeMessageMenu.senderId === currentUserUid;
+  const isMe = activeMessageMenu?.senderId === currentUserUid;
 
   return (
-    <div className="absolute bottom-full right-4 mb-3 w-40 bg-[var(--bg-card)] rounded-xl shadow-2xl border border-[var(--border-color)] py-1 z-[9999] overflow-hidden">
-      <div className="px-3 py-1.5 border-b border-[var(--border-color)] mb-1">
-        <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Message Options</p>
-      </div>
-      <button onClick={() => { setShowReactionPicker(activeMessageMenu); setActiveMessageMenu(null); }} className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
-        <Smile size={16} className="text-[var(--text-secondary)]" /> React
-      </button>
-      <button onClick={() => { setReplyingTo(activeMessageMenu); setActiveMessageMenu(null); }} className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
-        <Reply size={16} className="text-[var(--text-secondary)]" /> Reply
-      </button>
-      {isMe && (
-        <button onClick={() => startEdit(activeMessageMenu)} className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
-          <Edit2 size={16} className="text-[var(--text-secondary)]" /> Edit
-        </button>
+    <AnimatePresence>
+      {activeMessageMenu && (
+        <>
+          {/* Backdrop */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.05 }}
+            onClick={() => setActiveMessageMenu(null)}
+            className="fixed inset-0 bg-black/60 z-[9998] backdrop-blur-sm"
+          />
+
+          {/* Sheet */}
+          <motion.div 
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ 
+              type: 'spring', 
+              damping: 40, 
+              stiffness: 1200, 
+              mass: 0.2,
+              restDelta: 0.001 
+            }}
+            className="fixed bottom-0 left-0 right-0 bg-[var(--bg-card)] z-[9999] rounded-t-[32px] border-t border-[var(--border-color)] flex flex-col overflow-hidden shadow-2xl safe-bottom"
+          >
+            {/* Handle */}
+            <div className="w-full flex justify-center py-2">
+              <div className="w-10 h-1 bg-[var(--border-color)] rounded-full opacity-40" />
+            </div>
+
+            {/* Header */}
+            <div className="px-6 py-1 flex items-center justify-between border-b border-[var(--border-color)]/20">
+              <h3 className="text-[20px] leading-[18px] font-black text-[var(--text-primary)] tracking-tight">Message Options</h3>
+              <button 
+                onClick={() => setActiveMessageMenu(null)}
+                className="p-1.5 hover:bg-[var(--bg-main)] rounded-full transition-colors text-[var(--text-secondary)]"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Options List */}
+            <div className="p-2 space-y-1 pb-8">
+              <button onClick={() => { setShowReactionPicker(activeMessageMenu); setActiveMessageMenu(null); }} className="w-full px-5 py-3.5 text-left text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl">
+                <Smile size={20} className="text-[var(--text-secondary)]" /> React
+              </button>
+              <button onClick={() => { setReplyingTo(activeMessageMenu); setActiveMessageMenu(null); }} className="w-full px-5 py-3.5 text-left text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl">
+                <Reply size={20} className="text-[var(--text-secondary)]" /> Reply
+              </button>
+              {isMe && (
+                <button onClick={() => { startEdit(activeMessageMenu); setActiveMessageMenu(null); }} className="w-full px-5 py-3.5 text-left text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl">
+                  <Edit2 size={20} className="text-[var(--text-secondary)]" /> Edit
+                </button>
+              )}
+              <button 
+                onClick={() => {
+                  if (activeMessageMenu.text) {
+                    navigator.clipboard.writeText(activeMessageMenu.text);
+                  }
+                  setActiveMessageMenu(null);
+                }} 
+                className="w-full px-5 py-3.5 text-left text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl"
+              >
+                <Copy size={20} className="text-[var(--text-secondary)]" /> Copy
+              </button>
+              <button onClick={() => setActiveMessageMenu(null)} className="w-full px-5 py-3.5 text-left text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl">
+                <Forward size={20} className="text-[var(--text-secondary)]" /> Forward
+              </button>
+              {isMe && (
+                <button onClick={() => { deleteMessage(activeMessageMenu.id); setActiveMessageMenu(null); }} className="w-full px-5 py-3.5 text-left text-sm font-bold text-red-500 hover:bg-red-50 flex items-center gap-4 transition-colors rounded-2xl">
+                  <Trash size={20} className="text-red-400" /> Delete
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </>
       )}
-      <button onClick={() => setActiveMessageMenu(null)} className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
-        <Forward size={16} className="text-[var(--text-secondary)]" /> Forward
-      </button>
-      {isMe && (
-        <button onClick={() => deleteMessage(activeMessageMenu.id)} className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
-          <Trash size={16} className="text-[var(--text-secondary)]" /> Delete
-        </button>
-      )}
-      <button onClick={() => setActiveMessageMenu(null)} className="w-full px-4 py-2 text-center text-[11px] font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors mt-1">
-        Cancel
-      </button>
-    </div>
+    </AnimatePresence>
   );
 };
 

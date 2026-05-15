@@ -1,18 +1,69 @@
-import React from 'react';
-import { ArrowLeft, Shield, Smartphone, Key, UserX, FileText, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, Shield, Smartphone, Key, UserX, FileText, ChevronRight, Mail, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
+import ReauthSheet from './components/ReauthSheet';
+import ChangeEmailSheet from './components/ChangeEmailSheet';
+import ChangePasswordSheet from './components/ChangePasswordSheet';
+import DeleteAccountSheet from './components/DeleteAccountSheet';
+import { auth } from '../../services/firebase.ts';
 
 export default function AccountSettingsScreen() {
   const navigate = useNavigate();
+  const [isReauthOpen, setIsReauthOpen] = useState(false);
+  const [isEmailSheetOpen, setIsEmailSheetOpen] = useState(false);
+  const [isPasswordSheetOpen, setIsPasswordSheetOpen] = useState(false);
+  const [isDeleteSheetOpen, setIsDeleteSheetOpen] = useState(false);
+  const [reauthCallback, setReauthCallback] = useState<'email' | 'password' | 'delete' | null>(null);
+
+  const currentUser = auth.currentUser;
+  const isPasswordUser = currentUser?.providerData.some(p => p.providerId === 'password');
+
+  const handleReauthSuccess = () => {
+    setIsReauthOpen(false);
+    if (reauthCallback === 'email') {
+      setIsEmailSheetOpen(true);
+    } else if (reauthCallback === 'password') {
+      setIsPasswordSheetOpen(true);
+    } else if (reauthCallback === 'delete') {
+      setIsDeleteSheetOpen(true);
+    }
+    setReauthCallback(null);
+  };
 
   const accountItems = [
-    { icon: Shield, label: 'Security notifications', sub: 'Get notified of security changes', color: 'text-primary' },
-    { icon: UserX, label: 'Delete account', sub: 'Permanently remove your account', color: 'text-red-500', onClick: () => {
-      if (confirm("Are you sure you want to delete your account? This action is irreversible.")) {
-        // Logic for deletion would go here, for now we just log out as safety measure or prompt
-        alert("Account deletion request received. Please contact support for final confirmation.");
+    { icon: Shield, label: 'Security notifications', sub: 'Get notified of security changes', color: 'text-primary', onClick: () => alert("Security notifications are enabled by default for your protection.") },
+    { 
+      icon: Mail, 
+      label: 'Change Email', 
+      sub: currentUser?.email || 'Update your email address', 
+      color: 'text-blue-500',
+      onClick: () => {
+        if (!isPasswordUser) {
+          alert("You are signed in with a social account. Please manage your email through your provider settings.");
+          return;
+        }
+        setReauthCallback('email');
+        setIsReauthOpen(true);
       }
+    },
+    { 
+      icon: Lock, 
+      label: 'Change Password', 
+      sub: 'Update your login password', 
+      color: 'text-orange-500',
+      onClick: () => {
+        if (!isPasswordUser) {
+          alert("You are signed in with a social account. Please manage your password through your provider settings.");
+          return;
+        }
+        setReauthCallback('password');
+        setIsReauthOpen(true);
+      }
+    },
+    { icon: UserX, label: 'Delete account', sub: 'Permanently remove your account', color: 'text-red-500', onClick: () => {
+      setReauthCallback('delete');
+      setIsReauthOpen(true);
     }},
   ];
 
@@ -25,6 +76,7 @@ export default function AccountSettingsScreen() {
           {accountItems.map((item, index) => (
             <button 
               key={item.label}
+              onClick={item.onClick}
               className={`w-full flex items-center gap-4 px-6 py-4 hover:bg-zinc-50/10 transition-colors ${
                 index !== accountItems.length - 1 ? 'border-b border-[var(--border-color)]' : ''
               }`}
@@ -47,6 +99,29 @@ export default function AccountSettingsScreen() {
           </p>
         </div>
       </div>
+
+      <ReauthSheet 
+        isOpen={isReauthOpen} 
+        onClose={() => setIsReauthOpen(false)} 
+        onSuccess={handleReauthSuccess}
+      />
+
+      <ChangeEmailSheet 
+        isOpen={isEmailSheetOpen} 
+        onClose={() => setIsEmailSheetOpen(false)} 
+        onSuccess={() => {}} 
+      />
+
+      <ChangePasswordSheet 
+        isOpen={isPasswordSheetOpen} 
+        onClose={() => setIsPasswordSheetOpen(false)} 
+        onSuccess={() => {}} 
+      />
+
+      <DeleteAccountSheet 
+        isOpen={isDeleteSheetOpen} 
+        onClose={() => setIsDeleteSheetOpen(false)} 
+      />
     </div>
   );
 }

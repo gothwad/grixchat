@@ -14,7 +14,8 @@ import {
   getDocs,
   orderBy,
   increment,
-  limit
+  limit,
+  getCountFromServer
 } from 'firebase/firestore';
 import { db, auth } from '../../../services/firebase.ts';
 import { ImageService } from '../../../services/ImageService.ts';
@@ -25,6 +26,37 @@ import { toDate } from '../../../utils/dateUtils.ts';
 
 export const useChatActions = (chatId: string, receiverId: string, receiver: any, receiverActiveChatId: string | null) => {
   
+  const cleanupMessages = useCallback(async (targetChatId: string) => {
+    if (!targetChatId) return;
+    
+    try {
+      const messagesRef = collection(db, "messages");
+      const qCount = query(messagesRef, where("chatId", "==", targetChatId));
+      
+      const snapshot = await getCountFromServer(qCount);
+      const count = snapshot.data().count;
+
+      if (count > 50) {
+        const qOldest = query(
+          messagesRef, 
+          where("chatId", "==", targetChatId),
+          orderBy("timestamp", "asc"),
+          limit(25)
+        );
+        
+        const oldMsgs = await getDocs(qOldest);
+        if (!oldMsgs.empty) {
+          const batch = writeBatch(db);
+          oldMsgs.docs.forEach(doc => batch.delete(doc.ref));
+          await batch.commit();
+          console.log(`Auto-cleaned up ${oldMsgs.size} messages for chat ${targetChatId}`);
+        }
+      }
+    } catch (error) {
+      console.warn("Auto-cleanup failed:", error);
+    }
+  }, []);
+
   const sendMessage = useCallback(async ({
     text,
     file,
@@ -84,6 +116,9 @@ export const useChatActions = (chatId: string, receiverId: string, receiver: any
       }
 
       await addDoc(collection(db, "messages"), messageData);
+
+      // Trigger automatic cleanup
+      cleanupMessages(chatId).catch(console.error);
 
       // Update Conversations Collection
       if (chatId && chatId.trim() !== "" && (chatId.includes('_') || chatId.length > 5)) { 

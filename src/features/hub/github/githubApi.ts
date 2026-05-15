@@ -16,8 +16,13 @@ export interface GithubRepo {
 
 export const githubApi = {
   async getAuthUrl() {
-    const res = await axios.get('/api/github/auth-url');
-    return res.data.url;
+    try {
+      const res = await axios.get('/api/github/auth-url');
+      return res.data.url;
+    } catch (error) {
+      console.error("API Error fetching GitHub auth URL:", error);
+      throw error;
+    }
   },
 
   async getRepos(token: string) {

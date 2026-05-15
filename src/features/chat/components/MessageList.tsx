@@ -19,8 +19,6 @@ interface MessageListProps {
   setActiveMessageMenu: (msg: any) => void;
   replyingTo: any;
   setReplyingTo: (msg: any) => void;
-  visibleButtonsId: string | null;
-  setVisibleButtonsId: (id: string | null) => void;
   showReactionPicker: any;
   setShowReactionPicker: (msg: any) => void;
   receiverStatus: string;
@@ -45,8 +43,6 @@ export const MessageList: React.FC<MessageListProps> = ({
   setActiveMessageMenu,
   replyingTo,
   setReplyingTo,
-  visibleButtonsId,
-  setVisibleButtonsId,
   showReactionPicker,
   setShowReactionPicker,
   receiverStatus,
@@ -59,7 +55,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       ref={scrollContainerRef}
       onScroll={handleScroll}
       className={`flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-2 relative no-scrollbar touch-pan-y w-full max-w-full ${chatBackground || 'bg-[var(--bg-main)]'}`} 
-      onClick={() => { setActiveMessageMenu(null); setVisibleButtonsId(null); }}
+      onClick={() => { setActiveMessageMenu(null); }}
     >
       <div className="absolute inset-0 opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")', backgroundSize: '400px' }}></div>
       
@@ -103,8 +99,6 @@ export const MessageList: React.FC<MessageListProps> = ({
                 setActiveMessageMenu={setActiveMessageMenu}
                 replyingTo={replyingTo}
                 setReplyingTo={setReplyingTo}
-                visibleButtonsId={visibleButtonsId}
-                setVisibleButtonsId={setVisibleButtonsId}
                 showReactionPicker={showReactionPicker}
                 setShowReactionPicker={setShowReactionPicker}
                 receiverStatus={receiverStatus}

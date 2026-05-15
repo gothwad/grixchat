@@ -70,7 +70,7 @@ export default function ChatsTab() {
                   >
                     <div className="relative shrink-0">
                       <img 
-                        src={call.avatar} 
+                        src={call.avatar || `https://cdn-icons-png.flaticon.com/512/149/149071.png`} 
                         alt={call.user} 
                         className="w-[52px] h-[52px] rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform"
                         referrerPolicy="no-referrer"
@@ -178,7 +178,7 @@ export default function ChatsTab() {
                   >
                     <div className="relative shrink-0">
                       <img 
-                        src={chat.avatar} 
+                        src={chat.avatar || `https://cdn-icons-png.flaticon.com/512/149/149071.png`} 
                         className="w-[52px] h-[52px] object-cover shadow-sm group-hover:scale-105 transition-transform rounded-full"
                         referrerPolicy="no-referrer"
                         alt={chat.user}

@@ -14,26 +14,16 @@ import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/fir
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 
+import { useAuth } from '../../providers/AuthProvider';
+
 export default function ProfileTab() {
-  const [userData, setUserData] = useState<any>(null);
+  const { userData: authUserData } = useAuth();
   const [posts, setPosts] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'posts' | 'reels' | 'tube' | 'saved'>('posts');
   const navigate = useNavigate();
 
   const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
-
-  useEffect(() => {
-    if (!auth.currentUser) return;
-
-    const docRef = doc(db, "users", auth.currentUser.uid);
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setUserData(docSnap.data());
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const userData = authUserData;
 
   // Fetch posts based on active tab
   useEffect(() => {

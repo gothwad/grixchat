@@ -74,6 +74,7 @@ export default function CommentSheet({ postId, isOpen, onClose, currentUserData,
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.05 }}
             onClick={onClose}
             className="fixed inset-0 bg-black/60 z-[200] backdrop-blur-sm"
           />
@@ -83,22 +84,28 @@ export default function CommentSheet({ postId, isOpen, onClose, currentUserData,
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            transition={{ 
+              type: 'spring', 
+              damping: 40, 
+              stiffness: 1200, 
+              mass: 0.2, 
+              restDelta: 0.001 
+            }}
             className="fixed bottom-0 left-0 right-0 h-[80dvh] bg-[var(--bg-card)] z-[201] rounded-t-[32px] border-t border-[var(--border-color)] flex flex-col overflow-hidden shadow-2xl"
           >
             {/* Handle */}
-            <div className="w-full flex justify-center py-3">
-              <div className="w-12 h-1.5 bg-[var(--border-color)] rounded-full opacity-50" />
+            <div className="w-full flex justify-center py-2">
+              <div className="w-10 h-1 bg-[var(--border-color)] rounded-full opacity-40" />
             </div>
 
             {/* Header */}
-            <div className="px-6 pb-4 flex items-center justify-between border-b border-[var(--border-color)]/30">
-              <h3 className="text-lg font-bold text-[var(--text-primary)]">Comments</h3>
+            <div className="px-6 py-1 flex items-center justify-between border-b border-[var(--border-color)]/20">
+              <h3 className="text-[20px] leading-[18px] font-black text-[var(--text-primary)] tracking-tight">Comments</h3>
               <button 
                 onClick={onClose}
-                className="p-2 hover:bg-[var(--bg-main)] rounded-full transition-colors text-[var(--text-secondary)]"
+                className="p-1.5 hover:bg-[var(--bg-main)] rounded-full transition-colors text-[var(--text-secondary)]"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 

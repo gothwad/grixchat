@@ -107,9 +107,10 @@ export default function ChatHeader({
         >
           <div className="relative shrink-0">
             <img 
-              src={receiverId === 'gx-ai' || receiverId === 'grix-ai' ? '/assets/favicon.png' : (receiver?.photoURL || receiver?.icon || `https://cdn-icons-png.flaticon.com/512/149/149071.png`)} 
+              src={(receiverId === 'gx-ai' || receiverId === 'grix-ai') ? '/assets/favicon.png' : (receiver?.photoURL || receiver?.icon || `https://cdn-icons-png.flaticon.com/512/149/149071.png`)} 
               className="w-9 h-9 rounded-full object-cover border border-black/10 shadow-sm"
               referrerPolicy="no-referrer"
+              alt=""
             />
             {((isOnline && !isGroup) || receiverId === 'gx-ai' || receiverId === 'grix-ai') && (
               <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-[var(--header-bg)] rounded-full"></div>

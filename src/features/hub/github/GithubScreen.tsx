@@ -63,24 +63,36 @@ export default function GithubScreen() {
   };
 
   const handleConnect = async () => {
-    // Open a blank window immediately to avoid popup blockers triggered by async delay
+    // Open a blank window immediately to avoid popup blockers
     const authWindow = window.open('about:blank', 'github_oauth', 'width=600,height=700');
+    
     if (!authWindow) {
       alert('Please allow popups for GrixChat to connect your GitHub account.');
       return;
     }
 
     try {
+      console.log('Fetching GitHub Auth URL from backend...');
       const url = await githubApi.getAuthUrl();
+      
       if (url) {
-        authWindow.location.href = url;
+        console.log('Redirecting popup to:', url);
+        authWindow.location.assign(url);
       } else {
-        throw new Error("Empty Auth URL");
+        throw new Error("Backend returned empty auth URL");
       }
     } catch (error) {
-      console.error("Failed to get auth URL:", error);
+      console.error("Failed to get GitHub auth URL:", error);
       authWindow.close();
-      alert('Failed to connect with GitHub. Please check if GitHub Client ID is configured.');
+      
+      let errorMsg = 'Failed to connect with GitHub.';
+      if ((error as any).message?.includes('500') || (error as any).response?.status === 500) {
+        errorMsg += '\n\nError: GITHUB_CLIENT_ID is likely missing on the server.';
+      } else {
+        errorMsg += '\n\nPlease check your internet connection or if GitHub Client ID is configured in .env';
+      }
+      
+      alert(errorMsg);
     }
   };
 

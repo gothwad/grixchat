@@ -42,6 +42,7 @@ export interface UserProfile {
   };
   fcmTokens?: string[];
   isPrivate?: boolean;
+  savedPosts?: string[];
 }
 
 export interface ChatMessage {

@@ -85,16 +85,21 @@ export default function GithubZipHandler({ repo, token, onBack }: Props) {
         repo.owner.login,
         repo.name,
         filesToPush,
-        `Sync ${files.length} files via GrixChat`
+        `Smart Sync via GrixChat: ${files.length} files processed`
       );
 
-      // Mark all as success
-      updatedFiles.forEach(f => {
-        f.status = 'success';
-        f.error = undefined;
-      });
-      setPushProgress(100);
-      setSyncResult({ success: true, message: `Successfully synced ${files.length} files!` });
+      if (result.noChanges) {
+        setSyncResult({ success: true, message: "Sync complete: All files were already up to date!" });
+        updatedFiles.forEach(f => f.status = 'success');
+      } else {
+        // Mark all as success
+        updatedFiles.forEach(f => {
+          f.status = 'success';
+          f.error = undefined;
+        });
+        setPushProgress(100);
+        setSyncResult({ success: true, message: `Successfully updated ${result.tree?.length || 'changed'} files on GitHub!` });
+      }
     } catch (error: any) {
       console.error(`Batch push failed:`, error);
       const errorMessage = error.response?.data?.message || error.message || "Unknown error";

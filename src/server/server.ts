@@ -309,6 +309,7 @@ app.get("/api/github/debug", (req, res) => {
 // GitHub Auth URL
 app.get("/api/github/auth-url", (req, res) => {
   if (!GITHUB_CLIENT_ID) {
+    console.error("GITHUB_CLIENT_ID is missing from environment variables.");
     return res.status(500).json({ error: "GITHUB_CLIENT_ID is not set" });
   }
   
@@ -320,6 +321,7 @@ app.get("/api/github/auth-url", (req, res) => {
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || 'https';
     appUrl = `${protocol}://${host}`;
+    console.log(`Derived APP_URL from request: ${appUrl}`);
   }
   
   // Ensure appUrl doesn't end with a slash for consistency
@@ -327,12 +329,18 @@ app.get("/api/github/auth-url", (req, res) => {
   
   const redirectUri = `${appUrl}/auth/github/callback`;
   const url = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=repo,user,workflow&state=${Math.random().toString(36).substring(7)}`;
+  
+  console.log(`Generated GitHub Auth URL: ${url}`);
+  console.log(`Using Redirect URI: ${redirectUri}`);
+  
   res.json({ url, redirectUri });
 });
 
 // GitHub Callback
 app.get(["/auth/github/callback", "/auth/github/callback/"], async (req, res) => {
   const { code } = req.query;
+  console.log(`GitHub Callback received with code: ${code ? 'PRESENT' : 'MISSING'}`);
+  
   try {
     const response = await axios.post("https://github.com/login/oauth/access_token", {
       client_id: GITHUB_CLIENT_ID,
@@ -343,7 +351,12 @@ app.get(["/auth/github/callback", "/auth/github/callback/"], async (req, res) =>
     });
 
     const accessToken = response.data.access_token;
-    if (!accessToken) throw new Error("No access token");
+    if (!accessToken) {
+      console.error("Failed to obtain access token from GitHub:", response.data);
+      throw new Error("No access token");
+    }
+
+    console.log("GitHub Access Token obtained successfully.");
 
     res.send(`
       <html>
@@ -418,10 +431,19 @@ app.post("/api/github/push", async (req, res) => {
   }
 });
 
+import crypto from "crypto";
+
+// Helper to calculate GitHub's blob SHA
+function calculateGitHubSha(contentBase64: string): string {
+  const content = Buffer.from(contentBase64, 'base64');
+  const header = `blob ${content.length}\0`;
+  const store = Buffer.concat([Buffer.from(header), content]);
+  return crypto.createHash('sha1').update(store).digest('hex');
+}
+
 // GitHub Batch Push (Atomic commit for multiple files)
 app.post("/api/github/push-batch", async (req, res) => {
   const { token, owner, repo, files, message, branch = 'main' } = req.body;
-  // files: Array<{ path: string, content: string }> (content is base64)
   
   try {
     const headers = { 
@@ -429,54 +451,101 @@ app.post("/api/github/push-batch", async (req, res) => {
       Accept: 'application/vnd.github.v3+json'
     };
 
+    console.log(`Starting smart batch push for ${files.length} files to ${owner}/${repo} on branch ${branch}`);
+
     // 1. Get the latest commit SHA of the branch
     const branchRes = await axios.get(`https://api.github.com/repos/${owner}/${repo}/branches/${branch}`, { headers });
     const parentSha = branchRes.data.commit.sha;
     const baseTreeSha = branchRes.data.commit.commit.tree.sha;
 
-    // 2. Create blobs for each file
+    // 2. Fetch the current recursive tree to compare SHAs
+    console.log(`Fetching current tree for comparison...`);
+    const existingTreeRes = await axios.get(`https://api.github.com/repos/${owner}/${repo}/git/trees/${baseTreeSha}?recursive=1`, { headers });
+    const existingFiles = new Map<string, string>(); // path -> sha
+    if (existingTreeRes.data.tree) {
+      existingTreeRes.data.tree.forEach((node: any) => {
+        if (node.type === 'blob') {
+          existingFiles.set(node.path, node.sha);
+        }
+      });
+    }
+
+    // 3. Filter files that actually changed
+    const modifiedFiles = files.filter((file: any) => {
+      const localSha = calculateGitHubSha(file.content);
+      const remoteSha = existingFiles.get(file.path);
+      return localSha !== remoteSha;
+    });
+
+    console.log(`Smart Sync: ${modifiedFiles.length} of ${files.length} files changed.`);
+
+    if (modifiedFiles.length === 0) {
+      return res.json({ 
+        message: "No changes detected. Repository is already up to date.",
+        noChanges: true 
+      });
+    }
+
+    // 4. Create blobs for each modified file with concurrency control
     const treeItems = [];
-    for (const file of files) {
-      try {
-        const blobRes = await axios.post(`https://api.github.com/repos/${owner}/${repo}/git/blobs`, {
-          content: file.content,
-          encoding: 'base64'
-        }, { headers });
-        
-        treeItems.push({
-          path: file.path,
-          mode: '100644',
-          type: 'blob',
-          sha: blobRes.data.sha
-        });
-      } catch (err: any) {
-        console.error(`Failed to create blob for ${file.path}:`, err.response?.data || err.message);
-        throw new Error(`Failed to upload ${file.path}: ${err.response?.data?.message || err.message}`);
+    const BATCH_SIZE = 5;
+    const DELAY_BETWEEN_BATCHES = 400; // ms
+
+    for (let i = 0; i < modifiedFiles.length; i += BATCH_SIZE) {
+      const batch = modifiedFiles.slice(i, i + BATCH_SIZE);
+      console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(modifiedFiles.length / BATCH_SIZE)} (${batch.length} files)`);
+      
+      const results = await Promise.all(batch.map(async (file: any) => {
+        try {
+          const blobRes = await axios.post(`https://api.github.com/repos/${owner}/${repo}/git/blobs`, {
+            content: file.content,
+            encoding: 'base64'
+          }, { headers });
+          
+          return {
+            path: file.path,
+            mode: '100644',
+            type: 'blob',
+            sha: blobRes.data.sha
+          };
+        } catch (err: any) {
+          console.error(`Failed to create blob for ${file.path}:`, err.response?.data || err.message);
+          throw new Error(`Failed to upload ${file.path}: ${err.response?.data?.message || err.message}`);
+        }
+      }));
+      
+      treeItems.push(...results);
+      
+      if (i + BATCH_SIZE < modifiedFiles.length) {
+        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
       }
     }
 
-    // 3. Create a new tree
+    console.log(`Successfully created ${treeItems.length} new blobs. Creating updated tree...`);
+
+    // 5. Create a new tree (basing it on the existing baseTreeSha to merge changes)
     const treeRes = await axios.post(`https://api.github.com/repos/${owner}/${repo}/git/trees`, {
       base_tree: baseTreeSha,
       tree: treeItems
     }, { headers });
 
-    // 4. Create a new commit
+    // 6. Create a new commit
     const commitRes = await axios.post(`https://api.github.com/repos/${owner}/${repo}/git/commits`, {
       message,
       tree: treeRes.data.sha,
       parents: [parentSha]
     }, { headers });
 
-    // 5. Update the branch reference
+    // 7. Update the branch reference
     const refRes = await axios.patch(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${branch}`, {
       sha: commitRes.data.sha,
       force: false
     }, { headers });
 
+    console.log(`Successfully updated reference for branch ${branch}`);
     res.json(refRes.data);
   } catch (error: any) {
-    console.error("Batch push error:", error.response?.data || error.message);
+    console.error("Smart Batch Push error:", error.response?.data || error.message);
     res.status(error.response?.status || 500).json(error.response?.data || { message: error.message });
   }
 });

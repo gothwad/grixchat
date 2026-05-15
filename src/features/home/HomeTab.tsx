@@ -1,28 +1,19 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { collection, query, orderBy, limit, onSnapshot, doc, getDocs, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, doc, getDocs } from 'firebase/firestore';
 import { auth, db } from '../../services/firebase.ts';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { 
-  Heart, 
-  MessageCircle, 
-  MoreVertical, 
-  Share2, 
-  Bookmark,
   Plus,
   Camera,
-  Send,
   PenLine,
   Image as ImageIcon,
   Clapperboard,
   User,
-  X as CloseIcon,
   PlaySquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toDate } from '../../utils/dateUtils.ts';
 
 import PostCard from './components/PostCard.tsx';
-import VideoPostCard from './components/VideoPostCard.tsx';
 import CommentSheet from './components/CommentSheet.tsx';
 
 export default function HomeTab() {
@@ -33,11 +24,8 @@ export default function HomeTab() {
   const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [showStoryMenu, setShowStoryMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
-  const [activeCommentCollection, setActiveCommentCollection] = useState<'posts' | 'tube_videos'>('posts');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -110,7 +98,7 @@ export default function HomeTab() {
     return () => unsubscribe();
   }, [currentUserData?.following]);
 
-  // Fetch Feed (Posts + Videos - Following Only)
+  // Fetch Feed (Posts Only - Following Only)
   useEffect(() => {
     if (!auth.currentUser || !currentUserData) return;
 
@@ -121,12 +109,8 @@ export default function HomeTab() {
     const fetchFeed = async () => {
       setLoading(true);
       try {
-        // Since Firestore 'in' matches max 30 IDs, and we want a merged feed from multiple collections,
-        // we'll fetch both and merge/filter in JS for this demo.
-        // In production, we'd use a unified 'activities' collection.
-        
         // Fetch Posts
-        const postsQ = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(40));
+        const postsQ = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(60));
         const postsSnap = await getDocs(postsQ);
         const postItems = postsSnap.docs.map(d => ({ 
           id: d.id, 
@@ -134,17 +118,8 @@ export default function HomeTab() {
           feedType: 'post' 
         }));
 
-        // Fetch Tube Videos
-        const videosQ = query(collection(db, "tube_videos"), orderBy("createdAt", "desc"), limit(40));
-        const videosSnap = await getDocs(videosQ);
-        const videoItems = videosSnap.docs.map(d => ({ 
-          id: d.id, 
-          ...d.data(), 
-          feedType: 'video' 
-        }));
-
-        // Combine and Filter by Following
-        const combined = [...postItems, ...videoItems]
+        // Filter by Following and Sort
+        const filtered = postItems
           .filter((item: any) => allowedUserIds.includes(item.userId))
           .sort((a: any, b: any) => {
             const timeA = a.createdAt?.toMillis?.() || a.createdAt || 0;
@@ -152,7 +127,7 @@ export default function HomeTab() {
             return timeB - timeA;
           });
 
-        setFeedItems(combined);
+        setFeedItems(filtered);
       } catch (err) {
         console.error("Error fetching feed:", err);
       } finally {
@@ -162,39 +137,6 @@ export default function HomeTab() {
 
     fetchFeed();
   }, [currentUserData?.following]);
-
-  // Autoplay Intersection Observer
-  useEffect(() => {
-    if (loading || feedItems.length === 0) return;
-
-    const observer = new IntersectionObserver((entries) => {
-      // Find all videos currently in view
-      const visibleVideos = entries.filter(e => e.isIntersecting && e.target.getAttribute('data-type') === 'video');
-      
-      if (visibleVideos.length > 0) {
-        // Sort by intersection ratio to find the most "centered" one
-        const bestEntry = visibleVideos.sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        const id = bestEntry.target.getAttribute('data-id');
-        if (id) setActiveVideoId(id);
-      } else {
-        // If no videos are intersecting significantly, clear active video
-        const leavingVideos = entries.filter(e => !e.isIntersecting && e.target.getAttribute('data-type') === 'video');
-        if (leavingVideos.some(e => e.target.getAttribute('data-id') === activeVideoId)) {
-          setActiveVideoId(null);
-        }
-      }
-    }, {
-      root: null,
-      rootMargin: '-20% 0px -20% 0px', // Detects items in the middle 60% of the screen
-      threshold: [0, 0.5, 0.9] // Check at multiple visibility points
-    });
-
-    Object.values(itemRefs.current).forEach(node => {
-      if (node instanceof HTMLElement) observer.observe(node);
-    });
-
-    return () => observer.disconnect();
-  }, [loading, feedItems, activeVideoId]);
 
   const myStories = stories.find(s => s.userId === auth.currentUser?.uid);
   const otherStories = stories.filter(s => s.userId !== auth.currentUser?.uid);
@@ -215,6 +157,7 @@ export default function HomeTab() {
                   src={currentUserData?.photoURL || DEFAULT_LOGO} 
                   className="w-full h-full object-cover" 
                   referrerPolicy="no-referrer"
+                  alt=""
                 />
               </div>
             </div>
@@ -225,7 +168,7 @@ export default function HomeTab() {
           <span className="text-[10px] font-medium text-[var(--text-secondary)]">Your World</span>
         </div>
 
-        {/* WhatsApp-like Dropdown Menu */}
+        {/* Action Menu Dropdown */}
         <AnimatePresence>
           {showStoryMenu && (
             <div className="fixed inset-0 z-[100]" onClick={() => setShowStoryMenu(false)}>
@@ -303,6 +246,7 @@ export default function HomeTab() {
                   src={userStory.photoURL || DEFAULT_LOGO} 
                   className="w-full h-full object-cover" 
                   referrerPolicy="no-referrer"
+                  alt=""
                 />
               </div>
             </div>
@@ -322,32 +266,14 @@ export default function HomeTab() {
           </div>
         ) : feedItems.length > 0 ? (
           feedItems.map((item) => (
-            <div 
-              key={item.id} 
-              ref={el => { itemRefs.current[item.id] = el; }}
-              data-id={item.id}
-              data-type={item.feedType}
-            >
-              {item.feedType === 'video' ? (
-                <VideoPostCard 
-                  video={item} 
-                  currentUserData={currentUserData} 
-                  isActive={activeVideoId === item.id}
-                  onCommentClick={(videoId) => {
-                    setActiveCommentCollection('tube_videos');
-                    setActiveCommentPostId(videoId);
-                  }}
-                />
-              ) : (
-                <PostCard 
-                  post={item} 
-                  currentUserData={currentUserData} 
-                  onCommentClick={(postId) => {
-                    setActiveCommentCollection('posts');
-                    setActiveCommentPostId(postId);
-                  }}
-                />
-              )}
+            <div key={item.id}>
+              <PostCard 
+                post={item} 
+                currentUserData={currentUserData} 
+                onCommentClick={(postId) => {
+                  setActiveCommentPostId(postId);
+                }}
+              />
             </div>
           ))
         ) : (
@@ -356,7 +282,7 @@ export default function HomeTab() {
               <Camera size={32} />
             </div>
             <h3 className="text-sm font-bold text-[var(--text-primary)]">Feed is empty</h3>
-            <p className="text-xs text-[var(--text-secondary)]">Follow people to see their posts and videos here.</p>
+            <p className="text-xs text-[var(--text-secondary)]">Follow people to see their posts here.</p>
             <button 
               onClick={() => navigate('/search-user')}
               className="mt-2 bg-[var(--primary)] text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-lg"
@@ -373,7 +299,7 @@ export default function HomeTab() {
         isOpen={!!activeCommentPostId}
         onClose={() => setActiveCommentPostId(null)}
         currentUserData={currentUserData}
-        collectionName={activeCommentCollection}
+        collectionName="posts"
       />
     </div>
   );

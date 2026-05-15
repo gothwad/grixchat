@@ -207,14 +207,14 @@ export default function ChatBottom({
               <div className="relative rounded-xl overflow-hidden border border-white/10 shadow-md max-w-[120px] sm:max-w-[150px] bg-black/20 p-1.5">
                 {filePreviewUrl ? (
                   selectedFile?.type.startsWith('video/') ? (
-                    <video src={filePreviewUrl} className="w-full h-auto rounded-lg" muted />
+                    <video src={filePreviewUrl || undefined} className="w-full h-auto rounded-lg" muted />
                   ) : selectedFile?.type.startsWith('audio/') ? (
                     <div className="flex items-center gap-2 px-2 py-1">
                       <Mic size={14} className="text-[#00a884]" />
                       <span className="text-[10px] font-black text-white/90">Voice message</span>
                     </div>
                   ) : (
-                    <img src={filePreviewUrl} alt="Preview" className="w-full h-auto rounded-lg" />
+                    <img src={filePreviewUrl || undefined} alt="Preview" className="w-full h-auto rounded-lg" />
                   )
                 ) : (
                   <div className="flex flex-col items-center gap-1 py-1 px-1">

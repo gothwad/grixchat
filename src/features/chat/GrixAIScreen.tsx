@@ -19,6 +19,10 @@ export default function GrixAIScreen() {
   const [showOptions, setShowOptions] = useState(false);
   const [currentModel, setCurrentModel] = useState<AIModelType>(aiService.getCurrentModel());
   const [isSending, setIsSending] = useState(false);
+  const [activeMessageMenu, setActiveMessageMenu] = useState<any | null>(null);
+  const [showReactionPicker, setShowReactionPicker] = useState<any | null>(null);
+  const [replyingTo, setReplyingTo] = useState<any>(null);
+  const [editingMessage, setEditingMessage] = useState<any | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -185,41 +189,42 @@ export default function GrixAIScreen() {
         auth={auth}
         convType="direct"
         receiver={aiReceiver}
-        activeMessageMenu={null}
-        setActiveMessageMenu={() => {}}
-        replyingTo={null}
-        setReplyingTo={() => {}}
-        visibleButtonsId={null}
-        setVisibleButtonsId={() => {}}
-        showReactionPicker={null}
-        setShowReactionPicker={() => {}}
+        activeMessageMenu={activeMessageMenu}
+        setActiveMessageMenu={setActiveMessageMenu}
+        replyingTo={replyingTo}
+        setReplyingTo={setReplyingTo}
+        showReactionPicker={showReactionPicker}
+        setShowReactionPicker={setShowReactionPicker}
         receiverStatus="online"
-        handleMessageTap={() => {}}
+        handleMessageTap={(e, msg) => {
+          e.stopPropagation();
+          setActiveMessageMenu(activeMessageMenu?.id === msg.id ? null : msg);
+        }}
         performReactToMessage={() => {}}
         isOtherTyping={isTyping}
       />
 
       <ChatBottom 
-        activeMessageMenu={null}
-        setActiveMessageMenu={() => {}}
-        setReplyingTo={() => {}}
+        activeMessageMenu={activeMessageMenu}
+        setActiveMessageMenu={setActiveMessageMenu}
+        setReplyingTo={setReplyingTo}
         startEdit={() => {}}
         deleteMessage={() => {}}
         currentUserUid={auth.currentUser?.uid}
-        setShowReactionPicker={() => {}}
+        setShowReactionPicker={setShowReactionPicker}
         editingMessage={null}
         setEditingMessage={() => {}}
         newMessage={newMessage}
         setNewMessage={setNewMessage}
-        replyingTo={null}
+        replyingTo={replyingTo}
         receiver={aiReceiver}
         handleSendMessage={handleSendMessage}
-        fileInputRef={null as any}
-        imageInputRef={null as any}
+        fileInputRef={{ current: null } as any}
+        imageInputRef={{ current: null } as any}
         handleFileChange={() => {}}
         showPlusMenu={false}
         setShowPlusMenu={() => {}}
-        plusMenuRef={null as any}
+        plusMenuRef={{ current: null } as any}
         chatId="grix-ai"
         filePreviewUrl={null}
         isUploading={false}
@@ -230,7 +235,7 @@ export default function GrixAIScreen() {
         handleTyping={() => {}}
         showEmojiPicker={false}
         setShowEmojiPicker={() => {}}
-        emojiPickerRef={null as any}
+        emojiPickerRef={{ current: null } as any}
         isSending={isSending}
         selectedFile={null}
         placeholder={`Ask ${currentModel === 'grix-ai-pro' ? 'Grix AI Pro' : 'Grix AI'}...`}

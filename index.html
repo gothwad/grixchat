@@ -16,6 +16,11 @@
     <meta name="application-name" content="GrixChat" />
     <meta name="apple-mobile-web-app-title" content="GrixChat" />
     
+    <!-- Disable Browser Caching for Dev -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://grixchat.gothwad.workers.dev/" />
@@ -60,7 +65,8 @@
     <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
     <title>GrixChat</title>
     <script>
-      // Register Service Worker for PWA
+      // Service Worker disabled in AI Studio Dev to ensure new updates show up instantly on mobile
+      /*
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
@@ -70,6 +76,17 @@
             .catch(registrationError => {
               console.log('SW registration failed: ', registrationError);
             });
+        });
+      }
+      */
+      
+      // Clean up existing service workers if any
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for(let registration of registrations) {
+            registration.unregister();
+            console.log('Existing SW unregistered to allow updates');
+          }
         });
       }
     </script>

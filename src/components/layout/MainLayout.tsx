@@ -6,19 +6,20 @@ import ResourcesNav, { TabType } from './ResourcesNav.tsx';
 import { useNav } from '../../contexts/NavContext.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 
+// Paths where BottomNav should be visible
+const TAB_PATHS = ['/', '/chats', '/hub', '/reels', '/profile', '/notifications', '/tube'];
+
 export default function MainLayout() {
   const location = useLocation();
   const { isResourcesNavOpen, setIsResourcesNavOpen } = useNav();
   const lastScrollY = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
-  // Paths where BottomNav should be visible
-  const tabPaths = ['/', '/chats', '/hub', '/reels', '/profile', '/notifications', '/tube'];
   const isChatScreen = location.pathname.startsWith('/chat/');
-  const showBottomNav = tabPaths.includes(location.pathname);
+  const showBottomNav = TAB_PATHS.includes(location.pathname);
   
   // Paths where TopNav should be visible
-  const showTopNav = tabPaths.includes(location.pathname);
+  const showTopNav = TAB_PATHS.includes(location.pathname);
 
   // Determine current tab for ResourcesNav
   const getTab = (path: string): TabType | null => {
@@ -30,12 +31,12 @@ export default function MainLayout() {
 
   // Reset visibility on tab change - Keep it open by default only on main tabs
   useEffect(() => {
-    if (tabPaths.includes(location.pathname)) {
+    if (TAB_PATHS.includes(location.pathname)) {
       setIsResourcesNavOpen(true);
     } else {
       setIsResourcesNavOpen(false);
     }
-  }, [location.pathname, setIsResourcesNavOpen, tabPaths]);
+  }, [location.pathname, setIsResourcesNavOpen]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden">

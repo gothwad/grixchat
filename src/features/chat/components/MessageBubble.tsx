@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'motion/react';
+import { motion, useMotionValue, useTransform } from 'motion/react';
 import { 
   Check, 
   CheckCheck, 
@@ -28,8 +28,6 @@ interface MessageBubbleProps {
   setActiveMessageMenu: (msg: any) => void;
   replyingTo: any;
   setReplyingTo: (msg: any) => void;
-  visibleButtonsId: string | null;
-  setVisibleButtonsId: (id: string | null) => void;
   showReactionPicker: any;
   setShowReactionPicker: (msg: any) => void;
   receiverStatus: string;
@@ -47,8 +45,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   setActiveMessageMenu,
   replyingTo,
   setReplyingTo,
-  visibleButtonsId,
-  setVisibleButtonsId,
   showReactionPicker,
   setShowReactionPicker,
   receiverStatus,
@@ -56,6 +52,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   performReactToMessage
 }) => {
   const navigate = useNavigate();
+  const x = useMotionValue(0);
+  
+  // Smooth reveal effects for the reply icon
+  const iconOpacity = useTransform(x, [0, 50], [0, 1]);
+  const iconScale = useTransform(x, [0, 50], [0.5, 1.2]);
+  const iconX = useTransform(x, [0, 50], [-20, 0]);
 
   if (msg.type === 'system') {
     return (
@@ -70,44 +72,42 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   }
 
   return (
-    <div className={`flex w-full max-w-full ${isMe ? 'justify-end' : 'justify-start'} ${!isSameSender ? 'mt-2' : 'mt-0.5'}`}>
-      <div className="relative group max-w-[75%] min-w-0">
+    <div className={`flex w-full max-w-full ${isMe ? 'justify-end' : 'justify-start'} ${!isSameSender ? 'mt-3' : 'mt-0.5'}`}>
+      <div className="relative group max-w-[85%] min-w-0 flex items-center gap-2">
         {!isSameSender && (
           <div className={`absolute top-0 w-3 h-3 ${isMe ? '-right-2 bg-[var(--bubble-own)]' : '-left-2 bg-[var(--bubble-other)]'}`} 
                style={{ clipPath: isMe ? 'polygon(0 0, 0 100%, 100% 0)' : 'polygon(100% 0, 100% 100%, 0 0)' }}>
           </div>
         )}
 
+        {/* Swipe Reveal Icon (Left side) - Controlled by Motion for maximum smoothness */}
         <motion.div 
+          style={{ opacity: iconOpacity, scale: iconScale, x: iconX }}
+          className="absolute left-[-40px] top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 pointer-events-none"
+        >
+          <div className="p-2 bg-[var(--primary)]/15 rounded-full text-[var(--primary)] shadow-sm">
+            <Reply size={16} />
+          </div>
+        </motion.div>
+
+        <motion.div 
+          style={{ x }}
           drag="x"
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.5}
+          dragConstraints={{ left: 0, right: 100 }}
+          dragElastic={{ left: 0, right: 0.1 }}
+          dragTransition={{ bounceStiffness: 600, bounceDamping: 30 }}
           dragSnapToOrigin
           onDragStart={(e) => e.stopPropagation()}
-          onDrag={(_, info) => {
-            if (!isMe) {
-              if (info.offset.x > 70 && replyingTo?.id !== msg.id) {
-                setReplyingTo(msg);
-                if (window.navigator.vibrate) window.navigator.vibrate(10);
-              }
-              if (info.offset.x < -70 && activeMessageMenu?.id !== msg.id) {
-                setActiveMessageMenu(msg);
-                if (window.navigator.vibrate) window.navigator.vibrate(10);
-              }
-            } else {
-              if (info.offset.x < -70 && replyingTo?.id !== msg.id) {
-                setReplyingTo(msg);
-                if (window.navigator.vibrate) window.navigator.vibrate(10);
-              }
-              if (info.offset.x > 70 && activeMessageMenu?.id !== msg.id) {
-                setActiveMessageMenu(msg);
-                if (window.navigator.vibrate) window.navigator.vibrate(10);
-              }
+          onDragEnd={(_, info) => {
+            // Left to right swipe (positive x) triggers reply
+            if (info.offset.x > 50) {
+              setReplyingTo(msg);
+              if (window.navigator.vibrate) try { window.navigator.vibrate(10); } catch(e){}
             }
           }}
           onClick={(e) => handleMessageTap(e, msg)}
-          className={`px-2.5 py-1.5 rounded-lg shadow-sm relative cursor-pointer active:scale-[0.98] transition-transform select-none max-w-full ${
-            activeMessageMenu?.id === msg.id ? 'z-50' : 'z-10'
+          className={`px-3 py-2 rounded-xl shadow-sm relative cursor-pointer active:scale-[0.99] transition-transform select-none max-w-full overflow-visible touch-none ${
+            activeMessageMenu?.id === msg.id ? 'z-50 ring-2 ring-[var(--primary)]/30' : 'z-10'
           } ${
             isMe 
               ? 'bg-[var(--bubble-own)] text-[var(--bubble-text-own)]' 
@@ -152,7 +152,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 }}
               >
                 <img 
-                  src={msg.imageUrl} 
+                  src={msg.imageUrl || undefined} 
                   alt="Sent image" 
                   className="max-w-full h-auto max-h-64 object-cover"
                   referrerPolicy="no-referrer"
@@ -165,12 +165,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               </div>
             )}
             {(msg.type === 'video' || (msg.fileUrl && msg.type === 'video')) && (
-              <div className="mb-1 rounded-lg overflow-hidden border border-black/5">
+              <div className="mb-1 rounded-lg overflow-hidden border border-black/10 aspect-video w-64 bg-black group/video relative">
                 <video 
-                  src={msg.fileUrl || msg.imageUrl} 
-                  controls 
-                  className="max-w-full h-auto max-h-80 object-contain bg-black"
+                  src={msg.fileUrl || msg.imageUrl || undefined} 
+                  className="w-full h-full object-cover opacity-90 group-hover/video:opacity-100 transition-opacity"
                   playsInline
+                  controls
                 />
               </div>
             )}
@@ -197,7 +197,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             )}
             {msg.type === 'share' && msg.sharedContent && (
               <div 
-                className="mb-1 rounded-xl overflow-hidden bg-black/5 border border-black/10 cursor-pointer active:scale-[0.98] transition-transform shadow-sm max-w-sm"
+                className="mb-1 rounded-xl overflow-hidden bg-zinc-900 border border-black/10 cursor-pointer active:scale-[0.98] transition-transform shadow-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (msg.sharedContent.type === 'post') navigate(`/posts/${msg.sharedContent.id}`);
@@ -205,28 +205,35 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   else if (msg.sharedContent.type === 'video') navigate(`/tube/watch/${msg.sharedContent.id}`);
                 }}
               >
-                <div className="relative aspect-square sm:aspect-video bg-zinc-800">
+                <div className={`relative bg-zinc-800 ${
+                  msg.sharedContent.type === 'reel' 
+                    ? 'aspect-[9/16] w-48 mx-auto' 
+                    : msg.sharedContent.type === 'video' 
+                      ? 'aspect-video w-64' 
+                      : 'aspect-square sm:aspect-video w-64'
+                }`}>
                   <img 
-                    src={msg.sharedContent.imageUrl} 
-                    className="w-full h-full object-cover opacity-90"
+                    src={msg.sharedContent.imageUrl || undefined} 
+                    className="w-full h-full object-cover"
                     alt={msg.sharedContent.title}
+                    referrerPolicy="no-referrer"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-3">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent flex flex-col justify-end p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-5 h-5 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
                         <Reply size={10} className="text-white fill-current" />
                       </div>
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest drop-shadow-md">
+                      <span className="text-[9px] font-black text-white uppercase tracking-[0.2em] drop-shadow-md">
                         {msg.sharedContent.type}
                       </span>
                     </div>
-                    <p className="text-white text-[12px] font-bold truncate drop-shadow-md">
+                    <p className="text-white text-[12px] font-black leading-tight line-clamp-2 drop-shadow-md">
                       {msg.sharedContent.title}
                     </p>
                   </div>
                 </div>
-                <div className="p-2.5 flex items-center justify-between bg-white/50 backdrop-blur-sm">
-                  <span className="text-[11px] font-black text-[var(--primary)] uppercase tracking-[0.1em]">
+                <div className="p-2.5 flex items-center justify-between bg-white dark:bg-zinc-800">
+                  <span className="text-[10px] font-black text-[var(--primary)] uppercase tracking-widest">
                     Open in {msg.sharedContent.type === 'video' ? 'GrixTube' : msg.sharedContent.type === 'reel' ? 'Reels' : 'Feed'}
                   </span>
                 </div>
@@ -258,14 +265,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           )}
         </motion.div>
 
-        <div className={`absolute top-1/2 -translate-y-1/2 transition-all duration-200 flex items-center gap-1 whitespace-nowrap z-20 ${isMe ? 'right-full mr-2' : 'left-full ml-2'} ${activeMessageMenu?.id === msg.id || visibleButtonsId === msg.id ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto'}`}>
-          <button onClick={(e) => { e.stopPropagation(); setReplyingTo(msg); setVisibleButtonsId(null); }} className="p-1.5 bg-white hover:bg-zinc-50 rounded-full text-[var(--primary)] shadow-md border border-zinc-100">
-            <Reply size={14} />
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); setActiveMessageMenu(activeMessageMenu?.id === msg.id ? null : msg); setVisibleButtonsId(null); }} className="p-1.5 bg-white hover:bg-zinc-50 rounded-full text-[var(--primary)] shadow-md border border-zinc-100">
-            <MoreVertical size={14} />
-          </button>
-        </div>
       </div>
     </div>
   );

@@ -31,6 +31,9 @@ function ErrorFallback({ error }: { error: any }) {
   );
 }
 
+import ProfileTab from './features/profile/ProfileTab';
+import SettingsScreen from './features/settings/SettingsScreen';
+
 // Lazy Loading Features & Screens
 const ChatsTab = React.lazy(() => import('./features/chat').then(m => ({ default: m.ChatsTab })));
 const HomeTab = React.lazy(() => import('./features/home').then(m => ({ default: m.HomeTab })));
@@ -58,7 +61,7 @@ const LikeNotificationsScreen = React.lazy(() => import('./features/notification
 const CommentsScreen = React.lazy(() => import('./features/home/CommentsScreen.tsx'));
 const ShareScreen = React.lazy(() => import('./features/home/ShareScreen.tsx'));
 
-const ProfileTab = React.lazy(() => import('./features/profile').then(m => ({ default: m.ProfileTab })));
+// ProfileTab directly imported above
 const EditProfileScreen = React.lazy(() => import('./features/profile').then(m => ({ default: m.EditProfileScreen })));
 const UserProfileScreen = React.lazy(() => import('./features/profile').then(m => ({ default: m.UserProfileScreen })));
 const FollowListScreen = React.lazy(() => import('./features/profile').then(m => ({ default: m.FollowListScreen })));
@@ -79,7 +82,7 @@ const CameraTab = React.lazy(() => import('./features/camera').then(m => ({ defa
 
 const PrivacySettingsScreen = React.lazy(() => import('./features/settings').then(m => ({ default: m.PrivacySettingsScreen })));
 const AppPreferencesScreen = React.lazy(() => import('./features/settings').then(m => ({ default: m.AppPreferencesScreen })));
-const SettingsScreen = React.lazy(() => import('./features/settings/SettingsScreen'));
+// SettingsScreen directly imported above
 const AccountSettingsScreen = React.lazy(() => import('./features/settings').then(m => ({ default: m.AccountSettingsScreen })));
 const NotificationsSettingsScreen = React.lazy(() => import('./features/settings').then(m => ({ default: m.NotificationsSettingsScreen })));
 const HelpScreen = React.lazy(() => import('./features/settings').then(m => ({ default: m.HelpScreen })));
@@ -88,6 +91,7 @@ const TimeSpentScreen = React.lazy(() => import('./features/settings/TimeSpentSc
 const FavoritesScreen = React.lazy(() => import('./features/settings/FavoritesScreen'));
 const BlockedAccountsScreen = React.lazy(() => import('./features/settings/BlockedAccountsScreen'));
 const MutedAccountsScreen = React.lazy(() => import('./features/settings/MutedAccountsScreen'));
+const DataUsageScreen = React.lazy(() => import('./features/settings/DataUsageScreen'));
 const AnalyticsScreen = React.lazy(() => import('./features/analytics/AnalyticsScreen'));
 const NewGroupScreen = React.lazy(() => import('./features/chat/NewGroupScreen'));
 const GroupSettingsScreen = React.lazy(() => import('./features/chat/GroupSettingsScreen'));
@@ -308,6 +312,7 @@ export default function App() {
                     <Route path="/setup-lock/:type" element={user ? <SetupLockScreen /> : <Navigate to="/login" />} />
                     <Route path="/verify-lock" element={user ? <VerifyLockScreen /> : <Navigate to="/login" />} />
                     <Route path="/notifications-settings" element={user ? <NotificationsSettingsScreen /> : <Navigate to="/login" />} />
+                    <Route path="/data-usage" element={user ? <DataUsageScreen /> : <Navigate to="/login" />} />
                     <Route path="/help" element={user ? <HelpScreen /> : <Navigate to="/login" />} />
                     <Route path="/app-info" element={user ? <AppInfoScreen /> : <Navigate to="/login" />} />
                     <Route path="/time-spent" element={user ? <TimeSpentScreen /> : <Navigate to="/login" />} />

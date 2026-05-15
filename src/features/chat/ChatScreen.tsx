@@ -37,8 +37,6 @@ export default function ChatScreen() {
   const [activeMessageMenu, setActiveMessageMenu] = useState<any | null>(null);
   const [showReactionPicker, setShowReactionPicker] = useState<any | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [visibleButtonsId, setVisibleButtonsId] = useState<string | null>(null);
-  const [lastTap, setLastTap] = useState<{id: string, time: number}>({id: '', time: 0});
   const [isSending, setIsSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | Blob | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
@@ -189,19 +187,13 @@ export default function ChatScreen() {
   const handleMessageTap = useCallback((e: React.MouseEvent | React.TouchEvent, msg: any) => {
     if (e.type === 'touchstart' && e.cancelable) e.preventDefault();
     e.stopPropagation();
-    const now = Date.now();
-    if (lastTap.id === msg.id && now - lastTap.time < 300) {
-      setReplyingTo(msg);
-      setVisibleButtonsId(null);
-      setShowReactionPicker(null);
-      setLastTap({id: '', time: 0});
-      if (window.navigator.vibrate) window.navigator.vibrate(10);
-    } else {
-      setLastTap({id: msg.id, time: now});
-      setVisibleButtonsId(visibleButtonsId === msg.id ? null : msg.id);
-      setShowReactionPicker(showReactionPicker?.id === msg.id ? null : msg);
-    }
-  }, [lastTap, visibleButtonsId, showReactionPicker]);
+    
+    // Open message options sheet on single tap
+    setActiveMessageMenu(msg);
+    setShowReactionPicker(null);
+    
+    if (window.navigator.vibrate) window.navigator.vibrate(5);
+  }, []);
 
   const startEdit = useCallback((msg: any) => {
     setEditingMessage(msg);
@@ -309,8 +301,6 @@ export default function ChatScreen() {
         setActiveMessageMenu={setActiveMessageMenu}
         replyingTo={replyingTo}
         setReplyingTo={setReplyingTo}
-        visibleButtonsId={visibleButtonsId}
-        setVisibleButtonsId={setVisibleButtonsId}
         showReactionPicker={showReactionPicker}
         setShowReactionPicker={setShowReactionPicker}
         receiverStatus={receiverStatus}
