@@ -1,20 +1,38 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs, orderBy, limit } from 'firebase/firestore';
 import { auth, db } from '../../../services/firebase.ts';
 import { toDate } from '../../../utils/dateUtils.ts';
 import { CacheService } from '../../../services/CacheService.ts';
 
 export const useConversations = (activeFilter: string) => {
   const [conversations, setConversations] = useState<any[]>([]);
+  const [otherUsers, setOtherUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!auth.currentUser) return;
     if (activeFilter === 'Calls') return;
 
+    // Fetch suggested users (others)
+    const fetchOtherUsers = async (chatParticipantIds: string[]) => {
+      try {
+        const qUsers = query(collection(db, "users"), limit(20));
+        const userSnap = await getDocs(qUsers);
+        const others = userSnap.docs
+          .map(d => d.data())
+          .filter(u => u.uid !== auth.currentUser?.uid && !chatParticipantIds.includes(u.uid))
+          .slice(0, 5); // Just show top 5 suggested
+        setOtherUsers(others);
+      } catch (err) {
+        console.warn("Failed to fetch other users", err);
+      }
+    };
+
     const q = query(
       collection(db, "conversations"),
-      where("participants", "array-contains", auth.currentUser.uid)
+      where("participants", "array-contains", auth.currentUser.uid),
+      orderBy("lastMessageTimestamp", "desc"),
+      limit(30)
     );
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
@@ -30,6 +48,11 @@ export const useConversations = (activeFilter: string) => {
       const otherUserIds = Array.from(new Set(convDocs.map((conv: any) => 
         conv.participants.find((p: string) => p !== auth.currentUser?.uid)
       ))).filter(Boolean) as string[];
+
+      // Fetch other users once we know who we are already chatting with
+      if (otherUserIds.length > 0 || convDocs.length === 0) {
+        fetchOtherUsers(otherUserIds);
+      }
 
       const userMap = new Map();
       const uncachedIds = otherUserIds.filter(id => !CacheService.getUser(id));
@@ -109,5 +132,5 @@ export const useConversations = (activeFilter: string) => {
     return () => unsubscribe();
   }, [activeFilter]);
 
-  return { conversations, loading };
+  return { conversations, otherUsers, loading };
 };

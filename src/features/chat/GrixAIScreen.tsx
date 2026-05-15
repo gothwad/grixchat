@@ -9,6 +9,7 @@ import { auth } from '../../services/firebase.ts';
 import ChatHeader from '../../components/layout/ChatHeader.tsx';
 import ChatBottom from '../../components/layout/ChatBottom.tsx';
 import { MessageList } from './components/MessageList';
+import { ChatOptionsSheet } from './components/ChatOptionsSheet';
 
 export default function GrixAIScreen() {
   const navigate = useNavigate();
@@ -140,42 +141,64 @@ export default function GrixAIScreen() {
         currentUserId={auth.currentUser?.uid}
         onWatchTogether={() => {}}
         type="direct"
-        customMenu={
-          <div className="py-1">
-            <div className="px-4 py-2 border-b border-[var(--border-color)]/30 mb-1">
-              <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest">Select AI Model</p>
-            </div>
-            <button 
-              onClick={() => toggleModel('grix-ai')}
-              className={`w-full flex items-center justify-between px-4 py-3 text-sm font-bold transition-colors ${currentModel === 'grix-ai' ? 'text-primary bg-primary/5' : 'text-[var(--text-primary)] hover:bg-[var(--bg-card)]'}`}
-            >
-              <div className="flex items-center gap-3">
-                <Zap size={18} />
-                <span>Grix AI (Llama 3.1)</span>
-              </div>
-              {currentModel === 'grix-ai' && <div className="w-2 h-2 rounded-full bg-primary" />}
-            </button>
-            <button 
-              onClick={() => toggleModel('grix-ai-pro')}
-              className={`w-full flex items-center justify-between px-4 py-3 text-sm font-bold transition-colors ${currentModel === 'grix-ai-pro' ? 'text-indigo-500 bg-indigo-500/5' : 'text-[var(--text-primary)] hover:bg-[var(--bg-card)]'}`}
-            >
-              <div className="flex items-center gap-3">
-                <Cpu size={18} />
-                <span>Grix AI Pro (Llama 3.3)</span>
-              </div>
-              {currentModel === 'grix-ai-pro' && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
-            </button>
-            <div className="h-px bg-[var(--border-color)]/30 my-1" />
-            <button 
-              onClick={clearChat}
-              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-rose-500 hover:bg-rose-500/5 transition-colors"
-            >
-              <Trash2 size={18} />
-              <span>Clear History</span>
-            </button>
-          </div>
-        }
       />
+
+      <ChatOptionsSheet
+        isOpen={showOptions}
+        onClose={() => setShowOptions(false)}
+        receiver={aiReceiver}
+        receiverId="grix-ai"
+        isArchived={false}
+        isHidden={false}
+        isMuted={false}
+        archiveChat={() => {}}
+        hideChat={() => {}}
+        setIsMuted={() => {}}
+        deleteChat={clearChat}
+        onWatchTogether={() => {}}
+      >
+        <div className="py-1">
+          <div className="px-5 py-2 border-b border-[var(--border-color)]/30 mb-2">
+            <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest">Select AI Model</p>
+          </div>
+          <button 
+            onClick={() => toggleModel('grix-ai')}
+            className={`w-full flex items-center justify-between px-5 py-4 text-sm font-bold transition-colors ${currentModel === 'grix-ai' ? 'text-[var(--primary)] bg-[var(--primary)]/5' : 'text-[var(--text-primary)] hover:bg-[var(--bg-main)]'}`}
+          >
+            <div className="flex items-center gap-4">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center ${currentModel === 'grix-ai' ? 'bg-[var(--primary)]/10' : 'bg-[var(--bg-main)]'}`}>
+                <Zap size={20} className={currentModel === 'grix-ai' ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)]'} />
+              </div>
+              <span>Grix AI (Llama 3.1)</span>
+            </div>
+            {currentModel === 'grix-ai' && <div className="w-2 h-2 rounded-full bg-[var(--primary)]" />}
+          </button>
+          <button 
+            onClick={() => toggleModel('grix-ai-pro')}
+            className={`w-full flex items-center justify-between px-5 py-4 text-sm font-bold transition-colors ${currentModel === 'grix-ai-pro' ? 'text-indigo-500 bg-indigo-500/5' : 'text-[var(--text-primary)] hover:bg-[var(--bg-main)]'}`}
+          >
+            <div className="flex items-center gap-4">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center ${currentModel === 'grix-ai-pro' ? 'bg-indigo-500/10' : 'bg-[var(--bg-main)]'}`}>
+                <Cpu size={20} className={currentModel === 'grix-ai-pro' ? 'text-indigo-500' : 'text-[var(--text-secondary)]'} />
+              </div>
+              <span>Grix AI Pro (Llama 3.3)</span>
+            </div>
+            {currentModel === 'grix-ai-pro' && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
+          </button>
+          
+          <div className="h-px bg-[var(--border-color)]/20 mx-5 my-2" />
+          
+          <button 
+            onClick={clearChat}
+            className="w-full flex items-center gap-4 px-5 py-4 text-sm font-bold text-rose-500 hover:bg-rose-500/5 transition-colors"
+          >
+            <div className="w-9 h-9 rounded-full bg-rose-500/10 flex items-center justify-center">
+              <Trash2 size={20} />
+            </div>
+            <span>Clear History</span>
+          </button>
+        </div>
+      </ChatOptionsSheet>
 
       <MessageList 
         scrollContainerRef={scrollContainerRef}
@@ -226,18 +249,18 @@ export default function GrixAIScreen() {
         setShowPlusMenu={() => {}}
         plusMenuRef={{ current: null } as any}
         chatId="grix-ai"
-        filePreviewUrl={null}
+        filePreviewUrls={[]}
         isUploading={false}
         uploadProgress={0}
-        setSelectedFile={() => {}}
-        setFilePreviewUrl={() => {}}
+        setSelectedFiles={() => {}}
+        setFilePreviewUrls={() => {}}
         textareaRef={textareaRef}
         handleTyping={() => {}}
         showEmojiPicker={false}
         setShowEmojiPicker={() => {}}
         emojiPickerRef={{ current: null } as any}
         isSending={isSending}
-        selectedFile={null}
+        selectedFiles={[]}
         placeholder={`Ask ${currentModel === 'grix-ai-pro' ? 'Grix AI Pro' : 'Grix AI'}...`}
       />
     </div>

@@ -85,6 +85,14 @@ export function useChatSync(receiverId: string | undefined, chatId: string, conv
     if (auth.currentUser) {
       const myStatusRef = rtdbRef(rtdb, `/status/${auth.currentUser.uid}`);
       update(myStatusRef, { activeChatId: receiverId });
+      
+      // Also reset unread count when opening the chat
+      if (chatId) {
+        const convRef = doc(db, "conversations", chatId);
+        updateDoc(convRef, {
+          [`unreadCount_${auth.currentUser.uid}`]: 0
+        }).catch(err => console.warn("Failed to reset unread count:", err));
+      }
     }
 
     return () => {

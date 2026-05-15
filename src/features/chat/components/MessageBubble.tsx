@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, useMotionValue, useTransform } from 'motion/react';
+import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
 import { 
   Check, 
   CheckCheck, 
@@ -33,6 +33,8 @@ interface MessageBubbleProps {
   receiverStatus: string;
   handleMessageTap: (e: any, msg: any) => void;
   performReactToMessage: (id: string, emoji: string) => void;
+  onJumpToMessage?: (messageId: string) => void;
+  isHighlighted?: boolean;
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -49,16 +51,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   setShowReactionPicker,
   receiverStatus,
   handleMessageTap,
-  performReactToMessage
+  performReactToMessage,
+  onJumpToMessage,
+  isHighlighted
 }) => {
   const navigate = useNavigate();
   const x = useMotionValue(0);
   
-  // Smooth reveal effects for the reply icon
-  const iconOpacity = useTransform(x, [0, 50], [0, 1]);
-  const iconScale = useTransform(x, [0, 50], [0.5, 1.2]);
-  const iconX = useTransform(x, [0, 50], [-20, 0]);
-
   if (msg.type === 'system') {
     return (
       <div className="flex justify-center my-4 w-full">
@@ -72,23 +71,28 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   }
 
   return (
-    <div className={`flex w-full max-w-full ${isMe ? 'justify-end' : 'justify-start'} ${!isSameSender ? 'mt-3' : 'mt-0.5'}`}>
-      <div className="relative group max-w-[85%] min-w-0 flex items-center gap-2">
+    <div id={`msg-${msg.id}`} className={`flex w-full max-w-full ${isMe ? 'justify-end' : 'justify-start'} ${!isSameSender ? 'mt-3' : 'mt-0.5'} relative`}>
+      {/* WhatsApp-style full height highlight stripe */}
+      <AnimatePresence>
+        {isHighlighted && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.15 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-[var(--primary)] z-0 pointer-events-none"
+            style={{ margin: '-2px -16px' }}
+          />
+        )}
+      </AnimatePresence>
+      
+      <div className={`relative group max-w-[85%] min-w-0 flex items-center gap-2 ${isHighlighted ? 'z-10' : ''}`}>
         {!isSameSender && (
           <div className={`absolute top-0 w-3 h-3 ${isMe ? '-right-2 bg-[var(--bubble-own)]' : '-left-2 bg-[var(--bubble-other)]'}`} 
                style={{ clipPath: isMe ? 'polygon(0 0, 0 100%, 100% 0)' : 'polygon(100% 0, 100% 100%, 0 0)' }}>
           </div>
         )}
 
-        {/* Swipe Reveal Icon (Left side) - Controlled by Motion for maximum smoothness */}
-        <motion.div 
-          style={{ opacity: iconOpacity, scale: iconScale, x: iconX }}
-          className="absolute left-[-40px] top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 pointer-events-none"
-        >
-          <div className="p-2 bg-[var(--primary)]/15 rounded-full text-[var(--primary)] shadow-sm">
-            <Reply size={16} />
-          </div>
-        </motion.div>
+        {/* Swipe Reveal Icon (Left side) - REMOVED AS PER USER REQUEST */}
 
         <motion.div 
           style={{ x }}
@@ -105,13 +109,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               if (window.navigator.vibrate) try { window.navigator.vibrate(10); } catch(e){}
             }
           }}
-          onClick={(e) => handleMessageTap(e, msg)}
-          className={`px-3 py-2 rounded-xl shadow-sm relative cursor-pointer active:scale-[0.99] transition-transform select-none max-w-full overflow-visible touch-none ${
+          onClick={(e) => handleMessageTap(e as any, msg)}
+          whileTap={{ scale: 0.98 }}
+          animate={isHighlighted ? { 
+            backgroundColor: isMe ? 'var(--bubble-own)' : 'var(--bubble-other)',
+            scale: [1, 1.03, 1],
+            transition: { duration: 0.5, repeat: 1 }
+          } : {}}
+          className={`px-3 py-2 rounded-xl shadow-sm relative cursor-pointer select-none max-w-full overflow-visible touch-none w-fit transition-shadow ${
             activeMessageMenu?.id === msg.id ? 'z-50 ring-2 ring-[var(--primary)]/30' : 'z-10'
           } ${
             isMe 
-              ? 'bg-[var(--bubble-own)] text-[var(--bubble-text-own)]' 
-              : 'bg-[var(--bubble-other)] text-[var(--bubble-text-other)]'
+              ? 'bg-[var(--bubble-own)] text-[var(--bubble-text-own)] ml-auto' 
+              : 'bg-[var(--bubble-other)] text-[var(--bubble-text-other)] mr-auto'
           }`}
         >
           {convType === 'group' && !isMe && !isSameSender && (
@@ -129,59 +139,137 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           )}
 
           {msg.replyTo && (
-            <div className="mb-1 p-1.5 rounded bg-black/5 border-l-4 border-[var(--primary)] text-[12px]">
+            <motion.div 
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (msg.replyTo.id && onJumpToMessage) {
+                  onJumpToMessage(msg.replyTo.id);
+                }
+              }}
+              className="mb-1 p-1.5 rounded bg-black/5 border-l-4 border-[var(--primary)] text-[12px] cursor-pointer hover:bg-black/10 transition-colors"
+            >
               <p className="font-bold text-[var(--primary)] text-[10px]">
                 {msg.replyTo.senderId === auth.currentUser?.uid ? 'You' : receiver?.fullName}
               </p>
               <p className="truncate text-zinc-600 italic">{msg.replyTo.text}</p>
-            </div>
+            </motion.div>
           )}
 
           <div className="flex flex-col min-w-[60px] max-w-full">
-            {msg.imageUrl && msg.type !== 'video' && (
-              <div 
-                className="mb-1 rounded-lg overflow-hidden border border-black/5 cursor-pointer active:opacity-80 transition-opacity"
+            {(msg.imageUrl || msg.localUrl) && msg.type !== 'video' && (
+              <motion.div 
+                className="mb-1 rounded-lg overflow-hidden border border-black/5 cursor-pointer active:opacity-80 transition-opacity relative"
+                onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
+                  if (msg.isUploading) return;
                   e.stopPropagation();
                   navigate('/chat/preview', { 
                     state: { 
-                      imageUrl: msg.imageUrl, 
+                      imageUrl: msg.imageUrl || msg.localUrl, 
                       senderName: isMe ? 'You' : receiver?.fullName 
                     } 
                   });
                 }}
               >
                 <img 
-                  src={msg.imageUrl || undefined} 
+                  src={msg.imageUrl || msg.localUrl || undefined} 
                   alt="Sent image" 
-                  className="max-w-full h-auto max-h-64 object-cover"
+                  className={`max-w-full h-auto max-h-64 object-cover ${msg.isUploading ? 'blur-sm grayscale' : ''}`}
                   referrerPolicy="no-referrer"
                 />
-                {msg.expiresAt && (
+                {msg.isUploading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                    <div className="bg-black/60 rounded-full p-2 flex flex-col items-center">
+                      <div className="relative w-10 h-10 flex items-center justify-center">
+                        <svg className="w-full h-full -rotate-90">
+                          <circle
+                            cx="20"
+                            cy="20"
+                            r="18"
+                            fill="transparent"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                             className="text-white/20"
+                          />
+                          <circle
+                            cx="20"
+                            cy="20"
+                            r="18"
+                            fill="transparent"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                             className="text-white transition-all duration-300"
+                            strokeDasharray={2 * Math.PI * 18}
+                            strokeDashoffset={2 * Math.PI * 18 * (1 - (msg.uploadProgress || 0) / 100)}
+                          />
+                        </svg>
+                        <span className="absolute text-[10px] text-white font-bold">{msg.uploadProgress || 0}%</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {msg.expiresAt && !msg.isUploading && (
                   <div className="bg-black/40 text-white text-[9px] px-2 py-1 flex items-center gap-1">
                     <Clock size={10} /> Expires in 24h
                   </div>
                 )}
-              </div>
+              </motion.div>
             )}
-            {(msg.type === 'video' || (msg.fileUrl && msg.type === 'video')) && (
+            {(msg.type === 'video' || (msg.fileUrl && msg.type === 'video') || (msg.localUrl && msg.type === 'video')) && (
               <div className="mb-1 rounded-lg overflow-hidden border border-black/10 aspect-video w-64 bg-black group/video relative">
                 <video 
-                  src={msg.fileUrl || msg.imageUrl || undefined} 
-                  className="w-full h-full object-cover opacity-90 group-hover/video:opacity-100 transition-opacity"
+                  src={msg.fileUrl || msg.imageUrl || msg.localUrl || undefined} 
+                  className={`w-full h-full object-cover transition-opacity ${msg.isUploading ? 'opacity-40 blur-sm' : 'opacity-90 group-hover/video:opacity-100'}`}
                   playsInline
-                  controls
+                  controls={!msg.isUploading}
                 />
+                {msg.isUploading && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <div className="w-12 h-12 relative flex items-center justify-center bg-black/40 rounded-full">
+                       <svg className="w-full h-full -rotate-90">
+                          <circle
+                            cx="24"
+                            cy="24"
+                            r="20"
+                            fill="transparent"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                             className="text-white/20"
+                          />
+                          <circle
+                            cx="24"
+                            cy="24"
+                            r="20"
+                            fill="transparent"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                             className="text-white transition-all duration-300"
+                            strokeDasharray={2 * Math.PI * 20}
+                            strokeDashoffset={2 * Math.PI * 20 * (1 - (msg.uploadProgress || 0) / 100)}
+                          />
+                        </svg>
+                        <span className="absolute text-[10px] text-white font-bold">{msg.uploadProgress || 0}%</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
-            {msg.type === 'audio' && msg.fileUrl && (
-              <div className="mb-1 w-full flex justify-center">
-                <VoiceMessage fileUrl={msg.fileUrl} isMe={isMe} />
+            {msg.type === 'audio' && (msg.fileUrl || msg.localUrl) && (
+              <div className="mb-1 w-full flex justify-center relative">
+                <div className={msg.isUploading ? 'opacity-50 blur-[1px]' : ''}>
+                  <VoiceMessage fileUrl={msg.fileUrl || msg.localUrl} isMe={isMe} />
+                </div>
+                {msg.isUploading && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">Uploading {msg.uploadProgress}%</span>
+                  </div>
+                )}
               </div>
             )}
-            {msg.fileUrl && msg.type !== 'video' && msg.type !== 'audio' && (
-              <div className="mb-1 p-2 rounded-lg bg-black/5 border border-black/10 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center text-[var(--primary)]">
+            {(msg.fileUrl || msg.localUrl) && msg.type !== 'video' && msg.type !== 'audio' && msg.type !== 'image' && (
+              <div className="mb-1 p-2 rounded-lg bg-black/5 border border-black/10 flex items-center gap-3 relative">
+                <div className={`w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center text-[var(--primary)] ${msg.isUploading ? 'animate-pulse' : ''}`}>
                   <FileIcon size={20} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -190,14 +278,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     <ShieldAlert size={10} /> One-Time Download
                   </p>
                 </div>
-                <a href={msg.fileUrl} download={msg.fileName} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-black/5 rounded-full text-[var(--primary)]">
-                  <Download size={18} />
-                </a>
+                {!msg.isUploading ? (
+                  <a href={msg.fileUrl || msg.localUrl} download={msg.fileName} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-black/5 rounded-full text-[var(--primary)]">
+                    <Download size={18} />
+                  </a>
+                ) : (
+                  <div className="p-1 text-[10px] font-bold text-[var(--primary)]">{msg.uploadProgress}%</div>
+                )}
               </div>
             )}
             {msg.type === 'share' && msg.sharedContent && (
-              <div 
+              <motion.div 
                 className="mb-1 rounded-xl overflow-hidden bg-zinc-900 border border-black/10 cursor-pointer active:scale-[0.98] transition-transform shadow-sm"
+                onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (msg.sharedContent.type === 'post') navigate(`/posts/${msg.sharedContent.id}`);
@@ -237,7 +330,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     Open in {msg.sharedContent.type === 'video' ? 'GrixTube' : msg.sharedContent.type === 'reel' ? 'Reels' : 'Feed'}
                   </span>
                 </div>
-              </div>
+              </motion.div>
             )}
             {msg.text && msg.type !== 'share' && <p className="text-[14.5px] leading-snug break-all whitespace-pre-wrap overflow-hidden">{msg.text}</p>}
             <div className="flex items-center justify-end gap-1 mt-0.5 -mr-1">
@@ -246,8 +339,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {msg.isEdited && ' • edited'}
               </span>
               {isMe && (
-                <div className="flex ml-0.5">
-                  {msg.isRead ? <CheckCheck size={14} className="text-blue-500" /> : <Check size={14} className="text-zinc-400" />}
+                <div className="flex ml-0.5 items-center">
+                  {msg.isUploading ? (
+                    <Clock size={12} className="text-zinc-400" />
+                  ) : msg.isRead ? (
+                    <CheckCheck size={14} className="text-blue-500" />
+                  ) : receiverStatus === 'online' ? (
+                    <CheckCheck size={14} className="text-zinc-400" />
+                  ) : (
+                    <Check size={14} className="text-zinc-400" />
+                  )}
                 </div>
               )}
             </div>

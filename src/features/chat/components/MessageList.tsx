@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { Loader2, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageBubble } from './MessageBubble';
@@ -50,6 +50,26 @@ export const MessageList: React.FC<MessageListProps> = ({
   performReactToMessage,
   isOtherTyping
 }) => {
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+
+  const onJumpToMessage = useCallback((messageId: string) => {
+    const element = document.getElementById(`msg-${messageId}`);
+    if (element && scrollContainerRef.current) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedMessageId(messageId);
+      
+      // Vibrate on jump
+      if (window.navigator.vibrate) try { window.navigator.vibrate(15); } catch(e){}
+
+      // Clear highlight after animation
+      setTimeout(() => {
+        setHighlightedMessageId(null);
+      }, 2000);
+    } else {
+      console.warn("Message element not found to jump to:", messageId);
+    }
+  }, [scrollContainerRef]);
+
   return (
     <div 
       ref={scrollContainerRef}
@@ -104,6 +124,8 @@ export const MessageList: React.FC<MessageListProps> = ({
                 receiverStatus={receiverStatus}
                 handleMessageTap={handleMessageTap}
                 performReactToMessage={performReactToMessage}
+                onJumpToMessage={onJumpToMessage}
+                isHighlighted={highlightedMessageId === msg.id}
               />
             );
           });

@@ -65,8 +65,7 @@
     <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
     <title>GrixChat</title>
     <script>
-      // Service Worker disabled in AI Studio Dev to ensure new updates show up instantly on mobile
-      /*
+      // Register Service Worker for PWA
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
@@ -76,17 +75,6 @@
             .catch(registrationError => {
               console.log('SW registration failed: ', registrationError);
             });
-        });
-      }
-      */
-      
-      // Clean up existing service workers if any
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(registrations => {
-          for(let registration of registrations) {
-            registration.unregister();
-            console.log('Existing SW unregistered to allow updates');
-          }
         });
       }
     </script>

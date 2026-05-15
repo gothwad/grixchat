@@ -64,6 +64,15 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const rtdb = getDatabase(app);
 
+// Offline persistence disabled to avoid SecurityErrors in iframe (AI Studio preview) environments
+/*
+if (typeof window !== 'undefined') {
+  enableIndexedDbPersistence(db).catch((err) => {
+    ...
+  });
+}
+*/
+
 // Messaging may not be supported in some environments (like iframes)
 export const messagingPromise = (async () => {
   try {

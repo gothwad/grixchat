@@ -1,22 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { UserMinus, UserPlus, Loader2, X } from 'lucide-react';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
-import { auth, db } from '../../services/firebase.ts';
-import { doc, onSnapshot, updateDoc, arrayRemove, getDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase.ts';
+import { doc, updateDoc, arrayRemove, getDoc } from 'firebase/firestore';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 
 export default function BlockedAccountsScreen() {
+  const { userData, user } = useAuth();
   const [blockedUsers, setBlockedUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [unblockingId, setUnblockingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!userData) return;
 
-    const unsubscribe = onSnapshot(doc(db, "users", auth.currentUser.uid), async (snap) => {
-      if (snap.exists()) {
-        const blockedIds = snap.data().blockedUsers || [];
-        
-        // Fetch details for each blocked user
+    const fetchBlockedDetails = async () => {
+      const blockedIds = userData.blockedUsers || [];
+      if (blockedIds.length === 0) {
+        setBlockedUsers([]);
+        setLoading(false);
+        return;
+      }
+      
+      try {
         const details = await Promise.all(blockedIds.map(async (uid: string) => {
           const userSnap = await getDoc(doc(db, "users", uid));
           if (userSnap.exists()) {
@@ -24,20 +30,22 @@ export default function BlockedAccountsScreen() {
           }
           return { uid, username: 'Unknown User' };
         }));
-        
         setBlockedUsers(details);
+      } catch (err) {
+        console.warn("Failed to fetch blocked user details", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, []);
+    fetchBlockedDetails();
+  }, [userData?.blockedUsers]);
 
   const handleUnblock = async (uid: string) => {
-    if (!auth.currentUser) return;
+    if (!user) return;
     setUnblockingId(uid);
     try {
-      await updateDoc(doc(db, "users", auth.currentUser.uid), {
+      await updateDoc(doc(db, "users", user.uid), {
         blockedUsers: arrayRemove(uid)
       });
     } catch (error) {

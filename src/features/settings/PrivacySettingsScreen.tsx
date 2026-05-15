@@ -13,33 +13,20 @@ import {
   UserCheck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { auth, db } from '../../services/firebase.ts';
-import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '../../services/firebase.ts';
+import { doc, updateDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 
 export default function PrivacySettingsScreen() {
   const navigate = useNavigate();
-  const [userData, setUserData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!auth.currentUser) return;
-
-    const unsubscribe = onSnapshot(doc(db, "users", auth.currentUser.uid), (docSnap) => {
-      if (docSnap.exists()) {
-        setUserData(docSnap.data());
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const { userData, user } = useAuth();
 
   const updatePrivacySetting = async (field: string, value: any) => {
-    if (!auth.currentUser) return;
+    if (!user) return;
     try {
-      await updateDoc(doc(db, "users", auth.currentUser.uid), {
+      await updateDoc(doc(db, "users", user.uid), {
         [field]: value
       });
     } catch (error) {
@@ -66,15 +53,15 @@ export default function PrivacySettingsScreen() {
     }
   ];
 
-  if (loading) {
+  const isPrivate = userData?.profileType === 'private';
+
+  if (!userData) {
     return (
       <div className="h-full flex items-center justify-center bg-[var(--bg-main)]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
-
-  const isPrivate = userData?.profileType === 'private';
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden">

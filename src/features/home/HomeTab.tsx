@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { collection, query, orderBy, limit, onSnapshot, doc, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
 import { auth, db } from '../../services/firebase.ts';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { 
   Plus,
   Camera,
@@ -18,10 +19,10 @@ import CommentSheet from './components/CommentSheet.tsx';
 
 export default function HomeTab() {
   const navigate = useNavigate();
+  const { userData: currentUserData } = useAuth();
   const [feedItems, setFeedItems] = useState<any[]>([]);
   const [stories, setStories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [showStoryMenu, setShowStoryMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
@@ -38,17 +39,6 @@ export default function HomeTab() {
   }, []);
 
   const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
-
-  useEffect(() => {
-    if (auth.currentUser) {
-      const unsubscribeMe = onSnapshot(doc(db, "users", auth.currentUser.uid), (docSnap) => {
-        if (docSnap.exists()) {
-          setCurrentUserData(docSnap.data());
-        }
-      });
-      return () => unsubscribeMe();
-    }
-  }, []);
 
   // Fetch Stories
   useEffect(() => {
@@ -106,36 +96,36 @@ export default function HomeTab() {
     const myUid = auth.currentUser.uid;
     const allowedUserIds = [myUid, ...following];
 
-    const fetchFeed = async () => {
-      setLoading(true);
-      try {
-        // Fetch Posts
-        const postsQ = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(60));
-        const postsSnap = await getDocs(postsQ);
-        const postItems = postsSnap.docs.map(d => ({ 
-          id: d.id, 
-          ...d.data(), 
-          feedType: 'post' 
-        }));
+    const q = query(
+      collection(db, "posts"),
+      orderBy("createdAt", "desc"),
+      limit(20)
+    );
 
-        // Filter by Following and Sort
-        const filtered = postItems
-          .filter((item: any) => allowedUserIds.includes(item.userId))
-          .sort((a: any, b: any) => {
-            const timeA = a.createdAt?.toMillis?.() || a.createdAt || 0;
-            const timeB = b.createdAt?.toMillis?.() || b.createdAt || 0;
-            return timeB - timeA;
-          });
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const postItems = snapshot.docs.map(d => ({ 
+        id: d.id, 
+        ...d.data(), 
+        feedType: 'post' 
+      }));
 
-        setFeedItems(filtered);
-      } catch (err) {
-        console.error("Error fetching feed:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      // Filter by Following in memory
+      const filtered = postItems
+        .filter((item: any) => allowedUserIds.includes(item.userId))
+        .sort((a: any, b: any) => {
+          const timeA = a.createdAt?.toMillis?.() || a.createdAt || 0;
+          const timeB = b.createdAt?.toMillis?.() || b.createdAt || 0;
+          return timeB - timeA;
+        });
 
-    fetchFeed();
+      setFeedItems(filtered);
+      setLoading(false);
+    }, (err) => {
+      console.error("Error fetching feed:", err);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [currentUserData?.following]);
 
   const myStories = stories.find(s => s.userId === auth.currentUser?.uid);

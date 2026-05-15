@@ -14,7 +14,8 @@ import {
   Trash, 
   UserX, 
   AlertTriangle,
-  Play
+  Play,
+  Settings
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -37,7 +38,6 @@ interface ChatHeaderProps {
   receiverStatus?: 'online' | 'offline';
   receiverActiveChatId?: string | null;
   currentUserId?: string;
-  customMenu?: React.ReactNode;
 }
 
 export default function ChatHeader({
@@ -59,7 +59,6 @@ export default function ChatHeader({
   receiverStatus,
   receiverActiveChatId,
   currentUserId,
-  customMenu,
   type = 'direct'
 }: ChatHeaderProps & { type?: 'direct' | 'group' }) {
   const navigate = useNavigate();
@@ -143,76 +142,13 @@ export default function ChatHeader({
             </button>
           </>
         )}
-        <div className="relative" ref={optionsRef}>
+        <div className="relative">
           <button 
-            onClick={() => setShowOptions(!showOptions)}
+            onClick={() => setShowOptions(true)}
             className="p-2 hover:bg-white/10 rounded-full transition-colors"
           >
-            <MoreVertical size={22} className="text-[var(--header-text)]" />
+            <Settings size={22} className="text-[var(--header-text)]" />
           </button>
-
-          {showOptions && (
-            <div className="absolute right-0 mt-2 w-44 bg-[var(--bg-card)] rounded-xl shadow-2xl border border-[var(--border-color)] py-1 z-[9999] overflow-hidden">
-              {customMenu ? customMenu : (
-                <>
-                  <button 
-                    onClick={() => receiverId === 'gx-ai' || receiverId === 'grix-ai' ? navigate('/profile/grix-ai') : navigate(`/user/${receiverId}`)} 
-                    className="w-full px-4 py-3 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors"
-                  >
-                    <User size={18} className="text-[var(--text-secondary)]" /> View Profile
-                  </button>
-                  {receiverId !== 'gx-ai' && receiverId !== 'grix-ai' && (
-                    <>
-                      <button onClick={archiveChat} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
-                        {isArchived ? (
-                          <>
-                            <ArchiveRestore size={18} className="text-[var(--text-secondary)]" /> Unarchive Chat
-                          </>
-                        ) : (
-                          <>
-                            <Archive size={18} className="text-[var(--text-secondary)]" /> Archive Chat
-                          </>
-                        )}
-                      </button>
-                      <button 
-                        onClick={() => {
-                          onWatchTogether?.();
-                          setShowOptions(false);
-                        }} 
-                        className="w-full px-4 py-3 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors text-blue-500"
-                      >
-                        <Play size={18} className="text-blue-500" /> Watch Together
-                      </button>
-                      <button onClick={hideChat} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
-                        {isHidden ? (
-                          <>
-                            <Eye size={18} className="text-[var(--text-secondary)]" /> Unhide Chat
-                          </>
-                        ) : (
-                          <>
-                            <EyeOff size={18} className="text-[var(--text-secondary)]" /> Hide Chat
-                          </>
-                        )}
-                      </button>
-                      <button onClick={() => setIsMuted(!isMuted)} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
-                        {isMuted ? <Volume2 size={18} className="text-[var(--text-secondary)]" /> : <VolumeX size={18} className="text-[var(--text-secondary)]" />}
-                        {isMuted ? 'Unmute' : 'Mute'}
-                      </button>
-                      <button onClick={deleteChat} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
-                        <Trash size={18} className="text-[var(--text-secondary)]" /> Delete Chat
-                      </button>
-                      <button className="w-full px-4 py-3 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 border-t border-[var(--border-color)] transition-colors">
-                        <UserX size={18} className="text-[var(--text-secondary)]" /> Block User
-                      </button>
-                      <button className="w-full px-4 py-3 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors">
-                        <AlertTriangle size={18} className="text-[var(--text-secondary)]" /> Report
-                      </button>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>

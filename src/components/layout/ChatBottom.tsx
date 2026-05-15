@@ -31,18 +31,18 @@ interface ChatBottomProps {
   setShowPlusMenu: (show: boolean) => void;
   plusMenuRef: React.RefObject<HTMLDivElement | null>;
   chatId: string | undefined;
-  filePreviewUrl: string | null;
+  filePreviewUrls: string[];
   isUploading: boolean;
   uploadProgress: number;
-  setSelectedFile: (file: File | Blob | null) => void;
-  setFilePreviewUrl: (url: string | null) => void;
+  setSelectedFiles: (files: File[]) => void;
+  setFilePreviewUrls: (urls: string[]) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   handleTyping: () => void;
   showEmojiPicker: boolean;
   setShowEmojiPicker: (show: boolean) => void;
   emojiPickerRef: React.RefObject<HTMLDivElement | null>;
   isSending: boolean;
-  selectedFile: File | Blob | null;
+  selectedFiles: File[];
   placeholder?: string;
 }
 
@@ -68,18 +68,18 @@ export default function ChatBottom({
   setShowPlusMenu,
   plusMenuRef,
   chatId,
-  filePreviewUrl,
+  filePreviewUrls,
   isUploading,
   uploadProgress,
-  setSelectedFile,
-  setFilePreviewUrl,
+  setSelectedFiles,
+  setFilePreviewUrls,
   textareaRef,
   handleTyping,
   showEmojiPicker,
   setShowEmojiPicker,
   emojiPickerRef,
   isSending,
-  selectedFile,
+  selectedFiles,
   placeholder = "Message"
 }: ChatBottomProps) {
   const navigate = useNavigate();
@@ -120,8 +120,9 @@ export default function ChatBottom({
         const type = mimeType || 'audio/webm';
         if (audioChunksRef.current.length > 0) {
           const audioBlob = new Blob(audioChunksRef.current, { type });
-          setSelectedFile(audioBlob);
-          setFilePreviewUrl(URL.createObjectURL(audioBlob));
+          const file = new File([audioBlob], 'voice_message.webm', { type });
+          setSelectedFiles([file]);
+          setFilePreviewUrls([URL.createObjectURL(audioBlob)]);
         }
         stream.getTracks().forEach(track => track.stop());
         audioChunksRef.current = [];
@@ -173,7 +174,7 @@ export default function ChatBottom({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const isMicMode = !newMessage.trim() && !selectedFile && !isRecording;
+  const isMicMode = !newMessage.trim() && selectedFiles.length === 0 && !isRecording;
 
   return (
     <div className="shrink-0 bg-transparent px-2 pb-safe z-50 relative w-full max-w-full">
@@ -202,40 +203,39 @@ export default function ChatBottom({
 
       <div className="flex items-end gap-2 w-full max-w-full relative pb-2 pt-1">
         <div className={`flex-1 min-w-0 bg-[#2b3943] rounded-[24px] px-1 sm:px-2 flex flex-col transition-all shadow-sm ${isRecording ? 'animate-pulse' : ''}`}>
-          {selectedFile && !isRecording && (
-            <div className="mt-2 mb-1 px-2 relative w-fit group">
-              <div className="relative rounded-xl overflow-hidden border border-white/10 shadow-md max-w-[120px] sm:max-w-[150px] bg-black/20 p-1.5">
-                {filePreviewUrl ? (
-                  selectedFile?.type.startsWith('video/') ? (
-                    <video src={filePreviewUrl || undefined} className="w-full h-auto rounded-lg" muted />
-                  ) : selectedFile?.type.startsWith('audio/') ? (
-                    <div className="flex items-center gap-2 px-2 py-1">
-                      <Mic size={14} className="text-[#00a884]" />
-                      <span className="text-[10px] font-black text-white/90">Voice message</span>
-                    </div>
-                  ) : (
-                    <img src={filePreviewUrl || undefined} alt="Preview" className="w-full h-auto rounded-lg" />
-                  )
-                ) : (
-                  <div className="flex flex-col items-center gap-1 py-1 px-1">
-                    <Paperclip className="text-white/60" size={18} />
-                    <p className="text-[9px] text-white/60 font-bold truncate w-[60px] sm:w-[80px] text-center">{(selectedFile as File).name}</p>
+          {selectedFiles.length > 0 && !isRecording && (
+            <div className="mt-2 mb-1 px-2 relative w-full overflow-x-auto">
+              <div className="flex items-center gap-2 pb-1">
+                {selectedFiles.map((file, index) => (
+                  <div key={index} className="relative shrink-0 rounded-xl overflow-hidden border border-white/10 shadow-md w-[80px] h-[80px] bg-black/20 p-1 flex items-center justify-center">
+                    {filePreviewUrls[index] ? (
+                      file.type.startsWith('video/') ? (
+                        <video src={filePreviewUrls[index]} className="w-full h-full object-cover rounded-lg" muted />
+                      ) : (
+                        <img src={filePreviewUrls[index]} alt="Preview" className="w-full h-full object-cover rounded-lg" />
+                      )
+                    ) : (
+                      <div className="flex flex-col items-center gap-1">
+                        <Paperclip className="text-white/60" size={18} />
+                        <p className="text-[8px] text-white/60 font-bold truncate w-[60px] text-center">{file.name}</p>
+                      </div>
+                    )}
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const newFiles = [...selectedFiles];
+                        const newUrls = [...filePreviewUrls];
+                        newFiles.splice(index, 1);
+                        newUrls.splice(index, 1);
+                        setSelectedFiles(newFiles);
+                        setFilePreviewUrls(newUrls);
+                      }}
+                      className="absolute top-0.5 right-0.5 p-1 bg-black/60 hover:bg-black/80 rounded-full text-white transition-all shadow-sm z-10"
+                    >
+                      <X size={10} />
+                    </button>
                   </div>
-                )}
-                {!isUploading && !isSending && (
-                  <button 
-                    type="button"
-                    onClick={() => { setSelectedFile(null); setFilePreviewUrl(null); }}
-                    className="absolute top-0.5 right-0.5 p-1 bg-black/60 hover:bg-black/80 rounded-full text-white transition-all shadow-sm"
-                  >
-                    <X size={10} />
-                  </button>
-                )}
-                {isUploading && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <span className="text-white text-[10px] font-black">{uploadProgress}%</span>
-                  </div>
-                )}
+                ))}
               </div>
             </div>
           )}
@@ -289,32 +289,22 @@ export default function ChatBottom({
                   }}
                 />
 
-                <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 pr-1 mb-1">
+                <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 pr-1 mb-1 self-end">
                   <input 
                     type="file" 
                     ref={fileInputRef} 
                     className="hidden" 
                     onChange={handleFileChange}
+                    accept="*/*"
+                    multiple
                   />
                   <button 
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-2 text-white/60 hover:text-white transition-colors"
+                    className="p-2 text-white/60 hover:text-white transition-colors flex items-center justify-center rounded-full hover:bg-white/5"
                     title="Attach"
                   >
                     <Paperclip size={22} className="-rotate-45" />
                   </button>
-                  
-                  {!newMessage.trim() && !selectedFile && (
-                    <>
-                      <button 
-                        onClick={() => navigate(`/camera?chatId=${chatId}`)}
-                        className="p-2 text-white/60 hover:text-white transition-colors"
-                        title="Camera"
-                      >
-                        <CameraIcon size={22} />
-                      </button>
-                    </>
-                  )}
                 </div>
               </>
             )}
@@ -332,7 +322,7 @@ export default function ChatBottom({
               handleSendMessage(e as any);
             }
           }}
-          disabled={((!newMessage.trim() && !selectedFile) && !isMicMode && !isRecording) || isSending || isUploading}
+          disabled={((!newMessage.trim() && selectedFiles.length === 0) && !isMicMode && !isRecording) || isSending}
           className={`shrink-0 w-[48px] h-[48px] flex items-center justify-center rounded-full text-white transition-all shadow-md active:scale-95 ${
             isRecording ? 'bg-red-500' : 'bg-sky-500'
           }`}

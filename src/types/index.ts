@@ -42,6 +42,7 @@ export interface UserProfile {
   };
   fcmTokens?: string[];
   isPrivate?: boolean;
+  profileType?: 'public' | 'private';
   savedPosts?: string[];
 }
 

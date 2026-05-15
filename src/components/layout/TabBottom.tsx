@@ -12,14 +12,20 @@ export default function TabBottom() {
   useEffect(() => {
     if (!auth.currentUser) return;
 
+    // Use conversations to count unread instead of all messages (cheaper reads)
     const q = query(
-      collection(db, "messages"),
-      where("receiverId", "==", auth.currentUser.uid)
+      collection(db, "conversations"),
+      where("participants", "array-contains", auth.currentUser.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const unread = snapshot.docs.filter(doc => doc.data().isRead === false);
-      setUnreadCount(unread.length);
+      let totalUnread = 0;
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const count = data[`unreadCount_${auth.currentUser?.uid}`] || 0;
+        totalUnread += count;
+      });
+      setUnreadCount(totalUnread);
     });
 
     return () => unsubscribe();

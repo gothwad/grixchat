@@ -15,7 +15,7 @@ import {
 import { db, auth } from '../../../services/firebase.ts';
 import { toDate } from '../../../utils/dateUtils.ts';
 
-export const useChatMessages = (chatId: string, initialLimit: number = 20) => {
+export const useChatMessages = (chatId: string, initialLimit: number = 10) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [messageLimit, setMessageLimit] = useState(initialLimit);
@@ -27,29 +27,26 @@ export const useChatMessages = (chatId: string, initialLimit: number = 20) => {
 
     setLoading(true);
 
-    // Fetch without orderBy to avoid composite index requirement
+    // Use orderBy and limit to significantly reduce reads
+    // Note: This requires a composite index on chatId (ASC) and timestamp (DESC)
     const q = query(
       collection(db, "messages"),
-      where("chatId", "==", chatId)
+      where("chatId", "==", chatId),
+      orderBy("timestamp", "desc"),
+      limit(messageLimit)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setLoading(false);
       setLoadingMore(false);
       
-      const allMsgs = snapshot.docs.map(doc => ({
+      const latestMsgs = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data({ serverTimestamps: 'estimate' })
       }));
 
-      // Sort in-memory to avoid index requirement
-      const sortedMsgs = allMsgs
-        .sort((a: any, b: any) => {
-          const timeA = toDate(a.timestamp)?.getTime() || 0;
-          const timeB = toDate(b.timestamp)?.getTime() || 0;
-          return timeA - timeB;
-        })
-        .slice(-messageLimit); // Only take the latest messages based on limit
+      // Reverse to chronological order for the UI
+      const sortedMsgs = latestMsgs.reverse();
       
       setMessages(sortedMsgs);
 
@@ -111,7 +108,7 @@ export const useChatMessages = (chatId: string, initialLimit: number = 20) => {
   const loadMore = useCallback((currentHeight: number, scrollContainer: HTMLDivElement | null) => {
     if (!loadingMore && !loading && messages.length >= messageLimit) {
       setLoadingMore(true);
-      setMessageLimit(prev => prev + 20);
+      setMessageLimit(prev => prev + 10);
       // Note: onSnapshot will trigger and update messages
     }
   }, [messages.length, messageLimit, loadingMore, loading]);
