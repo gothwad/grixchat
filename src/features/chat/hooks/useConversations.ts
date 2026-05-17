@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { collection, query, where, onSnapshot, getDocs, orderBy, limit } from 'firebase/firestore';
 import { auth, db } from '../../../services/firebase.ts';
 import { toDate } from '../../../utils/dateUtils.ts';
@@ -8,10 +8,13 @@ export const useConversations = (activeFilter: string) => {
   const [conversations, setConversations] = useState<any[]>([]);
   const [otherUsers, setOtherUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const usersFetchedRef = useRef(false);
 
   useEffect(() => {
     if (!auth.currentUser) return;
     if (activeFilter === 'Calls') return;
+
+    usersFetchedRef.current = false;
 
     // Fetch suggested users (others)
     const fetchOtherUsers = async (chatParticipantIds: string[]) => {
@@ -49,9 +52,11 @@ export const useConversations = (activeFilter: string) => {
         conv.participants.find((p: string) => p !== auth.currentUser?.uid)
       ))).filter(Boolean) as string[];
 
-      // Fetch other users once we know who we are already chatting with
-      if (otherUserIds.length > 0 || convDocs.length === 0) {
+      // Initial fetch of other users moved outside of frequent snapshot updates in refinement
+      // to reduce read costs. We only fetch once per filter change.
+      if (!usersFetchedRef.current && (otherUserIds.length > 0 || convDocs.length === 0)) {
         fetchOtherUsers(otherUserIds);
+        usersFetchedRef.current = true;
       }
 
       const userMap = new Map();

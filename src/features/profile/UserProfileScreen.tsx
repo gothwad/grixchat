@@ -33,11 +33,13 @@ import ProfileContent from './components/ProfileContent.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import PostCard from '../home/components/PostCard.tsx';
 
+import { useAuth } from '../../providers/AuthProvider.tsx';
+
 export default function UserProfileScreen() {
   const { id: userId } = useParams();
   const navigate = useNavigate();
+  const { userData: myUserData } = useAuth();
   const [user, setUser] = useState<any>(null);
-  const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isBlocked, setIsBlocked] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -62,17 +64,10 @@ export default function UserProfileScreen() {
       setLoading(false);
     });
 
-    // Check if blocked and following (listen to current user data)
-    let unsubscribeMe: any;
-    if (auth.currentUser) {
-      unsubscribeMe = onSnapshot(doc(db, "users", auth.currentUser.uid), (myDocSnap) => {
-        if (myDocSnap.exists()) {
-          const myData = myDocSnap.data();
-          setCurrentUserData(myData);
-          setIsBlocked(myData.blockedUsers?.includes(userId) || false);
-          setIsFollowing(myData.following?.includes(userId) || false);
-        }
-      });
+    // Sync isBlocked and isFollowing from AuthProvider data
+    if (myUserData) {
+      setIsBlocked(myUserData.blockedUsers?.includes(userId) || false);
+      setIsFollowing(myUserData.following?.includes(userId) || false);
     }
 
     // Fetch user posts
@@ -112,9 +107,8 @@ export default function UserProfileScreen() {
 
     return () => {
       unsubscribeUser();
-      if (unsubscribeMe) unsubscribeMe();
     };
-  }, [userId, activeFilter]);
+  }, [userId, activeFilter, myUserData]);
 
   const handleToggleFollow = async () => {
     if (!auth.currentUser || !userId || followLoading) return;
@@ -140,8 +134,8 @@ export default function UserProfileScreen() {
         await addDoc(collection(db, "notifications"), {
           userId: userId,
           fromUserId: auth.currentUser.uid,
-          fromUserName: currentUserData?.fullName || 'User',
-          fromUserAvatar: currentUserData?.photoURL || '',
+          fromUserName: myUserData?.fullName || 'User',
+          fromUserAvatar: myUserData?.photoURL || '',
           type: 'follow',
           text: 'started following you',
           read: false,

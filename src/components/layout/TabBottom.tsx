@@ -40,7 +40,7 @@ export default function TabBottom() {
   ];
 
   return (
-    <div className="w-full bg-[var(--header-bg)] px-2 h-16 flex justify-around items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] shrink-0 border-t border-[var(--border-color)] pb-safe rounded-t-2xl">
+    <div className="w-full bg-[var(--header-bg)] px-2 min-h-[64px] pb-safe flex justify-around items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] shrink-0 border-t border-[var(--border-color)] rounded-t-2xl">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = location.pathname === item.path;

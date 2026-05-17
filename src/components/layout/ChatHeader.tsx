@@ -95,7 +95,7 @@ export default function ChatHeader({
   };
   
   return (
-    <div className="shrink-0 flex items-center justify-between px-4 h-14 bg-[var(--header-bg)] z-50 border-b border-[var(--border-color)] shadow-sm w-full min-w-0 rounded-b-2xl">
+    <div className="shrink-0 flex items-center justify-between px-4 min-h-[56px] pt-safe bg-[var(--header-bg)] z-50 border-b border-[var(--border-color)] shadow-sm w-full min-w-0 rounded-b-2xl">
       <div className="flex items-center gap-2 min-w-0">
         <button onClick={() => navigate(-1)} className="hover:bg-white/10 p-1.5 rounded-full transition-colors shrink-0">
           <ArrowLeft size={22} className="text-[var(--header-text)]" />

@@ -194,6 +194,17 @@ export default function App() {
     CacheService.clearOldCache();
   }, [user]);
 
+  // Dynamic theme-color meta tag sync
+  useEffect(() => {
+    const isDark = (userData?.preferences?.theme || 'light') === 'dark';
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      // Light: #ffffff, Dark: #202124
+      const color = isDark ? '#202124' : '#ffffff';
+      metaThemeColor.setAttribute('content', color);
+    }
+  }, [userData?.preferences?.theme]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setSplashLoading(false);

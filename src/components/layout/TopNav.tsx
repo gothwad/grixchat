@@ -11,7 +11,7 @@ export default function TopNav() {
     <div className="relative z-50">
       {isSearchOpen ? (
         <div 
-          className="absolute inset-0 bg-[var(--header-bg)] flex items-center px-4 z-[60] h-14 rounded-b-2xl border-b border-[var(--border-color)] shadow-sm"
+          className="absolute inset-0 bg-[var(--header-bg)] flex items-center px-4 z-[60] min-h-[56px] pt-safe rounded-b-2xl border-b border-[var(--border-color)] shadow-sm"
         >
           <div className="flex-1 flex items-center bg-[var(--bg-chat)] rounded-full px-4 py-1.5 border border-[var(--border-color)]">
             <Search size={18} className="text-[var(--text-secondary)] mr-3" />

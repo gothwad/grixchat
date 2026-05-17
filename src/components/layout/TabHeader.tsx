@@ -89,7 +89,7 @@ export default function TabHeader() {
   const isProfilePage = location.pathname === '/profile';
 
   return (
-    <div className="w-full bg-[var(--header-bg)] px-4 h-14 flex justify-between items-center z-50 shrink-0 relative border-b border-[var(--border-color)] shadow-sm rounded-b-2xl">
+    <div className="w-full bg-[var(--header-bg)] px-4 min-h-[56px] pt-safe flex justify-between items-center z-50 shrink-0 relative border-b border-[var(--border-color)] shadow-sm rounded-b-2xl">
       <div className="flex items-center">
         <Link to="/" className="flex items-center gap-2">
           <h1 className="text-2xl font-black text-[var(--header-text)] tracking-tighter italic">
