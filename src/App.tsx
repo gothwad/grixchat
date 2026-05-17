@@ -70,23 +70,23 @@ const ProfilePostViewer = React.lazy(() => import('./features/profile/ProfilePos
 const ProfileReelViewer = React.lazy(() => import('./features/profile/ProfileReelViewer.tsx'));
 const ProfileTubeViewer = React.lazy(() => import('./features/profile/ProfileTubeViewer.tsx'));
 
-const ReelsTab = React.lazy(() => import('./features/reels').then(m => ({ default: m.ReelsTab })));
-const ReelsScreen = React.lazy(() => import('./features/reels').then(m => ({ default: m.ReelsScreen })));
+const ReelsTab = React.lazy(() => import('./features/reels/ReelsTab'));
+const ReelsScreen = React.lazy(() => import('./features/reels/ReelsScreen'));
 const ReelsMakerScreen = React.lazy(() => import('./features/reels/ReelsMakerScreen'));
 const ReelWatcherScreen = React.lazy(() => import('./features/reels/ReelWatcherScreen'));
 
-const CallsTab = React.lazy(() => import('./features/call').then(m => ({ default: m.CallsTab })));
-const HubTab = React.lazy(() => import('./features/hub').then(m => ({ default: m.HubTab })));
-const GithubScreen = React.lazy(() => import('./features/hub/github').then(m => ({ default: m.GithubScreen })));
-const CameraTab = React.lazy(() => import('./features/camera').then(m => ({ default: m.CameraTab })));
+const CallsTab = React.lazy(() => import('./features/call/CallsTab'));
+const HubTab = React.lazy(() => import('./features/hub/HubTab'));
+const GithubScreen = React.lazy(() => import('./features/hub/github/GithubScreen'));
+const CameraTab = React.lazy(() => import('./features/camera/CameraTab'));
 
-const PrivacySettingsScreen = React.lazy(() => import('./features/settings').then(m => ({ default: m.PrivacySettingsScreen })));
-const AppPreferencesScreen = React.lazy(() => import('./features/settings').then(m => ({ default: m.AppPreferencesScreen })));
+const PrivacySettingsScreen = React.lazy(() => import('./features/settings/PrivacySettingsScreen'));
+const AppPreferencesScreen = React.lazy(() => import('./features/settings/AppPreferencesScreen'));
 // SettingsScreen directly imported above
-const AccountSettingsScreen = React.lazy(() => import('./features/settings').then(m => ({ default: m.AccountSettingsScreen })));
-const NotificationsSettingsScreen = React.lazy(() => import('./features/settings').then(m => ({ default: m.NotificationsSettingsScreen })));
-const HelpScreen = React.lazy(() => import('./features/settings').then(m => ({ default: m.HelpScreen })));
-const AppInfoScreen = React.lazy(() => import('./features/settings').then(m => ({ default: m.AppInfoScreen })));
+const AccountSettingsScreen = React.lazy(() => import('./features/settings/AccountSettingsScreen'));
+const NotificationsSettingsScreen = React.lazy(() => import('./features/settings/NotificationsSettingsScreen'));
+const HelpScreen = React.lazy(() => import('./features/settings/HelpScreen'));
+const AppInfoScreen = React.lazy(() => import('./features/settings/AppInfoScreen'));
 const TimeSpentScreen = React.lazy(() => import('./features/settings/TimeSpentScreen'));
 const FavoritesScreen = React.lazy(() => import('./features/settings/FavoritesScreen'));
 const BlockedAccountsScreen = React.lazy(() => import('./features/settings/BlockedAccountsScreen'));
@@ -110,7 +110,7 @@ const SetupLockScreen = React.lazy(() => import('./features/lock/SetupLockScreen
 const VerifyLockScreen = React.lazy(() => import('./features/lock/VerifyLockScreen'));
 const GlobalLockScreen = React.lazy(() => import('./features/lock/GlobalLockScreen'));
 
-const CallScreen = React.lazy(() => import('./features/call').then(m => ({ default: m.CallScreen })));
+const CallScreen = React.lazy(() => import('./features/call/CallScreen'));
 
 import { storage } from './services/StorageService.ts';
 import MainLayout from './components/layout/MainLayout.tsx';

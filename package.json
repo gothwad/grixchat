@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.0.0"
   },
+  "packageManager": "npm@10.5.0",
   "scripts": {
     "dev": "tsx src/server/server.ts",
     "build": "vite build",
