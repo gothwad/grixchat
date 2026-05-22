@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { APP_CONFIG } from '../../config/appConfig';
 import { Link, useNavigate } from 'react-router-dom';
-import { auth, db, googleProvider, githubProvider } from '../../services/firebase.ts';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Eye, EyeOff, Mail, Lock, User as UserIcon, ArrowRight, Github } from 'lucide-react';
+import { authService } from './services/authService.ts';
 
 export default function LoginScreen() {
   const [identifier, setIdentifier] = useState(''); // Can be email or username
@@ -20,39 +19,32 @@ export default function LoginScreen() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) return;
     setLoading(true);
     setError('');
     
     let loginEmail = identifier;
 
     try {
-      // Check if identifier is email, phone, or username
+      // Check if identifier is email or username
       if (identifier.includes('@')) {
         loginEmail = identifier;
       } else {
-        const usersRef = collection(db, "users");
-        let q;
+        const { data, error: fetchError } = await supabase
+          .from('users')
+          .select('email')
+          .eq('username', identifier.toLowerCase().trim())
+          .maybeSingle();
         
-        // Check if it's a phone number (digits only or starts with +)
-        const isPhone = /^\+?[0-9]+$/.test(identifier.trim());
-        
-        if (isPhone) {
-          q = query(usersRef, where("phoneNumber", "==", identifier.trim()));
-        } else {
-          q = query(usersRef, where("username", "==", identifier.toLowerCase().trim()));
+        if (fetchError) throw fetchError;
+        if (!data) {
+          throw new Error("Username not found");
         }
         
-        const querySnapshot = await getDocs(q);
-        
-        if (querySnapshot.empty) {
-          throw new Error(isPhone ? "Phone number not found" : "Username not found");
-        }
-        
-        const userData = querySnapshot.docs[0].data();
-        loginEmail = (userData as any).email;
+        loginEmail = data.email;
       }
 
-      await signInWithEmailAndPassword(auth, loginEmail, password);
+      await authService.login(loginEmail, password);
       navigate('/');
     } catch (err: any) {
       setError(err.message);
@@ -65,18 +57,10 @@ export default function LoginScreen() {
     setGoogleLoading(true);
     setError('');
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (!userDoc.exists()) {
-        navigate('/complete-profile');
-      } else {
-        navigate('/');
-      }
+      await authService.loginWithGoogle();
+      // Supabase OAuth will redirect the page automatically
     } catch (err: any) {
       setError(err.message);
-    } finally {
       setGoogleLoading(false);
     }
   };
@@ -85,15 +69,9 @@ export default function LoginScreen() {
     setGithubLoading(true);
     setError('');
     try {
-      const result = await signInWithPopup(auth, githubProvider);
-      const user = result.user;
-      
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (!userDoc.exists()) {
-        navigate('/complete-profile');
-      } else {
-        navigate('/');
-      }
+      await authService.loginWithGithub();
+      // Redirect behavior for OAuth is handled automatically by Supabase 
+      // but let's keep consistent formatting
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -101,24 +79,25 @@ export default function LoginScreen() {
     }
   };
 
+
   return (
     <div className="h-full overflow-y-auto bg-[var(--bg-main)] flex flex-col items-center relative font-sans">
-      <div className="w-full px-8 pt-12 pb-12 z-10 flex flex-col items-center min-h-full relative max-w-md mx-auto">
+      <div className="w-full px-8 pt-8 pb-12 z-10 flex flex-col items-center min-h-full relative max-w-md mx-auto">
         {/* Header Section */}
-        <div className="w-full relative flex items-center justify-center mb-8">
-          <div className="w-16 h-16 bg-[var(--bg-card)] rounded-[20px] shadow-sm flex items-center justify-center border border-[var(--border-color)] p-3">
+        <div className="w-full relative flex items-center justify-center mb-4">
+          <div className="w-16 h-16 bg-[var(--bg-card)] rounded-[20px] shadow-sm flex items-center justify-center border border-[var(--border-color)] p-0 overflow-hidden">
             <img 
-              src={APP_CONFIG.LOGO_URL} 
+              src="/assets/icon-512-maskable.png" 
               alt="Logo" 
-              className="w-full h-full object-contain"
+              className="w-full h-full object-cover scale-110"
               referrerPolicy="no-referrer"
             />
           </div>
         </div>
 
         {/* Header Area */}
-        <div className="text-center mb-8">
-          <h2 className="text-[28px] font-bold text-[var(--text-primary)] mb-2">Welcome Back</h2>
+        <div className="text-center mb-4">
+          <h2 className="text-[28px] font-bold text-[var(--text-primary)] mb-2">GrixChat</h2>
           <p className="text-[var(--text-secondary)] text-xs leading-relaxed max-w-[200px] mx-auto opacity-80">
             Connecting you to your world, one message at a time.
           </p>
@@ -199,9 +178,16 @@ export default function LoginScreen() {
               disabled={loading || googleLoading || githubLoading}
               className="w-full flex items-center justify-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] py-3.5 rounded-xl text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] transition-all active:scale-[0.98]"
             >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" />
+              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+              </svg>
               <span>Log in with Google</span>
             </button>
+
+
 
             <button 
               type="button"

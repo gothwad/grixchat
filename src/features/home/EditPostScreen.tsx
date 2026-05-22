@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronRight, Loader2, Save } from 'lucide-react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../../services/firebase.ts';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 import SettingHeader from '../../components/layout/SettingHeader';
 
 export default function EditPostScreen() {
   const { id: postId } = useParams();
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
   const [loading, setLoading] = useState(true);
@@ -15,11 +16,15 @@ export default function EditPostScreen() {
 
   useEffect(() => {
     const fetchPost = async () => {
-      if (!postId) return;
+      if (!postId || !supabase) return;
       try {
-        const postDoc = await getDoc(doc(db, "posts", postId));
-        if (postDoc.exists()) {
-          const data = postDoc.data();
+        const { data, error } = await supabase
+          .from('posts')
+          .select('*')
+          .eq('id', postId)
+          .single();
+        
+        if (data) {
           setCaption(data.caption || '');
           setLocation(data.location || '');
         } else {
@@ -35,14 +40,18 @@ export default function EditPostScreen() {
   }, [postId, navigate]);
 
   const handleUpdate = async () => {
-    if (!postId) return;
+    if (!postId || !supabase) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, "posts", postId), {
-        caption,
-        location,
-        updatedAt: new Date()
-      });
+      const { error } = await supabase
+        .from('posts')
+        .update({
+          caption,
+          location,
+        } as any)
+        .eq('id', postId);
+      
+      if (error) throw error;
       navigate(-1);
     } catch (err) {
       console.error("Error updating post:", err);

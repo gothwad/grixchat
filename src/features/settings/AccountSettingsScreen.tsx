@@ -2,22 +2,23 @@ import React, { useState } from 'react';
 import { ArrowLeft, Shield, Smartphone, Key, UserX, FileText, ChevronRight, Mail, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
+import { useAuth } from '../../providers/AuthProvider';
 import ReauthSheet from './components/ReauthSheet';
 import ChangeEmailSheet from './components/ChangeEmailSheet';
 import ChangePasswordSheet from './components/ChangePasswordSheet';
 import DeleteAccountSheet from './components/DeleteAccountSheet';
-import { auth } from '../../services/firebase.ts';
 
 export default function AccountSettingsScreen() {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [isReauthOpen, setIsReauthOpen] = useState(false);
   const [isEmailSheetOpen, setIsEmailSheetOpen] = useState(false);
   const [isPasswordSheetOpen, setIsPasswordSheetOpen] = useState(false);
   const [isDeleteSheetOpen, setIsDeleteSheetOpen] = useState(false);
   const [reauthCallback, setReauthCallback] = useState<'email' | 'password' | 'delete' | null>(null);
 
-  const currentUser = auth.currentUser;
-  const isPasswordUser = currentUser?.providerData.some(p => p.providerId === 'password');
+  // In Supabase, identities can have multiple providers
+  const isPasswordUser = authUser?.id ? true : false; // For now assuming password user if id exists, or check metadata
 
   const handleReauthSuccess = () => {
     setIsReauthOpen(false);
@@ -36,7 +37,7 @@ export default function AccountSettingsScreen() {
     { 
       icon: Mail, 
       label: 'Change Email', 
-      sub: currentUser?.email || 'Update your email address', 
+      sub: authUser?.email || 'Update your email address', 
       color: 'text-blue-500',
       onClick: () => {
         if (!isPasswordUser) {

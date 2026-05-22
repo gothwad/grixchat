@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
-import { db, auth } from '../../services/firebase.ts';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider.tsx';
+import { profileService } from './services/profileService';
 import SettingHeader from '../../components/layout/SettingHeader';
 
 export default function FollowListScreen() {
@@ -11,36 +12,43 @@ export default function FollowListScreen() {
   const [userList, setUserList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentUserData, setCurrentUserData] = useState<any>(null);
+  const { user: authUser, userData: myUserData, followingIds } = useAuth();
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!userId || !type) return;
+      if (!userId || !type || !supabase) return;
       setLoading(true);
       try {
-        // Fetch current user data for follow/unfollow logic
-        if (auth.currentUser) {
-          const myDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-          if (myDoc.exists()) setCurrentUserData(myDoc.data());
+        let query;
+        if (type === 'following') {
+          // Fetch users I follow
+          query = supabase
+            .from('follows')
+            .select(`
+              user:users!follows_following_id_fkey (*)
+            `)
+            .eq('follower_id', userId);
+        } else {
+          // Fetch my followers
+          query = supabase
+            .from('follows')
+            .select(`
+              user:users!follows_follower_id_fkey (*)
+            `)
+            .eq('following_id', userId);
         }
 
-        const userDoc = await getDoc(doc(db, "users", userId));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const ids = type === 'followers' ? (userData.followers || []) : (userData.following || []);
-          
-          if (ids.length > 0) {
-            // Fetch details for all users in the list
-            const usersData: any[] = [];
-            for (const id of ids) {
-              const uDoc = await getDoc(doc(db, "users", id));
-              if (uDoc.exists()) {
-                usersData.push({ id: uDoc.id, ...uDoc.data() });
-              }
-            }
-            setUserList(usersData);
-          }
-        }
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const usersData = (data as any[] || []).map(item => ({
+          id: item.user.id,
+          fullName: item.user.full_name,
+          username: item.user.username,
+          photoURL: item.user.photo_url
+        }));
+        
+        setUserList(usersData);
       } catch (error) {
         console.error("Error fetching follow list:", error);
       } finally {
@@ -51,27 +59,15 @@ export default function FollowListScreen() {
   }, [userId, type]);
 
   const handleToggleFollow = async (targetId: string, isCurrentlyFollowing: boolean) => {
-    if (!auth.currentUser || !targetId) return;
+    if (!authUser || !targetId) return;
     
     try {
-      const myDocRef = doc(db, "users", auth.currentUser.uid);
-      const targetDocRef = doc(db, "users", targetId);
-      
-      await updateDoc(myDocRef, {
-        following: !isCurrentlyFollowing ? arrayUnion(targetId) : arrayRemove(targetId)
-      });
-      
-      await updateDoc(targetDocRef, {
-        followers: !isCurrentlyFollowing ? arrayUnion(auth.currentUser.uid) : arrayRemove(auth.currentUser.uid)
-      });
-
-      // Update local state
-      setCurrentUserData((prev: any) => ({
-        ...prev,
-        following: !isCurrentlyFollowing 
-          ? [...(prev.following || []), targetId] 
-          : (prev.following || []).filter((id: string) => id !== targetId)
-      }));
+      if (isCurrentlyFollowing) {
+        await profileService.unfollowUser(authUser.uid, targetId);
+      } else {
+        await profileService.followUser(authUser.uid, targetId);
+      }
+      // Re-fetch or rely on AuthProvider sync if available
     } catch (error) {
       console.error("Error toggling follow:", error);
     }
@@ -125,8 +121,8 @@ export default function FollowListScreen() {
         ) : (
           <div className="divide-y divide-[var(--border-color)]">
             {filteredUsers.map((u) => {
-              const isMe = auth.currentUser?.uid === u.id;
-              const amIFollowing = currentUserData?.following?.includes(u.id);
+              const isMe = authUser?.uid === u.id;
+              const amIFollowing = followingIds.includes(u.id);
 
               return (
                 <div key={u.id} className="flex items-center justify-between p-4 hover:bg-black/5 transition-colors">

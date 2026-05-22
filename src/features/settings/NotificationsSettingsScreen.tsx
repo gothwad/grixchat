@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Bell, MessageSquare, Phone, Users, Volume2, Vibrate, ChevronRight, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
-import { db } from '../../services/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
 
 export default function NotificationsSettingsScreen() {
-  const { user, userData } = useAuth();
+  const { user, userData, refreshUserData } = useAuth();
   const navigate = useNavigate();
   
   const [permission, setPermission] = useState<NotificationPermission>(
@@ -32,11 +31,20 @@ export default function NotificationsSettingsScreen() {
   }, [userData]);
 
   const updateServerSettings = async (newSettings: any) => {
-    if (!user) return;
+    if (!user || !supabase) return;
     try {
-      await updateDoc(doc(db, "users", user.uid), {
-        'settings.notifications': newSettings
-      });
+      const { error } = await supabase
+        .from('users')
+        .update({
+          settings: {
+            ...userData?.settings,
+            notifications: newSettings
+          }
+        } as any)
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      await refreshUserData();
     } catch (e) {
       console.error('Failed to update notification settings:', e);
     }
@@ -66,15 +74,15 @@ export default function NotificationsSettingsScreen() {
     };
 
     try {
-      const { isSupported } = await import('firebase/messaging');
-      results.fcmSupported = await isSupported();
+      // Firebase specific check removed during migration
+      results.fcmSupported = false;
     } catch (e) {
       results.fcmError = String(e);
     }
 
     if ('serviceWorker' in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations();
-      results.swRegistered = regs.some(r => r.active && r.active.scriptURL.includes('firebase-messaging-sw.js'));
+      results.swRegistered = regs.some(r => r.active && r.active.scriptURL.includes('sw.js'));
     }
 
     setDiag(results);

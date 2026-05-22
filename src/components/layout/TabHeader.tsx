@@ -22,13 +22,12 @@ import {
   PlaySquare
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
-import { auth, db } from '../../services/firebase.ts';
+import { supabase } from '../../lib/supabase';
 import { useSearch } from '../../contexts/SearchContext.tsx';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 
 export default function TabHeader() {
-  const { userData } = useAuth();
+  const { userData, user: authUser } = useAuth();
   const { setIsSearchOpen } = useSearch();
   const location = useLocation();
   const navigate = useNavigate();
@@ -49,27 +48,43 @@ export default function TabHeader() {
   }, []);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!authUser || !supabase) return;
 
-    // Listen for unread activity (likes/comments)
-    const likesQuery = query(
-      collection(db, "notifications"),
-      where("userId", "==", auth.currentUser.uid),
-      where("read", "==", false),
-      limit(20) // Small limit to keep costs down but enough to differentiate
-    );
-
-    const unsubscribe = onSnapshot(likesQuery, (snapshot) => {
-      const docs = snapshot.docs.map(d => d.data());
-      const hasLikes = docs.some(d => ["like", "comment"].includes(d.type));
-      const hasNotifs = docs.some(d => ["follow", "system"].includes(d.type));
+    const fetchUnread = async () => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('type, is_read')
+        .eq('user_id', authUser.id)
+        .eq('is_read', false)
+        .limit(20);
       
-      setHasUnreadLikes(hasLikes);
-      setHasUnreadNotifs(hasNotifs);
-    });
+      if (!error && data) {
+        const hasLikes = data.some(d => ["like", "comment"].includes(d.type));
+        const hasNotifs = data.some(d => ["follow", "system"].includes(d.type));
+        
+        setHasUnreadLikes(hasLikes);
+        setHasUnreadNotifs(hasNotifs);
+      }
+    };
 
-    return () => unsubscribe();
-  }, []);
+    fetchUnread();
+
+    const channel = supabase
+      .channel(`tab-header-notifs:${authUser.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${authUser.id}`
+      }, () => {
+        fetchUnread();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [authUser?.id]);
 
   const menuOptions = [
     { label: 'New group', icon: Users, path: '/new-group' },
@@ -89,10 +104,10 @@ export default function TabHeader() {
   const isProfilePage = location.pathname === '/profile';
 
   return (
-    <div className="w-full bg-[var(--header-bg)] px-4 min-h-[56px] pt-safe flex justify-between items-center z-50 shrink-0 relative border-b border-[var(--border-color)] shadow-sm rounded-b-2xl">
+    <div className="w-full px-4 min-h-[56px] flex justify-between items-center z-50 shrink-0 relative">
       <div className="flex items-center">
         <Link to="/" className="flex items-center gap-2">
-          <h1 className="text-2xl font-black text-[var(--header-text)] tracking-tighter italic">
+          <h1 className="text-2xl font-black text-[var(--header-text)] tracking-tighter">
             GrixChat
           </h1>
         </Link>
@@ -104,7 +119,7 @@ export default function TabHeader() {
             onClick={() => navigate('/search-user')}
             className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group"
           >
-            <Plus size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
+            <Users size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
           </button>
         )}
 

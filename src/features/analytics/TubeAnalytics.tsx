@@ -7,34 +7,43 @@ import {
   TrendingUp,
   Award
 } from 'lucide-react';
-import { auth, db } from '../../services/firebase.ts';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { motion } from 'motion/react';
 
 export default function TubeAnalytics() {
   const [topVideos, setTopVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalViews, setTotalViews] = useState(0);
+  const { user: authUser } = useAuth();
 
   useEffect(() => {
     const fetchTubeAnalytics = async () => {
-      if (!auth.currentUser) return;
+      if (!authUser || !supabase) return;
       try {
-        const q = query(
-          collection(db, "tube_videos"), 
-          where("userId", "==", auth.currentUser.uid),
-          orderBy("views", "desc"),
-          limit(5)
-        );
-        const snapshot = await getDocs(q);
-        const videos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setTopVideos(videos);
+        const { data: videos, error } = await supabase
+          .from('tube_videos')
+          .select('*')
+          .eq('user_id', authUser.id)
+          .order('views_count', { ascending: false })
+          .limit(5);
 
-        let views = 0;
-        videos.forEach((v: any) => {
-          views += v.views || 0;
-        });
-        setTotalViews(views);
+        if (error) throw error;
+
+        if (videos) {
+          setTopVideos(videos.map(v => ({
+            ...v,
+            thumbnail: v.thumbnail_url,
+            views: v.views_count,
+            likes: v.likes_count
+          })));
+
+          let views = 0;
+          videos.forEach((v: any) => {
+            views += v.views_count || 0;
+          });
+          setTotalViews(views);
+        }
       } catch (err) {
         console.error("Error fetching tube analytics:", err);
       } finally {
@@ -43,7 +52,7 @@ export default function TubeAnalytics() {
     };
 
     fetchTubeAnalytics();
-  }, []);
+  }, [authUser]);
 
   if (loading) return <div className="p-10 text-center text-xs font-bold animate-pulse">Calculating views...</div>;
 

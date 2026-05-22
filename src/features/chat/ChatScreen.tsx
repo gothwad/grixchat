@@ -1,12 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { auth, db } from '../../services/firebase.ts';
-import { 
-  doc, 
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
-} from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 
 import { AnimatePresence } from 'motion/react';
 import { useChatMessages } from './hooks/useChatMessages';
@@ -27,6 +22,7 @@ export default function ChatScreen() {
   const { id: receiverId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, userData: currentUserData } = useAuth();
   
   const { chatId, convType } = useChatId(receiverId);
 
@@ -60,7 +56,6 @@ export default function ChatScreen() {
     receiverActiveChatId,
     receiverLastSeen,
     chatSettings,
-    currentUserData,
     watchData,
     isWatchMode,
     updateWatchState,
@@ -73,6 +68,7 @@ export default function ChatScreen() {
     messageLimit, 
     loadingMore, 
     loadMore,
+    addOptimisticMessage,
     lastMessageCount 
   } = useChatMessages(chatId);
 
@@ -81,17 +77,8 @@ export default function ChatScreen() {
     editMessage: performEditMessage, 
     deleteMessage: performDeleteMessage, 
     reactToMessage: performReactToMessage, 
-    clearChat: performClearChat,
-    cleanupMessages
-  } = useChatActions(chatId, receiverId || '', receiver, receiverActiveChatId);
-
-  // Trigger cleanup when first opening the chat
-  useEffect(() => {
-    if (chatId) {
-      console.log(`🔥 [AUTO-CLEANUP] Initializing cleanup for chat: ${chatId}`);
-      cleanupMessages(chatId).catch(err => console.error("Auto-cleanup on mount failed:", err));
-    }
-  }, [chatId, cleanupMessages]);
+    clearChat: performClearChat
+  } = useChatActions(chatId, receiverId || '');
 
   const { isOtherTyping, handleTyping } = useTypingStatus(chatId, receiverId || '');
 
@@ -129,18 +116,18 @@ export default function ChatScreen() {
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     if (target.scrollTop === 0) {
-      loadMore(target.scrollHeight, scrollContainerRef.current);
+      loadMore();
     }
   };
 
   useEffect(() => {
     if (messages.length > lastMessageCount.current) {
       const lastMsg = messages[messages.length - 1];
-      const isFromMe = lastMsg?.senderId === auth.currentUser?.uid;
+      const isFromMe = lastMsg?.sender_id === user?.id;
       scrollToBottom(isFromMe ? 'smooth' : 'auto');
       lastMessageCount.current = messages.length;
     }
-  }, [messages, scrollToBottom, lastMessageCount]);
+  }, [messages, scrollToBottom, user?.id]);
 
   useEffect(() => {
     if (isOtherTyping) setTimeout(() => scrollToBottom('smooth'), 100);
@@ -148,17 +135,19 @@ export default function ChatScreen() {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length === 0 || !auth.currentUser) return;
+    if (files.length === 0 || !user) return;
     
     const newFiles = [...selectedFiles, ...files];
     setSelectedFiles(newFiles);
 
     const newPreviewUrls = [...filePreviewUrls];
     for (const file of files) {
-      if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+      // Create a local URL for all file types for instant preview
+      try {
         const url = URL.createObjectURL(file);
         newPreviewUrls.push(url);
-      } else {
+      } catch (err) {
+        console.warn("Could not create local URL for file:", file.name, err);
         newPreviewUrls.push('');
       }
     }
@@ -168,7 +157,7 @@ export default function ChatScreen() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if ((!newMessage.trim() && selectedFiles.length === 0) || !auth.currentUser || isSending) return;
+    if ((!newMessage.trim() && selectedFiles.length === 0) || !user || isSending) return;
     
     const textToSend = newMessage;
     const replyContext = replyingTo;
@@ -188,25 +177,43 @@ export default function ChatScreen() {
       if (editMsg) {
         await performEditMessage(editMsg.id, textToSend);
       } else {
-        // If there's text, send it first
+        // Optimistic UI for text
         if (textToSend) {
-          await performSendMessage({
+          addOptimisticMessage({
+            content: textToSend,
+            type: 'text'
+          });
+          
+          performSendMessage({
             text: textToSend,
-            replyTo: filesToSend.length === 0 ? replyContext : null // Only apply reply to text if no files
+            replyTo: filesToSend.length === 0 ? replyContext : null
+          }).catch(err => {
+            console.error("Error sending text:", err);
+            // Optionally handle error by showing a "Retry" or "Failed" state
           });
         }
         
-        // Send files in background
+        // Optimistic UI for files
         for (let i = 0; i < filesToSend.length; i++) {
           const file = filesToSend[i];
           const localUrl = filePreviewUrls[i];
+          const fileType = file.type.startsWith('image/') ? 'image' : 
+                           file.type.startsWith('video/') ? 'video' : 
+                           file.type.startsWith('audio/') ? 'audio' : 'file';
+
+          addOptimisticMessage({
+            content: '',
+            media_url: localUrl,
+            media_type: fileType,
+            type: fileType
+          });
           
           performSendMessage({
-            text: '', // Files sent individually
+            text: '',
             file,
             localPreviewUrl: localUrl,
-            replyTo: i === 0 && !textToSend ? replyContext : null // Only apply reply to first file if no text
-          }).catch(err => console.error("Error sending file message:", err));
+            replyTo: i === 0 && !textToSend ? replyContext : null
+          }).catch(err => console.error("Error sending file:", err));
         }
       }
     } catch (error) {
@@ -224,12 +231,16 @@ export default function ChatScreen() {
     setActiveMessageMenu(msg);
     setShowReactionPicker(null);
     
-    if (window.navigator.vibrate) window.navigator.vibrate(5);
+    try {
+      if (window.navigator?.vibrate) window.navigator.vibrate(5);
+    } catch (e) {
+      // Ignore vibration errors
+    }
   }, []);
 
   const startEdit = useCallback((msg: any) => {
     setEditingMessage(msg);
-    setNewMessage(msg.text);
+    setNewMessage(msg.content || msg.text || '');
     setActiveMessageMenu(null);
     setTimeout(() => {
       if (textareaRef.current) {
@@ -247,12 +258,14 @@ export default function ChatScreen() {
   };
 
   const hideChat = async () => {
-    if (!auth.currentUser) return;
+    if (!user) return;
     const isHidden = Array.isArray(currentUserData?.hiddenChats) && currentUserData.hiddenChats.includes(chatId);
     try {
-      await updateDoc(doc(db, "users", auth.currentUser.uid), {
-        hiddenChats: isHidden ? arrayRemove(chatId) : arrayUnion(chatId)
-      });
+      const newHidden = isHidden 
+        ? currentUserData.hiddenChats.filter((id: string) => id !== chatId)
+        : [...(currentUserData.hiddenChats || []), chatId];
+        
+      await (supabase as any).from('users').update({ hidden_chats: newHidden }).eq('id', user.id);
       if (!isHidden) navigate('/chats');
     } catch (error) {
       console.error("Error hideChat:", error);
@@ -260,12 +273,14 @@ export default function ChatScreen() {
   };
 
   const archiveChat = async () => {
-    if (!auth.currentUser) return;
+    if (!user) return;
     const isArchived = Array.isArray(currentUserData?.archivedChats) && currentUserData.archivedChats.includes(chatId);
     try {
-      await updateDoc(doc(db, "users", auth.currentUser.uid), {
-        archivedChats: isArchived ? arrayRemove(chatId) : arrayUnion(chatId)
-      });
+      const newArchived = isArchived 
+        ? currentUserData.archivedChats.filter((id: string) => id !== chatId)
+        : [...(currentUserData.archivedChats || []), chatId];
+
+      await (supabase as any).from('users').update({ archived_chats: newArchived }).eq('id', user.id);
       if (!isArchived) navigate('/chats');
     } catch (error) {
       console.error("Error archiveChat:", error);
@@ -299,17 +314,17 @@ export default function ChatScreen() {
         isTyping={isOtherTyping}
         receiverStatus={receiverStatus}
         receiverActiveChatId={receiverActiveChatId}
-        currentUserId={auth.currentUser?.uid}
+        currentUserId={user?.id}
         onWatchTogether={toggleWatchMode}
         type={convType}
       />
 
       <AnimatePresence>
-        {isWatchMode && watchData?.watchTogetherUrl && (
+        {isWatchMode && watchData?.watch_together_url && (
           <WatchTogether 
-            url={watchData.watchTogetherUrl}
+            url={watchData.watch_together_url}
             chatId={chatId}
-            currentUserId={auth.currentUser?.uid || ''}
+            currentUserId={user?.id || ''}
             watchState={watchData.watchState}
             updateWatchState={updateWatchState}
             onClose={toggleWatchMode}
@@ -326,7 +341,6 @@ export default function ChatScreen() {
         loading={loading}
         messages={messages}
         messageLimit={messageLimit}
-        auth={auth}
         convType={convType}
         receiver={receiver}
         activeMessageMenu={activeMessageMenu}
@@ -347,7 +361,7 @@ export default function ChatScreen() {
         setReplyingTo={setReplyingTo}
         startEdit={startEdit}
         deleteMessage={performDeleteMessage}
-        currentUserUid={auth.currentUser?.uid}
+        currentUserUid={user?.id}
         setShowReactionPicker={setShowReactionPicker}
         editingMessage={editingMessage}
         setEditingMessage={setEditingMessage}

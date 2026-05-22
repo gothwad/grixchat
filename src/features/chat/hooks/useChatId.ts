@@ -1,44 +1,56 @@
 import { useState, useEffect } from 'react';
-import { auth, db } from '../../../services/firebase.ts';
-import { doc, getDoc } from 'firebase/firestore';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../providers/AuthProvider.tsx';
+import { chatService } from '../services/chatService';
 
 export function useChatId(receiverId: string | undefined) {
   const [chatId, setChatId] = useState<string>('');
   const [convType, setConvType] = useState<'direct' | 'group'>('direct');
+  const { user } = useAuth();
 
   useEffect(() => {
-    if (!receiverId || !auth.currentUser) {
+    if (!receiverId || !user || !supabase) {
       setChatId('');
       return;
     }
     
-    const checkId = async () => {
-      if (!receiverId || !auth.currentUser) return;
-      
-      const rId = receiverId;
-      if (rId === 'gx-ai' || rId === 'grix-ai') {
-        const id = [auth.currentUser?.uid, 'gx-ai'].sort().join('_');
-        setChatId(id);
-        setConvType('direct');
-        return;
-      }
+    const resolveChatId = async () => {
+      const myId = user.id;
 
-      try {
-        const userSnap = await getDoc(doc(db, "users", rId));
-        if (userSnap.exists()) {
-          const id = [auth.currentUser?.uid, rId].sort().join('_');
+      // Check if receiverId is a user (DM)
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', receiverId)
+        .single();
+
+      if (userData) {
+        // It's a user, get/create DM
+        const id = await chatService.getOrCreateDirectConversation(myId, receiverId);
+        if (id) {
           setChatId(id);
           setConvType('direct');
-        } else {
-          setChatId(rId);
-          setConvType('group');
         }
-      } catch (err) {
-        console.error("Error checking ID type:", err);
+      } else {
+        // Assume it's a conversation ID already
+        setChatId(receiverId);
+        
+        const { data: convData } = await supabase
+          .from('conversations')
+          .select('type')
+          .eq('id', receiverId)
+          .single();
+        
+        if (convData) {
+          setConvType(convData.type);
+        } else {
+          setConvType('group'); // Fallback
+        }
       }
     };
-    checkId();
-  }, [receiverId, auth.currentUser?.uid]);
+
+    resolveChatId();
+  }, [receiverId, user?.id]);
 
   return { chatId, convType };
 }

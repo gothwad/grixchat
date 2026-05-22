@@ -1,71 +1,54 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  doc, 
-  getDoc,
-  onSnapshot, 
-  orderBy 
-} from 'firebase/firestore';
-import { auth, db } from '../../services/firebase.ts';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 import PostCard from '../home/components/PostCard.tsx';
 
 export default function ProfilePostViewer() {
   const { id: userId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { user: authUser, userData: currentUserData } = useAuth();
   const searchParams = new URLSearchParams(location.search);
   const startPostId = searchParams.get('postId');
   const tab = searchParams.get('tab') || 'posts';
   
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentUserData, setCurrentUserData] = useState<any>(null);
   const postRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   useEffect(() => {
-    if (!auth.currentUser) return;
-
-    // Fetch current user data for PostCard
-    const unsubscribeMe = onSnapshot(doc(db, "users", auth.currentUser.uid), (docSnap) => {
-      if (docSnap.exists()) {
-        setCurrentUserData(docSnap.data());
-      }
-    });
+    if (!userId || !supabase) return;
 
     const fetchPosts = async () => {
       setLoading(true);
       try {
-        let q;
+        let baseQuery;
         if (tab === 'posts') {
-          q = query(
-            collection(db, "posts"), 
-            where("userId", "==", userId),
-            orderBy("createdAt", "desc")
-          );
+          baseQuery = supabase.from('posts').select(`
+            *,
+            users:user_id(username, photo_url, full_name)
+          `).eq('user_id', userId);
         } else if (tab === 'reels') {
-          q = query(
-            collection(db, "reels"), 
-            where("userUid", "==", userId),
-            orderBy("createdAt", "desc")
-          );
+          baseQuery = supabase.from('reels').select(`
+            *,
+            users:user_id(username, photo_url, full_name)
+          `).eq('user_id', userId);
         } else if (tab === 'tube') {
-          q = query(
-            collection(db, "tube_videos"), 
-            where("userId", "==", userId),
-            orderBy("createdAt", "desc")
-          );
+          baseQuery = supabase.from('tube_videos').select(`
+            *,
+            users:user_id(username, photo_url, full_name)
+          `).eq('user_id', userId);
         } else if (tab === 'saved') {
-            const userDoc = await getDoc(doc(db, "users", userId!));
-            const userData = userDoc.data();
-            const savedIds = userData?.savedPosts || [];
+            const { data: userProfile } = await supabase.from('users').select('saved_posts').eq('id', userId).single();
+            const savedIds = userProfile?.saved_posts || [];
             
             if (savedIds.length > 0) {
-              q = query(collection(db, "posts"), where("__name__", "in", savedIds.slice(0, 10)));
+              baseQuery = supabase.from('posts').select(`
+                *,
+                users:user_id(username, photo_url, full_name)
+              `).in('id', savedIds.slice(0, 10));
             } else {
               setPosts([]);
               setLoading(false);
@@ -76,18 +59,20 @@ export default function ProfilePostViewer() {
           return;
         }
 
-        const snapshot = await getDocs(q);
-        const fetchedPosts = snapshot.docs.map(doc => {
-          const data = doc.data() as any;
-          // Normalize fields for PostCard
+        const { data, error } = await baseQuery.order('created_at', { ascending: false });
+        if (error) throw error;
+        
+        const fetchedPosts = (data || []).map((m: any) => {
           return {
-            id: doc.id,
-            ...data,
-            imageUrl: data.imageUrl || data.cover || data.thumbnail || data.url,
-            userName: data.userName || data.authorName || 'User',
-            userAvatar: data.userAvatar || data.authorAvatar || '',
-            caption: data.caption || data.title || data.description || '',
-            userId: data.userId || data.userUid || ''
+            id: m.id,
+            ...m,
+            mediaUrls: m.media_urls || [],
+            imageUrl: m.media_urls?.[0] || m.imageUrl || m.thumbnail_url || m.cover || m.thumbnail || m.url || m.video_url,
+            userName: m.users?.full_name || m.users?.username || 'User',
+            userAvatar: m.users?.photo_url || '',
+            caption: m.caption || m.title || m.description || '',
+            content: m.caption || m.content || '',
+            userId: m.user_id || ''
           };
         });
         setPosts(fetchedPosts);
@@ -99,7 +84,6 @@ export default function ProfilePostViewer() {
     };
 
     fetchPosts();
-    return () => unsubscribeMe();
   }, [userId, tab]);
 
   // Scroll to the start post once loaded

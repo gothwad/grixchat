@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Search, ArrowLeft, Edit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../../services/firebase.ts';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { useConversations } from './hooks/useConversations.ts';
 import { ChatUserList } from './components/ChatUserList.tsx';
 
 export default function MessagesListScreen() {
   const navigate = useNavigate();
+  const { user, userData: currentUserData } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const { conversations, loading } = useConversations('Chats');
 
@@ -25,7 +26,7 @@ export default function MessagesListScreen() {
           </button>
           <div className="flex flex-col">
             <span className="text-[10px] font-bold text-[var(--header-text)]/70 uppercase tracking-widest leading-none mb-1">Messages</span>
-            <h2 className="text-sm font-black text-[var(--header-text)] tracking-tight">@{auth.currentUser?.displayName || 'My Chats'}</h2>
+            <h2 className="text-sm font-black text-[var(--header-text)] tracking-tight">@{currentUserData?.username || 'My Chats'}</h2>
           </div>
         </div>
         <div className="flex gap-2">

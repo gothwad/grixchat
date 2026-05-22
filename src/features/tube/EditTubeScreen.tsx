@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronRight, Loader2, Save, Type, FileText, LayoutGrid } from 'lucide-react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../../services/firebase.ts';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 import SettingHeader from '../../components/layout/SettingHeader';
 
-const CATEGORIES = ['All', 'Music', 'Gaming', 'Vlogs', 'Technology', 'Education', 'Movies'];
+const CATEGORIES = [
+  'All', 'Music', 'Education', 'Movies',
+  'Gaming', 'Mixes', 'Live', 'Comedy', 'Programming', 'News', 'Vlogs', 'Tech', 'Fashion', 'Sports', 'Travel', 'Cooking', 'DIY', 'Art', 'Business', 'Lifestyle'
+];
 
 export default function EditTubeScreen() {
   const { id: videoId } = useParams();
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -20,11 +24,15 @@ export default function EditTubeScreen() {
 
   useEffect(() => {
     const fetchVideo = async () => {
-      if (!videoId) return;
+      if (!videoId || !supabase) return;
       try {
-        const videoDoc = await getDoc(doc(db, "tube_videos", videoId));
-        if (videoDoc.exists()) {
-          const data = videoDoc.data();
+        const { data, error } = await supabase
+          .from('tube_videos')
+          .select('*')
+          .eq('id', videoId)
+          .single();
+        
+        if (data) {
           setFormData({
             title: data.title || '',
             description: data.description || '',
@@ -43,17 +51,21 @@ export default function EditTubeScreen() {
   }, [videoId, navigate]);
 
   const handleUpdate = async () => {
-    if (!videoId) return;
+    if (!videoId || !supabase) return;
     if (!formData.title.trim()) return;
     
     setSaving(true);
     try {
-      await updateDoc(doc(db, "tube_videos", videoId), {
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        updatedAt: new Date()
-      });
+      const { error } = await supabase
+        .from('tube_videos')
+        .update({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+        } as any)
+        .eq('id', videoId);
+      
+      if (error) throw error;
       navigate(-1);
     } catch (err) {
       console.error("Error updating video:", err);

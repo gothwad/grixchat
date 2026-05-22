@@ -9,22 +9,13 @@ import {
   Search,
   X
 } from 'lucide-react';
-import { 
-  collection, 
-  addDoc, 
-  getDocs, 
-  query, 
-  where, 
-  serverTimestamp,
-  doc,
-  getDoc
-} from 'firebase/firestore';
-import { db, auth } from '../../services/firebase.ts';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageService } from '../../services/ImageService.ts';
 
 interface UserProfile {
-  uid: string;
+  id: string;
   username: string;
   fullName: string;
   photoURL: string;
@@ -32,6 +23,7 @@ interface UserProfile {
 
 export default function NewGroupScreen() {
   const navigate = useNavigate();
+  const { user: authUser, userData: currentUserData } = useAuth();
   const [step, setStep] = useState(1);
   const [groupName, setGroupName] = useState('');
   const [groupIcon, setGroupIcon] = useState<File | null>(null);
@@ -44,31 +36,38 @@ export default function NewGroupScreen() {
 
   useEffect(() => {
     fetchFriends();
-  }, []);
+  }, [authUser?.id]);
 
-  const fetchFriends = async () => {
-    if (!auth.currentUser) return;
-    try {
-      setLoading(true);
-      const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
-      const following = userDoc.data()?.following || [];
-      
-      if (following.length > 0) {
-        // Firestore 'in' query has a limit of 10/30 elements. We'll fetch in chunks of 10 to be safe.
-        const chunks = [];
-        for (let i = 0; i < following.length; i += 10) {
-          chunks.push(following.slice(i, i + 10));
-        }
+    const fetchFriends = async () => {
+      if (!authUser?.id || !supabase) return;
+      try {
+        setLoading(true);
+        // Get following IDs from follows table
+        const { data: followData, error: followError } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', authUser.id);
+        
+        if (followError) throw followError;
+        
+        const following = followData?.map(f => f.following_id) || [];
+        
+        if (following.length > 0) {
+          const { data: friendsData, error: friendsError } = await supabase
+            .from('users')
+            .select('*')
+            .in('id', following);
+          
+          if (friendsError) throw friendsError;
 
-        const allFriendsFields: UserProfile[] = [];
-        for (const chunk of chunks) {
-          const q = query(collection(db, 'users'), where('uid', 'in', chunk));
-          const snap = await getDocs(q);
-          allFriendsFields.push(...snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile)));
+          setFriends(friendsData.map(f => ({
+            id: f.id,
+            username: f.username,
+            fullName: f.full_name,
+            photoURL: f.photo_url
+          })));
         }
-        setFriends(allFriendsFields);
-      }
-    } catch (error) {
+      } catch (error) {
       console.error('Error fetching friends:', error);
     } finally {
       setLoading(false);
@@ -86,15 +85,15 @@ export default function NewGroupScreen() {
   };
 
   const toggleUserSelection = (user: UserProfile) => {
-    if (selectedUsers.some(u => u.uid === user.uid)) {
-      setSelectedUsers(prev => prev.filter(u => u.uid !== user.uid));
+    if (selectedUsers.some(u => u.id === user.id)) {
+      setSelectedUsers(prev => prev.filter(u => u.id !== user.id));
     } else {
       setSelectedUsers(prev => [...prev, user]);
     }
   };
 
   const handleCreateGroup = async () => {
-    if (!groupName.trim() || !auth.currentUser) return;
+    if (!groupName.trim() || !authUser?.id || !supabase) return;
     setCreating(true);
     try {
       if (selectedUsers.length === 0) {
@@ -107,46 +106,54 @@ export default function NewGroupScreen() {
           iconUrl = await ImageService.uploadImage(groupIcon);
         } catch (imgErr) {
           console.error('Image upload failed:', imgErr);
-          // Don't fail the whole group creation if image fails, fall back to default
-          // Or at least show a specific error
           throw new Error(`Avatar upload failed: ${imgErr instanceof Error ? imgErr.message : 'Unknown error'}. Check your API keys in Settings.`);
         }
       }
 
-      const participants = [auth.currentUser.uid, ...selectedUsers.map(u => u.uid)];
+      const participants = [authUser.id, ...selectedUsers.map(u => u.id)];
       
-      const groupData = {
-        name: groupName,
-        icon: iconUrl,
-        type: 'group',
-        participants,
-        admins: [auth.currentUser.uid],
-        createdBy: auth.currentUser.uid,
-        createdAt: serverTimestamp(),
-        lastMessage: `Group "${groupName}" created`,
-        lastMessageTimestamp: serverTimestamp(),
-        lastSenderId: auth.currentUser.uid,
-      };
+      // 1. Create the conversation
+      const { data: conv, error: convError } = await (supabase as any)
+        .from('conversations')
+        .insert({
+          name: groupName,
+          photo_url: iconUrl,
+          type: 'group',
+          created_by: authUser.id,
+          last_message: `Group "${groupName}" created`,
+          last_message_at: new Date().toISOString()
+        })
+        .select()
+        .single();
 
-      console.log('Creating group with data:', groupData);
-      const docRef = await addDoc(collection(db, "conversations"), groupData);
-      console.log('Group created with ID:', docRef.id);
+      if (convError) throw convError;
+
+      // 2. Add participants
+      const participantInserts = participants.map(uid => ({
+        conversation_id: conv.id,
+        user_id: uid
+      }));
+
+      const { error: partError } = await (supabase as any)
+        .from('conversation_participants')
+        .insert(participantInserts);
+
+      if (partError) throw partError;
       
-      // Add a system message
+      // 3. Add system message
       try {
-        await addDoc(collection(db, "messages"), {
-          chatId: docRef.id,
-          senderId: 'system',
-          text: `${auth.currentUser.displayName || 'You'} created the group "${groupName}"`,
-          timestamp: serverTimestamp(),
-          type: 'system'
+        await (supabase as any).from('messages').insert({
+          conversation_id: conv.id,
+          sender_id: authUser.id, // System messages can be sent by creator or a special sys id?
+          content: `${currentUserData?.fullName || 'You'} created the group "${groupName}"`,
+          created_at: new Date().toISOString(),
+          media_type: 'system'
         });
       } catch (msgErr) {
         console.error('Failed to add system message:', msgErr);
-        // We still have the group, so proceed
       }
 
-      navigate(`/chat/${docRef.id}`);
+      navigate(`/chat/${conv.id}`);
     } catch (error) {
       console.error('Error creating group:', error);
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -200,7 +207,7 @@ export default function NewGroupScreen() {
               {selectedUsers.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
                   {selectedUsers.map(user => (
-                    <div key={user.uid} className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full shrink-0">
+                    <div key={user.id} className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full shrink-0">
                       <img src={user.photoURL} className="w-5 h-5 rounded-full object-cover" alt="" />
                       <span className="text-[9px] font-bold text-blue-600 truncate max-w-[60px]">{user.fullName}</span>
                       <button onClick={() => toggleUserSelection(user)} className="text-blue-600 hover:text-blue-800">
@@ -232,10 +239,10 @@ export default function NewGroupScreen() {
                   </div>
                 ) : filteredFriends.length > 0 ? (
                   filteredFriends.map(user => {
-                    const isSelected = selectedUsers.some(u => u.uid === user.uid);
+                    const isSelected = selectedUsers.some(u => u.id === user.id);
                     return (
                       <div 
-                        key={user.uid}
+                        key={user.id}
                         onClick={() => toggleUserSelection(user)}
                         className={`flex items-center gap-3 p-3 rounded-2xl transition-all cursor-pointer ${isSelected ? 'bg-blue-500/5 ring-1 ring-blue-500/20' : 'hover:bg-black/5'}`}
                       >
@@ -305,7 +312,7 @@ export default function NewGroupScreen() {
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-1 mb-3">Members: {selectedUsers.length}</h3>
                 <div className="grid grid-cols-2 gap-2">
                   {selectedUsers.map(user => (
-                    <div key={user.uid} className="flex items-center gap-2 p-2 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] overflow-hidden">
+                    <div key={user.id} className="flex items-center gap-2 p-2 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] overflow-hidden">
                       <img src={user.photoURL} className="w-6 h-6 rounded-full object-cover" alt="" />
                       <span className="text-[10px] font-bold text-[var(--text-primary)] truncate">{user.fullName}</span>
                     </div>

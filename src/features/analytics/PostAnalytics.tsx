@@ -7,13 +7,14 @@ import {
   Share2,
   MoreHorizontal
 } from 'lucide-react';
-import { auth, db } from '../../services/firebase.ts';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { motion } from 'motion/react';
 
 export default function PostAnalytics() {
   const [topPosts, setTopPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user: authUser } = useAuth();
   const [summary, setSummary] = useState({
     totalLikes: 0,
     totalComments: 0,
@@ -22,30 +23,38 @@ export default function PostAnalytics() {
 
   useEffect(() => {
     const fetchPostAnalytics = async () => {
-      if (!auth.currentUser) return;
+      if (!authUser || !supabase) return;
       try {
-        const q = query(
-          collection(db, "posts"), 
-          where("userId", "==", auth.currentUser.uid),
-          orderBy("likes", "desc"),
-          limit(5)
-        );
-        const snapshot = await getDocs(q);
-        const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setTopPosts(posts);
+        const { data: posts, error, count } = await supabase
+          .from('posts')
+          .select('*', { count: 'exact' })
+          .eq('user_id', authUser.id)
+          .order('likes_count', { ascending: false })
+          .limit(5);
 
-        let likes = 0;
-        let comments = 0;
-        posts.forEach((p: any) => {
-          likes += p.likes || 0;
-          comments += p.comments || 0;
-        });
+        if (error) throw error;
 
-        setSummary({
-          totalLikes: likes,
-          totalComments: comments,
-          count: snapshot.size
-        });
+        if (posts) {
+          setTopPosts(posts.map(p => ({
+            ...p,
+            imageUrl: p.media_url,
+            likes: p.likes_count,
+            comments: p.comments_count
+          })));
+
+          let likes = 0;
+          let comments = 0;
+          posts.forEach((p: any) => {
+            likes += p.likes_count || 0;
+            comments += p.comments_count || 0;
+          });
+
+          setSummary({
+            totalLikes: likes,
+            totalComments: comments,
+            count: count || 0
+          });
+        }
       } catch (err) {
         console.error("Error fetching post analytics:", err);
       } finally {
@@ -54,7 +63,7 @@ export default function PostAnalytics() {
     };
 
     fetchPostAnalytics();
-  }, []);
+  }, [authUser]);
 
   if (loading) return <div className="p-10 text-center text-xs font-bold animate-pulse">Analyzing Posts...</div>;
 

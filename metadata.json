@@ -1,5 +1,5 @@
 {
-  "name": "GrixChat",
+  "name": "Supabase GrixChat",
   "description": "GrixChat is the next-generation secure social messaging platform of India. Experience real-time chat, HD reels, and private communication powered by Grix Group.",
   "requestFramePermissions": [
     "camera",
@@ -7,5 +7,7 @@
     "geolocation",
     "notifications"
   ],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

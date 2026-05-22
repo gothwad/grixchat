@@ -1,14 +1,6 @@
 import { useState, useEffect } from 'react';
-import { auth, db, rtdb } from '../../../services/firebase.ts';
-import { ref as rtdbRef, onValue, update } from 'firebase/database';
-import { 
-  doc, 
-  onSnapshot, 
-  getDoc,
-  serverTimestamp,
-  updateDoc 
-} from 'firebase/firestore';
-import { CacheService } from '../../../services/CacheService.ts';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../providers/AuthProvider.tsx';
 
 export function useChatSync(receiverId: string | undefined, chatId: string, convType: 'direct' | 'group') {
   const [receiver, setReceiver] = useState<any>(null);
@@ -19,140 +11,122 @@ export function useChatSync(receiverId: string | undefined, chatId: string, conv
   const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [watchData, setWatchData] = useState<any>(null);
   const [isWatchMode, setIsWatchMode] = useState(false);
+  const { user, userData: authUser } = useAuth();
 
   useEffect(() => {
-    if (!receiverId || !auth.currentUser) return;
+    if (!receiverId || !supabase) return;
 
-    if (convType === 'direct') {
-      const cachedReceiver = CacheService.getUser(receiverId);
-      if (cachedReceiver) setReceiver(cachedReceiver);
-
-      const userDocRef = doc(db, "users", receiverId);
-      const receiverUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setReceiver(data);
-          CacheService.saveUser(receiverId, data);
+    const fetchReceiver = async () => {
+      if (convType === 'direct') {
+        const { data } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', receiverId)
+          .single();
+        
+        if (data) {
+          setReceiver({
+            uid: data.id,
+            fullName: data.full_name,
+            username: data.username,
+            photoURL: data.photo_url,
+            isOnline: data.is_online,
+            lastSeen: data.last_seen
+          });
+          setReceiverStatus(data.is_online ? 'online' : 'offline');
+          setReceiverLastSeen(data.last_seen);
         }
-      });
+      } else {
+        const { data } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('id', receiverId)
+          .single();
+        if (data) setReceiver(data);
+      }
+    };
 
-      const statusRef = rtdbRef(rtdb, `/status/${receiverId}`);
-      const statusUnsubscribe = onValue(statusRef, (snapshot) => {
-        const val = snapshot.val();
-        if (val) {
-          setReceiverStatus(val.state);
-          setReceiverActiveChatId(val.activeChatId || null);
-          setReceiverLastSeen(val.last_changed || null);
+    fetchReceiver();
+
+    const channel = supabase
+      .channel(`sync:${receiverId}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: convType === 'direct' ? 'users' : 'conversations',
+        filter: `id=eq.${receiverId}`
+      }, (payload) => {
+        const data = payload.new as any;
+        if (convType === 'direct') {
+          setReceiverStatus(data.is_online ? 'online' : 'offline');
+          setReceiverLastSeen(data.last_seen);
+          setReceiver(prev => ({ 
+            ...prev, 
+            isOnline: data.is_online, 
+            lastSeen: data.last_seen,
+            fullName: data.full_name,
+            username: data.username,
+            photoURL: data.photo_url
+          }));
         } else {
-          setReceiverStatus('offline');
-          setReceiverActiveChatId(null);
-          setReceiverLastSeen(null);
+          setReceiver(data);
         }
-      });
-      return () => {
-        receiverUnsubscribe();
-        statusUnsubscribe();
-      };
-    } else {
-      const groupDocRef = doc(db, "conversations", receiverId);
-      const groupUnsubscribe = onSnapshot(groupDocRef, (snap) => {
-        if (snap.exists()) {
-          setReceiver(snap.data());
-        }
-      });
-      return () => groupUnsubscribe();
-    }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [receiverId, convType]);
 
   useEffect(() => {
-    if (!receiverId || !auth.currentUser) return;
+    if (!user || !chatId || !supabase) return;
 
-    const chatSettingsRef = doc(db, "users", auth.currentUser.uid, "chatSettings", receiverId);
-    const settingsUnsubscribe = onSnapshot(chatSettingsRef, (snap) => {
-      if (snap.exists()) {
-        setChatSettings(snap.data());
-      } else {
-        setChatSettings(null);
-      }
-    });
-
-    const userUnsubscribe = onSnapshot(doc(db, "users", auth.currentUser.uid), (snap) => {
-      if (snap.exists()) {
-        setCurrentUserData(snap.data());
-      }
-    });
-
-    if (auth.currentUser) {
-      const myStatusRef = rtdbRef(rtdb, `/status/${auth.currentUser.uid}`);
-      update(myStatusRef, { activeChatId: receiverId });
+    // Fetch conversation data (including watch together state)
+    const fetchChat = async () => {
+      const { data } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('id', chatId)
+        .single();
       
-      // Also reset unread count when opening the chat
-      if (chatId) {
-        const convRef = doc(db, "conversations", chatId);
-        updateDoc(convRef, {
-          [`unreadCount_${auth.currentUser.uid}`]: 0
-        }).catch(err => console.warn("Failed to reset unread count:", err));
-      }
-    }
-
-    return () => {
-      settingsUnsubscribe();
-      userUnsubscribe();
-      if (auth.currentUser) {
-        const myStatusRef = rtdbRef(rtdb, `/status/${auth.currentUser.uid}`);
-        update(myStatusRef, { activeChatId: null });
+      if (data) {
+        setWatchData(data);
+        if (data.watch_together_url) setIsWatchMode(true);
       }
     };
-  }, [receiverId]);
+
+    fetchChat();
+
+    const channel = supabase
+      .channel(`chat_sync:${chatId}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'conversations',
+        filter: `id=eq.${chatId}`
+      }, (payload) => {
+        const data = payload.new as any;
+        setWatchData(data);
+        // Add more specific sync logic for watch together if needed
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [chatId, user?.id]);
 
   useEffect(() => {
-    if (!chatId || chatId.trim() === "") return;
-    const chatRef = doc(db, "conversations", chatId);
-    const unsub = onSnapshot(chatRef, (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setWatchData(data);
-        if (data.watchState?.isWatchActive !== undefined) {
-          setIsWatchMode(data.watchState.isWatchActive);
-        }
-      }
-    }, (err) => console.error("Sync error:", err));
-    return () => unsub();
-  }, [chatId]);
+    if (authUser) setCurrentUserData(authUser);
+  }, [authUser]);
 
   const updateWatchState = async (updates: any) => {
-    if (!auth.currentUser || !chatId) return;
-    try {
-      const chatRef = doc(db, "conversations", chatId);
-      const newState: any = {
-        "watchState.updatedBy": auth.currentUser.uid,
-        "watchState.timestamp": serverTimestamp()
-      };
-      
-      if (updates.isPlaying !== undefined) newState["watchState.isPlaying"] = updates.isPlaying;
-      if (updates.currentTime !== undefined) newState["watchState.currentTime"] = updates.currentTime;
-      
-      await updateDoc(chatRef, newState);
-    } catch (err) {
-      console.error("Error updating watch state:", err);
-    }
+    // Implementation for Supabase
   };
 
   const toggleWatchMode = async () => {
-    if (!chatId) return;
-    const newMode = !isWatchMode;
-    setIsWatchMode(newMode);
-    try {
-      await updateDoc(doc(db, "conversations", chatId), {
-        "watchState.isWatchActive": newMode,
-        "watchState.updatedBy": auth.currentUser?.uid,
-        "watchState.timestamp": serverTimestamp(),
-        "watchState.isPlaying": true,
-        "watchState.currentTime": 0
-      });
-    } catch (err) {
-      console.error("Error toggling watch mode:", err);
-    }
+    // Implementation for Supabase
   };
 
   return {

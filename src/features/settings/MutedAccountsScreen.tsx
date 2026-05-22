@@ -1,45 +1,79 @@
 import React, { useState, useEffect } from 'react';
 import { VolumeX, Loader2, X } from 'lucide-react';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
-import { auth, db } from '../../services/firebase.ts';
-import { doc, onSnapshot, updateDoc, arrayRemove, getDoc } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 
 export default function MutedAccountsScreen() {
+  const { user: authUser, userData: currentUserData } = useAuth();
   const [mutedUsers, setMutedUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [unmutingId, setUnmutingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!authUser || !supabase) return;
 
-    const unsubscribe = onSnapshot(doc(db, "users", auth.currentUser.uid), async (snap) => {
-      if (snap.exists()) {
-        const mutedIds = snap.data().mutedUsers || [];
-        
-        // Fetch details for each muted user
-        const details = await Promise.all(mutedIds.map(async (uid: string) => {
-          const userSnap = await getDoc(doc(db, "users", uid));
-          if (userSnap.exists()) {
-            return { uid, ...userSnap.data() };
-          }
-          return { uid, username: 'Unknown User' };
-        }));
-        
-        setMutedUsers(details);
+    const fetchMutedDetails = async () => {
+      // Re-fetch user data to get fresh muted list
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('muted_users')
+        .eq('id', authUser.id)
+        .single();
+      
+      const mutedIds = userProfile?.muted_users || [];
+      if (mutedIds.length === 0) {
+        setMutedUsers([]);
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-    });
+      
+      try {
+        const { data: usersData } = await supabase
+          .from('users')
+          .select('*')
+          .in('id', mutedIds);
+        
+        if (usersData) {
+          setMutedUsers(usersData);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch muted user details", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => unsubscribe();
-  }, []);
+    fetchMutedDetails();
 
-  const handleUnmute = async (uid: string) => {
-    if (!auth.currentUser) return;
-    setUnmutingId(uid);
+    const channel = supabase
+      .channel(`muted:${authUser.id}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'users',
+        filter: `id=eq.${authUser.id}`
+      }, () => fetchMutedDetails())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [authUser?.id]);
+
+  const handleUnmute = async (targetUid: string) => {
+    if (!authUser || !supabase) return;
+    setUnmutingId(targetUid);
     try {
-      await updateDoc(doc(db, "users", auth.currentUser.uid), {
-        mutedUsers: arrayRemove(uid)
-      });
+      const currentMuted = currentUserData?.muted_users || [];
+      const newMuted = currentMuted.filter((id: string) => id !== targetUid);
+
+      const { error } = await supabase
+        .from('users')
+        .update({ muted_users: newMuted } as any)
+        .eq('id', authUser.id);
+      
+      if (error) throw error;
     } catch (error) {
       console.error("Error unmuting user:", error);
     } finally {
@@ -71,30 +105,30 @@ export default function MutedAccountsScreen() {
             <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)]">
               {mutedUsers.map((user, index) => (
                 <div 
-                  key={user.uid}
+                  key={user.id}
                   className={`flex items-center justify-between px-6 py-4 ${
                     index !== mutedUsers.length - 1 ? 'border-b border-[var(--border-color)]/30' : ''
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <img 
-                      src={user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
+                      src={user.photo_url || user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
                       className="w-10 h-10 rounded-full object-cover"
                       alt=""
                     />
                     <div>
                       <h4 className="text-sm font-bold text-[var(--text-primary)]">
-                        {user.fullName || user.username}
+                        {user.full_name || user.fullName || user.username}
                       </h4>
                       <p className="text-[11px] text-[var(--text-secondary)]">@{user.username}</p>
                     </div>
                   </div>
                   <button 
-                    onClick={() => handleUnmute(user.uid)}
-                    disabled={unmutingId === user.uid}
+                    onClick={() => handleUnmute(user.id)}
+                    disabled={unmutingId === user.id}
                     className="text-xs font-bold text-blue-500 hover:text-blue-600 disabled:opacity-50"
                   >
-                    {unmutingId === user.uid ? 'Working...' : 'Unmute'}
+                    {unmutingId === user.id ? 'Working...' : 'Unmute'}
                   </button>
                 </div>
               ))}

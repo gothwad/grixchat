@@ -9,15 +9,14 @@ import {
   Pencil,
   Play
 } from 'lucide-react';
-import { auth, db } from '../../services/firebase.ts';
-import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 
 import { useAuth } from '../../providers/AuthProvider';
 
 export default function ProfileTab() {
-  const { userData: authUserData } = useAuth();
+  const { user: authUser, userData: authUserData } = useAuth();
   const [posts, setPosts] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'posts' | 'reels' | 'tube' | 'saved'>('posts');
   const navigate = useNavigate();
@@ -27,30 +26,29 @@ export default function ProfileTab() {
 
   // Fetch posts based on active tab
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!authUser || !supabase) return;
 
     const fetchContent = async () => {
-      if (!auth.currentUser) return;
-      
       try {
         if (activeTab === 'posts') {
-          const q = query(collection(db, "posts"), where("userId", "==", auth.currentUser.uid));
-          const snapshot = await getDocs(q);
-          setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          const { data } = await supabase.from('posts').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false });
+          setPosts((data || []).map(p => ({
+            ...p,
+            imageUrl: p.media_urls?.[0] || p.imageUrl 
+          })));
         } else if (activeTab === 'reels') {
-          const q = query(collection(db, "reels"), where("userUid", "==", auth.currentUser.uid));
-          const snapshot = await getDocs(q);
-          setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), imageUrl: (doc.data() as any).cover })));
+          const { data } = await supabase.from('reels').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false });
+          setPosts((data || []).map(d => ({ ...d, imageUrl: d.cover_url || d.thumbnail_url || d.cover })));
         } else if (activeTab === 'tube') {
-          const q = query(collection(db, "tube_videos"), where("userId", "==", auth.currentUser.uid));
-          const snapshot = await getDocs(q);
-          setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), imageUrl: (doc.data() as any).thumbnail })));
+          const { data } = await supabase.from('tube_videos').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false });
+          setPosts((data || []).map(d => ({ ...d, imageUrl: d.thumbnail_url || d.thumbnail })));
         } else if (activeTab === 'saved') {
-          if (userData?.savedPosts && userData.savedPosts.length > 0) {
-            const savedIds = userData.savedPosts.slice(0, 10); 
-            const q = query(collection(db, "posts"), where("__name__", "in", savedIds));
-            const snapshot = await getDocs(q);
-            setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          if (userData?.saved_posts && userData.saved_posts.length > 0) {
+            const { data } = await supabase.from('posts').select('*').in('id', userData.saved_posts).order('created_at', { ascending: false });
+            setPosts((data || []).map(p => ({
+              ...p,
+              imageUrl: p.media_urls?.[0] || p.imageUrl 
+            })));
           } else {
             setPosts([]);
           }
@@ -62,7 +60,7 @@ export default function ProfileTab() {
     };
     
     fetchContent();
-  }, [activeTab, userData?.savedPosts]);
+  }, [activeTab, userData?.saved_posts, authUser]);
 
   return (
     <div className="flex flex-col bg-[var(--bg-main)] font-sans h-full overflow-y-auto no-scrollbar">
@@ -112,7 +110,7 @@ export default function ProfileTab() {
 
             {/* Followers Box */}
             <button 
-              onClick={() => navigate(`/user/${auth.currentUser?.uid}/followers`)}
+              onClick={() => navigate(`/user/${authUser?.id}/followers`)}
               className="bg-[var(--box-bg)] p-3 rounded-xl text-[var(--box-text)] flex flex-col items-center justify-center min-h-[60px] active:scale-[0.98] transition-all"
             >
               <span className="text-sm font-bold">{userData?.followers?.length || 0}</span>
@@ -121,7 +119,7 @@ export default function ProfileTab() {
 
             {/* Following Box */}
             <button 
-              onClick={() => navigate(`/user/${auth.currentUser?.uid}/following`)}
+              onClick={() => navigate(`/user/${authUser?.id}/following`)}
               className="bg-[var(--box-bg)] p-3 rounded-xl text-[var(--box-text)] flex flex-col items-center justify-center min-h-[60px] active:scale-[0.98] transition-all"
             >
               <span className="text-sm font-bold">{userData?.following?.length || 0}</span>
@@ -171,11 +169,11 @@ export default function ProfileTab() {
                 className={`${activeTab === 'tube' ? 'aspect-video' : 'aspect-square'} bg-zinc-100 relative group overflow-hidden cursor-pointer`}
                 onClick={() => {
                   if (activeTab === 'posts' || activeTab === 'saved') {
-                    navigate(`/user/${auth.currentUser?.uid}/posts?postId=${post.id}&tab=${activeTab}`);
+                    navigate(`/user/${authUser?.id}/posts?postId=${post.id}&tab=${activeTab}`);
                   } else if (activeTab === 'reels') {
-                    navigate(`/user/${auth.currentUser?.uid}/reels?reelId=${post.id}`);
+                    navigate(`/user/${authUser?.id}/reels?reelId=${post.id}`);
                   } else if (activeTab === 'tube') {
-                    navigate(`/user/${auth.currentUser?.uid}/tube?videoId=${post.id}`);
+                    navigate(`/user/${authUser?.id}/tube?videoId=${post.id}`);
                   }
                 }}
               >

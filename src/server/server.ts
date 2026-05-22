@@ -6,28 +6,8 @@ import multer from "multer";
 import FormData from "form-data";
 import fs from "fs";
 import os from "os";
-import admin from 'firebase-admin';
 
 dotenv.config();
-
-// Initialize Firebase Admin
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  try {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-    console.log('Firebase Admin initialized via service account');
-  } catch (e) {
-    console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT:', e);
-  }
-} else if (process.env.VITE_FIREBASE_PROJECT_ID) {
-  // Fallback: Initialize with project ID (works if running in GCP with default service account)
-  admin.initializeApp({
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID
-  });
-  console.log('Firebase Admin initialized via project ID');
-}
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -47,85 +27,6 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", message: "GrixChat Server is running" });
 });
 
-// Serve Firebase Messaging Service Worker
-app.get("/firebase-messaging-sw.js", (req, res) => {
-  const config = {
-    apiKey: process.env.VITE_FIREBASE_API_KEY,
-    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.VITE_FIREBASE_APP_ID,
-  };
-
-  if (!config.apiKey) {
-    console.error("SW Config Error: Firebase environment variables are missing on the server!");
-  }
-
-  const script = `
-/* eslint-disable no-undef */
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
-
-const firebaseConfig = ${JSON.stringify(config)};
-
-if (firebaseConfig.apiKey) {
-  firebase.initializeApp(firebaseConfig);
-  const messaging = firebase.messaging();
-
-  messaging.onBackgroundMessage((payload) => {
-    console.log('Background message received:', payload);
-    
-    const notificationTitle = payload.notification?.title || 'New Message from GrixChat';
-    const notificationOptions = {
-      body: payload.notification?.body || 'You have a new message',
-      icon: '/assets/favicon.png',
-      badge: '/assets/favicon.png',
-      image: payload.data?.imageUrl || null, // Show image preview if available
-      tag: payload.data?.chatId || 'grix-chat-notif', // Group messages by chat
-      renotify: true, // Vibrate for every new message in the same group
-      vibrate: [200, 100, 200],
-      data: {
-        click_action: payload.data?.click_action || '/chats',
-        chatId: payload.data?.chatId
-      },
-      actions: [
-        { action: 'open', title: 'Open Chat' },
-        { action: 'close', title: 'Dismiss' }
-      ]
-    };
-    
-    return self.registration.showNotification(notificationTitle, notificationOptions);
-  });
-}
-
-// Handle notification click event
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  const urlToOpen = event.notification.data?.click_action || '/chats';
-
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // If a window tab is already open, focus it
-      for (var i = 0; i < windowClients.length; i++) {
-        var client = windowClients[i];
-        if (client.url.includes(urlToOpen) && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      // If not, open a new tab
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
-  );
-});
-  `;
-  res.setHeader("Content-Type", "application/javascript");
-  res.setHeader("Service-Worker-Allowed", "/");
-  res.send(script);
-});
-
 // Sitemap route for SEO
 app.get("/sitemap.xml", (req, res) => {
   res.setHeader("Content-Type", "application/xml");
@@ -138,81 +39,9 @@ app.get("/sitemap.xml", (req, res) => {
 </urlset>`);
 });
 
-// Send Notification Proxy
+// Send Notification Proxy (Disabled during Supabase migration)
 app.post("/api/send-notification", async (req, res) => {
-  const { tokens, title, body, data } = req.body;
-  
-  if (!tokens || !tokens.length) {
-    return res.status(400).json({ error: 'No tokens provided' });
-  }
-
-  try {
-    // Check if admin was actually initialized
-    if (!admin.apps.length) {
-      throw new Error('Firebase Admin not initialized. Check FIREBASE_SERVICE_ACCOUNT env var.');
-    }
-
-    const response = await admin.messaging().sendEachForMulticast({
-      tokens,
-      notification: { title, body },
-      data: data || {},
-      android: {
-        priority: 'high',
-        notification: {
-          icon: 'stock_ticker_update',
-          color: '#7e22ce',
-          sound: 'default'
-        }
-      },
-      webpush: {
-        headers: {
-          Urgency: 'high'
-        },
-        notification: {
-          title,
-          body,
-          icon: '/assets/favicon.png',
-          badge: '/assets/favicon.png',
-          vibrate: [200, 100, 200],
-          requireInteraction: true,
-          data: {
-            ...data,
-            url: data?.click_action || '/chats'
-          }
-        },
-        fcmOptions: {
-          link: data?.click_action || '/chats'
-        }
-      }
-    });
-
-    console.log(`Notification result: ${response.successCount} success, ${response.failureCount} failure`);
-
-    // Handle stale/invalid tokens
-    if (response.failureCount > 0) {
-      const invalidTokens: string[] = [];
-      response.responses.forEach((resp, idx) => {
-        if (!resp.success) {
-          const error = resp.error;
-          if (error?.code === 'messaging/registration-token-not-registered' || 
-              error?.code === 'messaging/invalid-registration-token') {
-            invalidTokens.push(tokens[idx]);
-          }
-        }
-      });
-
-      if (invalidTokens.length > 0) {
-        console.log(`Cleaning up ${invalidTokens.length} invalid tokens...`);
-        // This would require the user ID, which we don't have here unless passed.
-        // For now, we just log them. In a real app, you'd pass sender/receiver IDs to this API.
-      }
-    }
-
-    res.json({ success: true, response });
-  } catch (error: any) {
-    console.error('FCM Error:', error.message);
-    res.status(500).json({ error: error.message });
-  }
+  res.status(501).json({ error: 'Push notifications are currently disabled during Supabase migration' });
 });
 
 // File Upload Proxy (Catbox for images/videos, Gofile.io for others)

@@ -16,8 +16,7 @@ import {
   PictureInPicture
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { db } from '../../services/firebase';
-import { doc, onSnapshot, updateDoc, increment, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
 
@@ -31,7 +30,7 @@ declare global {
 export default function ReelWatcherScreen() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
   
   const [liked, setLiked] = useState(false);
   const [muted, setMuted] = useState(true);
@@ -50,7 +49,7 @@ export default function ReelWatcherScreen() {
 
   // Load YouTube API (only if needed)
   useEffect(() => {
-    if (reel?.youtubeId && !window.YT) {
+    if (reel?.youtube_id && !window.YT) {
       const tag = document.createElement('script');
       tag.src = "https://www.youtube.com/iframe_api";
       const firstScriptTag = document.getElementsByTagName('script')[0];
@@ -60,28 +59,61 @@ export default function ReelWatcherScreen() {
 
   // Fetch Reel Data
   useEffect(() => {
-    if (!id) return;
+    if (!id || !supabase) return;
 
-    const unsubscribe = onSnapshot(doc(db, 'reels', id), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setReel({ id: docSnap.id, ...data });
-        if (user && data.likedBy && data.likedBy.includes(user.uid)) {
-          setLiked(true);
-        } else {
-          setLiked(false);
-        }
-      } else {
+    const fetchReel = async () => {
+      const { data, error } = await supabase
+        .from('reels')
+        .select('*, users:user_id(username, photo_url)')
+        .eq('id', id)
+        .single();
+      
+      if (error || !data) {
+        console.error("Error fetching reel:", error);
         navigate('/reels');
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching reel:", error);
-      setLoading(false);
-    });
 
-    return () => unsubscribe();
-  }, [id, user, navigate]);
+      setReel({
+        ...data,
+        userName: data.users?.username || 'User',
+        userAvatar: data.users?.photo_url || '',
+        userUid: data.user_id,
+        videoUrl: data.video_url,
+        youtubeId: data.youtube_id,
+        likes: data.likes_count,
+        comments: data.comments_count,
+        audio: data.audio_title
+      });
+
+      if (authUser) {
+        const { data: likeData } = await supabase
+          .from('likes')
+          .select('id')
+          .eq('user_id', authUser.id)
+          .eq('target_id', id)
+          .eq('target_type', 'reel')
+          .single();
+        setLiked(!!likeData);
+      }
+      
+      setLoading(false);
+    };
+
+    fetchReel();
+
+    const channel = supabase
+      .channel(`reel-${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reels', filter: `id=eq.${id}` }, () => {
+        fetchReel();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [id, authUser, navigate]);
 
   // Native Video Event Handlers
   const handleTimeUpdate = () => {
@@ -265,15 +297,24 @@ export default function ReelWatcherScreen() {
 
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user || !id || !reel) return;
-    const reelRef = doc(db, 'reels', id);
+    if (!authUser || !id || !reel || !supabase) return;
     const isCurrentlyLiked = liked;
     setLiked(!isCurrentlyLiked);
     try {
       if (isCurrentlyLiked) {
-        await updateDoc(reelRef, { likes: increment(-1), likedBy: arrayRemove(user.uid) });
+        await supabase.from('likes').delete().eq('user_id', authUser.id).eq('target_id', id).eq('target_type', 'reel');
+        await supabase.from('reels').update({ 
+          likes_count: Math.max(0, (reel.likes || 0) - 1) 
+        } as any).eq('id', id);
       } else {
-        await updateDoc(reelRef, { likes: increment(1), likedBy: arrayUnion(user.uid) });
+        await supabase.from('likes').insert({ 
+          user_id: authUser.id, 
+          target_id: id, 
+          target_type: 'reel' 
+        } as any);
+        await supabase.from('reels').update({ 
+          likes_count: (reel.likes || 0) + 1 
+        } as any).eq('id', id);
       }
     } catch (error) {
       setLiked(isCurrentlyLiked);

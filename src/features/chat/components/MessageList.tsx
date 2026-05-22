@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Loader2, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageBubble } from './MessageBubble';
+import { useAuth } from '../../../providers/AuthProvider.tsx';
 
 interface MessageListProps {
   scrollContainerRef: React.RefObject<HTMLDivElement>;
@@ -12,7 +13,6 @@ interface MessageListProps {
   loading: boolean;
   messages: any[];
   messageLimit: number;
-  auth: any;
   convType: 'direct' | 'group';
   receiver: any;
   activeMessageMenu: any;
@@ -36,7 +36,6 @@ export const MessageList: React.FC<MessageListProps> = ({
   loading,
   messages,
   messageLimit,
-  auth,
   convType,
   receiver,
   activeMessageMenu,
@@ -51,6 +50,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   isOtherTyping
 }) => {
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const onJumpToMessage = useCallback((messageId: string) => {
     const element = document.getElementById(`msg-${messageId}`);
@@ -101,11 +101,12 @@ export const MessageList: React.FC<MessageListProps> = ({
             <p className="text-[11px] text-zinc-400 mt-1">Say hi to start the conversation!</p>
           </div>
         ) : (() => {
-          const currentMessages = messages.slice(-messageLimit);
+          // Use all messages or limit if specified
+          const currentMessages = messageLimit > 0 ? messages.slice(-messageLimit) : messages;
           return currentMessages.map((msg, index) => {
-            const isMe = msg.senderId === auth.currentUser?.uid;
+            const isMe = msg.sender_id === user?.id;
             const prevMsg = index > 0 ? currentMessages[index - 1] : null;
-            const isSameSender = prevMsg?.senderId === msg.senderId;
+            const isSameSender = prevMsg?.sender_id === msg.sender_id;
             
             return (
               <MessageBubble 

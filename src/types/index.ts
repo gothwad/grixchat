@@ -1,4 +1,5 @@
 export interface UserProfile {
+  id: string;
   uid: string;
   email: string;
   fullName: string;
@@ -40,10 +41,18 @@ export interface UserProfile {
       vibrate?: boolean;
     };
   };
+  preferences?: {
+    theme?: 'light' | 'dark' | 'system';
+    fontSize?: 'small' | 'medium' | 'large';
+  };
   fcmTokens?: string[];
   isPrivate?: boolean;
   profileType?: 'public' | 'private';
   savedPosts?: string[];
+  saved_posts?: string[];
+  favorites?: string[];
+  muted_users?: string[];
+  blocked_users?: string[];
 }
 
 export interface ChatMessage {

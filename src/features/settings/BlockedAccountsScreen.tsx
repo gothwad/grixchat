@@ -1,21 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { UserMinus, UserPlus, Loader2, X } from 'lucide-react';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
-import { db } from '../../services/firebase.ts';
-import { doc, updateDoc, arrayRemove, getDoc } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 
 export default function BlockedAccountsScreen() {
-  const { userData, user } = useAuth();
+  const { userData, user: authUser } = useAuth();
   const [blockedUsers, setBlockedUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [unblockingId, setUnblockingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!userData) return;
+    if (!authUser || !supabase) return;
 
     const fetchBlockedDetails = async () => {
-      const blockedIds = userData.blockedUsers || [];
+      // Re-fetch to get fresh list
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('blocked_users')
+        .eq('id', authUser.id)
+        .single();
+      
+      const blockedIds = userProfile?.blocked_users || [];
       if (blockedIds.length === 0) {
         setBlockedUsers([]);
         setLoading(false);
@@ -23,14 +29,14 @@ export default function BlockedAccountsScreen() {
       }
       
       try {
-        const details = await Promise.all(blockedIds.map(async (uid: string) => {
-          const userSnap = await getDoc(doc(db, "users", uid));
-          if (userSnap.exists()) {
-            return { uid, ...userSnap.data() };
-          }
-          return { uid, username: 'Unknown User' };
-        }));
-        setBlockedUsers(details);
+        const { data: usersData } = await supabase
+          .from('users')
+          .select('*')
+          .in('id', blockedIds);
+        
+        if (usersData) {
+          setBlockedUsers(usersData);
+        }
       } catch (err) {
         console.warn("Failed to fetch blocked user details", err);
       } finally {
@@ -39,15 +45,21 @@ export default function BlockedAccountsScreen() {
     };
 
     fetchBlockedDetails();
-  }, [userData?.blockedUsers]);
+  }, [authUser?.id, userData?.blocked_users]);
 
-  const handleUnblock = async (uid: string) => {
-    if (!user) return;
-    setUnblockingId(uid);
+  const handleUnblock = async (targetUid: string) => {
+    if (!authUser || !supabase) return;
+    setUnblockingId(targetUid);
     try {
-      await updateDoc(doc(db, "users", user.uid), {
-        blockedUsers: arrayRemove(uid)
-      });
+      const currentBlocked = userData?.blocked_users || [];
+      const newBlocked = currentBlocked.filter((id: string) => id !== targetUid);
+
+      const { error } = await supabase
+        .from('users')
+        .update({ blocked_users: newBlocked } as any)
+        .eq('id', authUser.id);
+      
+      if (error) throw error;
     } catch (error) {
       console.error("Error unblocking user:", error);
     } finally {
@@ -79,30 +91,30 @@ export default function BlockedAccountsScreen() {
             <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)]">
               {blockedUsers.map((user, index) => (
                 <div 
-                  key={user.uid}
+                  key={user.id}
                   className={`flex items-center justify-between px-6 py-4 ${
                     index !== blockedUsers.length - 1 ? 'border-b border-[var(--border-color)]/30' : ''
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <img 
-                      src={user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
+                      src={user.photo_url || user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
                       className="w-10 h-10 rounded-full object-cover"
                       alt=""
                     />
                     <div>
                       <h4 className="text-sm font-bold text-[var(--text-primary)]">
-                        {user.fullName || user.username}
+                        {user.full_name || user.fullName || user.username}
                       </h4>
                       <p className="text-[11px] text-[var(--text-secondary)]">@{user.username}</p>
                     </div>
                   </div>
                   <button 
-                    onClick={() => handleUnblock(user.uid)}
-                    disabled={unblockingId === user.uid}
+                    onClick={() => handleUnblock(user.id)}
+                    disabled={unblockingId === user.id}
                     className="text-xs font-bold text-blue-500 hover:text-blue-600 disabled:opacity-50"
                   >
-                    {unblockingId === user.uid ? 'Working...' : 'Unblock'}
+                    {unblockingId === user.id ? 'Working...' : 'Unblock'}
                   </button>
                 </div>
               ))}

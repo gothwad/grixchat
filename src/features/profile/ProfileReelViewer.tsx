@@ -1,20 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Loader2, Play } from 'lucide-react';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  orderBy 
-} from 'firebase/firestore';
-import { auth, db } from '../../services/firebase.ts';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 import { motion } from 'motion/react';
 
 export default function ProfileReelViewer() {
   const { id: userId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { user: authUser } = useAuth();
   const searchParams = new URLSearchParams(location.search);
   const startReelId = searchParams.get('reelId');
   
@@ -23,20 +18,19 @@ export default function ProfileReelViewer() {
   const reelRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!userId || !supabase) return;
 
     const fetchReels = async () => {
       setLoading(true);
       try {
-        const q = query(
-          collection(db, "reels"), 
-          where("userUid", "==", userId),
-          orderBy("createdAt", "desc")
-        );
+        const { data, error } = await supabase
+          .from('reels')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
 
-        const snapshot = await getDocs(q);
-        const fetchedReels = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
-        setReels(fetchedReels);
+        if (error) throw error;
+        setReels(data || []);
       } catch (err) {
         console.error("Error fetching viewer reels:", err);
       } finally {

@@ -32,10 +32,10 @@ import {
   Monitor,
   UserPlus
 } from 'lucide-react';
-import { auth } from '../../services/firebase.ts';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useAuth } from '../../providers/AuthProvider';
+import { authService } from '../auth/services/authService.ts';
 
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
 
@@ -46,7 +46,7 @@ export default function SettingsScreen() {
 
   const handleLogout = async () => {
     try {
-      await auth.signOut();
+      await authService.logout();
       navigate('/login');
     } catch (error) {
       console.error("Logout error:", error);

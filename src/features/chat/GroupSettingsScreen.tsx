@@ -15,25 +15,15 @@ import {
   ShieldCheck,
   MoreVertical
 } from 'lucide-react';
-import { 
-  doc, 
-  getDoc, 
-  updateDoc, 
-  arrayRemove, 
-  arrayUnion, 
-  deleteDoc,
-  collection,
-  addDoc,
-  serverTimestamp,
-  onSnapshot
-} from 'firebase/firestore';
-import { db, auth } from '../../services/firebase.ts';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageService } from '../../services/ImageService.ts';
 
 export default function GroupSettingsScreen() {
   const { id: chatId } = useParams();
   const navigate = useNavigate();
+  const { user: authUser, userData: currentUserData } = useAuth();
   const [group, setGroup] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,46 +33,74 @@ export default function GroupSettingsScreen() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    if (!chatId || !auth.currentUser) return;
+    if (!chatId || !authUser?.uid || !supabase) return;
 
-    const unsub = onSnapshot(doc(db, "conversations", chatId), async (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setGroup({ id: snap.id, ...data });
-        setNewName(data.name);
-        setIsAdmin(data.admins?.includes(auth.currentUser?.uid));
+    const fetchGroupData = async () => {
+      setLoading(true);
+      try {
+        const { data: conv, error: convError } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('id', chatId)
+          .single();
+
+        if (convError) throw convError;
+
+        setGroup(conv);
+        setNewName(conv.name);
+        setIsAdmin(conv.admins?.includes(authUser.uid) || conv.created_by === authUser.uid);
 
         // Fetch member details
-        const memberData = await Promise.all(
-          data.participants.map(async (uid: string) => {
-            const userSnap = await getDoc(doc(db, "users", uid));
-            return userSnap.exists() ? { uid, ...userSnap.data() } : { uid, fullName: 'Unknown' };
-          })
-        );
-        setMembers(memberData);
-        setLoading(false);
-      } else {
-        navigate('/chats');
-      }
-    });
+        const { data: participants, error: partError } = await (supabase as any)
+          .from('conversation_participants')
+          .select(`
+            user:users(*)
+          `)
+          .eq('conversation_id', chatId);
 
-    return () => unsub();
-  }, [chatId]);
+        if (partError) throw partError;
+
+        setMembers((participants as any[]).map(p => ({
+          uid: p.user.id,
+          username: p.user.username,
+          fullName: p.user.full_name,
+          photoURL: p.user.photo_url
+        })));
+      } catch (err) {
+        console.error("Error fetching group details:", err);
+        navigate('/chats');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGroupData();
+
+    // Subscribe to changes
+    const channel = supabase.channel(`group_settings_${chatId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `id=eq.${chatId}` }, () => fetchGroupData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_participants', filter: `conversation_id=eq.${chatId}` }, () => fetchGroupData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [chatId, authUser?.uid]);
 
   const handleUpdateIcon = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && chatId && isAdmin) {
+    if (file && chatId && isAdmin && supabase) {
       setUpdating(true);
       try {
         const iconUrl = await ImageService.uploadImage(file);
-        await updateDoc(doc(db, "conversations", chatId), { icon: iconUrl });
+        await supabase.from('conversations').update({ photo_url: iconUrl } as any).eq('id', chatId);
         
-        await addDoc(collection(db, "messages"), {
-          chatId,
-          senderId: 'system',
-          text: `${auth.currentUser?.displayName || 'Admin'} changed group icon`,
-          timestamp: serverTimestamp(),
-          type: 'system'
+        await supabase.from('messages').insert({
+          conversation_id: chatId,
+          sender_id: authUser?.uid,
+          content: `${currentUserData?.fullName || 'Admin'} changed group icon`,
+          created_at: new Date().toISOString(),
+          media_type: 'system'
         });
       } catch (err) {
         console.error(err);
@@ -93,16 +111,16 @@ export default function GroupSettingsScreen() {
   };
 
   const handleUpdateName = async () => {
-    if (!newName.trim() || newName === group.name || !chatId || !isAdmin) return;
+    if (!newName.trim() || newName === group.name || !chatId || !isAdmin || !supabase) return;
     setUpdating(true);
     try {
-      await updateDoc(doc(db, "conversations", chatId), { name: newName });
-      await addDoc(collection(db, "messages"), {
-        chatId,
-        senderId: 'system',
-        text: `${auth.currentUser?.displayName || 'Admin'} changed group name to "${newName}"`,
-        timestamp: serverTimestamp(),
-        type: 'system'
+      await supabase.from('conversations').update({ name: newName } as any).eq('id', chatId);
+      await (supabase as any).from('messages').insert({
+        conversation_id: chatId,
+        sender_id: authUser?.uid,
+        content: `${currentUserData?.fullName || 'Admin'} changed group name to "${newName}"`,
+        created_at: new Date().toISOString(),
+        media_type: 'system'
       });
       setShowEditName(false);
     } catch (err) {
@@ -113,22 +131,19 @@ export default function GroupSettingsScreen() {
   };
 
   const removeMember = async (uid: string) => {
-    if (!chatId || !isAdmin || uid === auth.currentUser?.uid) return;
+    if (!chatId || !isAdmin || uid === authUser?.uid || !supabase) return;
     if (!window.confirm("Remove this member from the group?")) return;
     
     try {
-      await updateDoc(doc(db, "conversations", chatId), {
-        participants: arrayRemove(uid),
-        admins: arrayRemove(uid)
-      });
+      await supabase.from('conversation_participants').delete().eq('conversation_id', chatId).eq('user_id', uid);
       
-      const removedUser = members.find(m => m.uid === uid);
-      await addDoc(collection(db, "messages"), {
-        chatId,
-        senderId: 'system',
-        text: `${auth.currentUser?.displayName || 'Admin'} removed ${removedUser?.fullName || 'a user'}`,
-        timestamp: serverTimestamp(),
-        type: 'system'
+      const removedUser = (members as any[]).find(m => m.uid === uid);
+      await (supabase as any).from('messages').insert({
+        conversation_id: chatId,
+        sender_id: authUser?.uid,
+        content: `${currentUserData?.fullName || 'Admin'} removed ${removedUser?.fullName || 'a user'}`,
+        created_at: new Date().toISOString(),
+        media_type: 'system'
       });
     } catch (err) {
       console.error(err);
@@ -136,38 +151,34 @@ export default function GroupSettingsScreen() {
   };
 
   const makeAdmin = async (uid: string) => {
-    if (!chatId || !isAdmin || group.admins.includes(uid)) return;
+    if (!chatId || !isAdmin || (group.admins || []).includes(uid) || !supabase) return;
     try {
-      await updateDoc(doc(db, "conversations", chatId), {
-        admins: arrayUnion(uid)
-      });
-      const user = members.find(m => m.uid === uid);
-      await addDoc(collection(db, "messages"), {
-        chatId,
-        senderId: 'system',
-        text: `${user?.fullName || 'User'} is now an admin`,
-        timestamp: serverTimestamp(),
-        type: 'system'
+      const newAdmins = [...(group.admins || []), uid];
+      await supabase.from('conversations').update({ admins: newAdmins } as any).eq('id', chatId);
+      const user = (members as any[]).find(m => m.uid === uid);
+      await (supabase as any).from('messages').insert({
+        conversation_id: chatId,
+        sender_id: authUser?.uid,
+        content: `${user?.fullName || 'User'} is now an admin`,
+        created_at: new Date().toISOString(),
+        media_type: 'system'
       });
     } catch (err) { console.error(err); }
   };
 
   const leaveGroup = async () => {
-    if (!chatId || !auth.currentUser) return;
+    if (!chatId || !authUser?.uid || !supabase) return;
     if (!window.confirm("Are you sure you want to leave this group?")) return;
     
     try {
-      await updateDoc(doc(db, "conversations", chatId), {
-        participants: arrayRemove(auth.currentUser.uid),
-        admins: arrayRemove(auth.currentUser.uid)
-      });
+      await supabase.from('conversation_participants').delete().eq('conversation_id', chatId).eq('user_id', authUser.uid);
       
-      await addDoc(collection(db, "messages"), {
-        chatId,
-        senderId: 'system',
-        text: `${auth.currentUser.displayName || 'User'} left the group`,
-        timestamp: serverTimestamp(),
-        type: 'system'
+      await (supabase as any).from('messages').insert({
+        conversation_id: chatId,
+        sender_id: authUser.uid,
+        content: `${currentUserData?.fullName || 'User'} left the group`,
+        created_at: new Date().toISOString(),
+        media_type: 'system'
       });
       
       navigate('/chats');
@@ -175,11 +186,11 @@ export default function GroupSettingsScreen() {
   };
 
   const deleteGroup = async () => {
-    if (!chatId || !isAdmin) return;
+    if (!chatId || !isAdmin || !supabase) return;
     if (!window.confirm("DELETE this group? This will remove all messages and group data for everyone. This cannot be undone.")) return;
     
     try {
-      await deleteDoc(doc(db, "conversations", chatId));
+      await supabase.from('conversations').delete().eq('id', chatId);
       navigate('/chats');
     } catch (err) { console.error(err); }
   };
@@ -221,7 +232,7 @@ export default function GroupSettingsScreen() {
                   <Loader2 size={32} className="animate-spin text-blue-500" />
                 </div>
               ) : (
-                <img src={group.icon} className="w-full h-full object-cover rounded-full" alt={group.name} />
+                <img src={group.photo_url || 'https://cdn-icons-png.flaticon.com/512/166/166258.png'} className="w-full h-full object-cover rounded-full" alt={group.name} />
               )}
             </div>
             {isAdmin && (
@@ -253,7 +264,7 @@ export default function GroupSettingsScreen() {
                 </div>
               )}
             </div>
-            <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest">Created by you • {new Date(group.createdAt?.seconds * 1000).toLocaleDateString()}</p>
+            <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest">Created • {group.created_at ? new Date(group.created_at).toLocaleDateString() : 'N/A'}</p>
           </div>
         </div>
 
@@ -271,11 +282,11 @@ export default function GroupSettingsScreen() {
 
             <div className="bg-[var(--bg-card)] rounded-3xl border border-[var(--border-color)] divide-y divide-[var(--border-color)] overflow-hidden">
               {members.map(member => {
-                const memberIsAdmin = group.admins.includes(member.uid);
-                const isMe = member.uid === auth.currentUser?.uid;
+                const memberIsAdmin = (group.admins || []).includes(member.uid);
+                const isMe = member.uid === authUser?.uid;
                 return (
                   <div key={member.uid} className="flex items-center gap-3 p-4">
-                    <img src={member.photoURL} className="w-11 h-11 rounded-full object-cover border border-[var(--border-color)]" alt="" />
+                    <img src={member.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} className="w-11 h-11 rounded-full object-cover border border-[var(--border-color)]" alt="" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-bold text-[var(--text-primary)] truncate">{member.fullName}</p>

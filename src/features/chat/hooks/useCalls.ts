@@ -1,57 +1,76 @@
 import { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, getDoc, doc } from 'firebase/firestore';
-import { auth, db } from '../../../services/firebase.ts';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../providers/AuthProvider.tsx';
 import { toDate } from '../../../utils/dateUtils.ts';
 
 export const useCalls = (activeFilter: string) => {
+  const { user } = useAuth();
   const [calls, setCalls] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!user || !supabase) return;
     if (activeFilter !== 'Calls') return;
 
     setLoading(true);
-    const q = query(collection(db, "calls"));
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const allCalls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data({ serverTimestamps: 'estimate' }) }));
-      
-      const relevantCalls = allCalls.filter((data: any) => {
-        const isCaller = data.callerId === auth.currentUser?.uid;
-        const isReceiver = data.receiverId === auth.currentUser?.uid;
-        return (isCaller || isReceiver) && data.status === 'ended';
-      }).sort((a: any, b: any) => {
-        const timeA = toDate(a.timestamp)?.getTime() || Date.now();
-        const timeB = toDate(b.timestamp)?.getTime() || Date.now();
-        return timeB - timeA;
-      });
+    const fetchCalls = async () => {
+      const { data, error } = await supabase
+        .from('calls')
+        .select(`
+          *,
+          caller:users!calls_caller_id_fkey (id, full_name, username, photo_url),
+          receiver:users!calls_receiver_id_fkey (id, full_name, username, photo_url)
+        `)
+        .or(`caller_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .eq('status', 'ended')
+        .order('created_at', { ascending: false });
 
-      const callList = await Promise.all(relevantCalls.map(async (data: any) => {
-        const isCaller = data.callerId === auth.currentUser?.uid;
-        const otherUserId = isCaller ? data.receiverId : data.callerId;
+      if (error) {
+        console.error('Error fetching calls:', error);
+        setLoading(false);
+        return;
+      }
+
+      const callList = data.map((call: any) => {
+        const isCaller = call.caller_id === user.id;
+        const otherUser = isCaller ? call.receiver : call.caller;
         
-        const userDoc = await getDoc(doc(db, "users", otherUserId || 'unknown'));
-        const userData = userDoc.data();
-
         return {
-          id: data.id,
-          otherUserId,
-          user: userData?.fullName || userData?.username || 'Unknown User',
-          avatar: userData?.photoURL || `https://cdn-icons-png.flaticon.com/512/149/149071.png`,
-          type: data.type,
+          id: call.id,
+          otherUserId: otherUser?.id,
+          user: otherUser?.full_name || otherUser?.username || 'Unknown User',
+          avatar: otherUser?.photo_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`,
+          type: call.type, // 'audio' or 'video'
           isIncoming: !isCaller,
-          isMissed: data.isMissed || false,
-          time: toDate(data.timestamp) ? new Date(toDate(data.timestamp)!).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently'
+          isMissed: call.is_missed || false,
+          time: toDate(call.created_at) ? new Date(toDate(call.created_at)!).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently'
         };
-      }));
+      });
 
       setCalls(callList);
       setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, [activeFilter]);
+    fetchCalls();
+
+    // Subscribe to changes in calls table
+    const subscription = supabase
+      .channel('table-db-changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'calls',
+        filter: `or(caller_id.eq.${user.id},receiver_id.eq.${user.id})`
+      }, () => {
+        fetchCalls();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [activeFilter, user]);
 
   return { calls, loading };
 };

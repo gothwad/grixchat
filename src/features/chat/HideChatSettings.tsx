@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Lock, Trash2, Eye, EyeOff, Save, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../providers/AuthProvider';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { supabase } from '../../lib/supabase';
 
 export default function HideChatSettings() {
   const navigate = useNavigate();
@@ -15,17 +14,23 @@ export default function HideChatSettings() {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !supabase) return;
     setLoading(true);
     setMessage(null);
 
     try {
-      await updateDoc(doc(db, "users", user.uid), {
-        hiddenChatSettings: {
-          secretCode: secretCode.trim() || null,
-          showMenuEntry: showMenuEntry
-        }
-      });
+      const { error } = await supabase
+        .from('users')
+        .update({
+          hidden_chat_settings: {
+            secretCode: secretCode.trim() || null,
+            showMenuEntry: showMenuEntry
+          }
+        } as any)
+        .eq('id', user.uid);
+
+      if (error) throw error;
+
       setMessage({ type: 'success', text: 'Settings updated successfully' });
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {

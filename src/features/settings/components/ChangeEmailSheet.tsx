@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Mail, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { auth, db } from '../../../services/firebase.ts';
-import { updateEmail } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { useAuth } from '../../../providers/AuthProvider';
+import { supabase } from '../../../lib/supabase';
 
 interface ChangeEmailSheetProps {
   isOpen: boolean;
@@ -12,6 +11,7 @@ interface ChangeEmailSheetProps {
 }
 
 export default function ChangeEmailSheet({ isOpen, onClose, onSuccess }: ChangeEmailSheetProps) {
+  const { user } = useAuth();
   const [newEmail, setNewEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -19,19 +19,25 @@ export default function ChangeEmailSheet({ isOpen, onClose, onSuccess }: ChangeE
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser) return;
+    if (!user) return;
 
     setLoading(true);
     setError('');
 
     try {
-      // 1. Update in Firebase Auth
-      await updateEmail(auth.currentUser, newEmail);
+      if (!supabase) throw new Error("Supabase client not initialized");
       
-      // 2. Update in Firestore users collection
-      await updateDoc(doc(db, "users", auth.currentUser.uid), {
-        email: newEmail
-      });
+      // 1. Update in Supabase Auth
+      const { error: authError } = await supabase.auth.updateUser({ email: newEmail });
+      if (authError) throw authError;
+      
+      // 2. Update in Supabase users table
+      const { error: dbError } = await supabase
+        .from('users')
+        .update({ email: newEmail } as any)
+        .eq('id', user.id);
+
+      if (dbError) throw dbError;
 
       setIsSuccess(true);
       setTimeout(() => {
@@ -106,7 +112,7 @@ export default function ChangeEmailSheet({ isOpen, onClose, onSuccess }: ChangeE
                 <div className="space-y-6">
                   <div className="p-4 bg-[var(--bg-main)] rounded-2xl border border-[var(--border-color)] space-y-1">
                     <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Current Email</p>
-                    <p className="text-sm font-bold text-[var(--text-primary)]">{auth.currentUser?.email}</p>
+                    <p className="text-sm font-bold text-[var(--text-primary)]">{user?.email}</p>
                   </div>
 
                   <form onSubmit={handleUpdate} className="space-y-4">
@@ -131,7 +137,7 @@ export default function ChangeEmailSheet({ isOpen, onClose, onSuccess }: ChangeE
 
                     <button 
                       type="submit"
-                      disabled={loading || !newEmail || newEmail === auth.currentUser?.email}
+                      disabled={loading || !newEmail || newEmail === user?.email}
                       className="w-full bg-[var(--primary)] text-white text-sm font-bold py-4 rounded-xl transition-all disabled:opacity-70 active:scale-[0.98] shadow-sm shadow-[var(--primary)]/20 shadow-lg flex items-center justify-center gap-2"
                     >
                       {loading ? 'Updating...' : (

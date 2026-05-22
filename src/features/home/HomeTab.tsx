@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { collection, query, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
-import { auth, db } from '../../services/firebase.ts';
+import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { 
@@ -13,6 +12,7 @@ import {
   PlaySquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { LocalDataCache } from '../../services/LocalDataCache';
 
 import PostCard from './components/PostCard.tsx';
 import CommentSheet from './components/CommentSheet.tsx';
@@ -20,9 +20,29 @@ import CommentSheet from './components/CommentSheet.tsx';
 export default function HomeTab() {
   const navigate = useNavigate();
   const { userData: currentUserData } = useAuth();
-  const [feedItems, setFeedItems] = useState<any[]>([]);
-  const [stories, setStories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  const [feedItems, setFeedItems] = useState<any[]>(() => {
+    if (currentUserData?.id) {
+      return LocalDataCache.getHomeFeed(currentUserData.id) || [];
+    }
+    return [];
+  });
+  
+  const [stories, setStories] = useState<any[]>(() => {
+    if (currentUserData?.id) {
+      return LocalDataCache.getHomeStories(currentUserData.id) || [];
+    }
+    return [];
+  });
+  
+  const [loading, setLoading] = useState(() => {
+    if (currentUserData?.id) {
+      const cached = LocalDataCache.getHomeFeed(currentUserData.id);
+      return !cached || cached.length === 0;
+    }
+    return true;
+  });
+  
   const [showStoryMenu, setShowStoryMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
@@ -42,94 +62,150 @@ export default function HomeTab() {
 
   // Fetch Stories
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!currentUserData || !supabase) return;
 
-    const q = query(
-      collection(db, "stories"),
-      orderBy("timestamp", "desc"),
-      limit(50)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const storyList = snapshot.docs.map(d => ({
-        id: d.id,
-        ...d.data()
-      }));
+    const fetchStories = async () => {
+      // Get stories from people I follow + myself
+      const myId = currentUserData.id;
       
+      const { data: followData } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', myId);
+      
+      const followingIds = (followData as any[])?.map(f => f.following_id) || [];
+      const allowedIds = [myId, ...followingIds];
+
+      const { data: storyData, error } = await supabase
+        .from('stories')
+        .select(`
+          *,
+          user:users (
+            id,
+            username,
+            full_name,
+            photo_url
+          )
+        `)
+        .in('user_id', allowedIds)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error('Error fetching stories:', error);
+        return;
+      }
+
+      // Group stories by user
       const grouped: { [key: string]: any } = {};
-      storyList.forEach((s: any) => {
-        const isMe = s.userId === auth.currentUser?.uid;
-        const isFollowing = currentUserData?.following?.includes(s.userId);
-
-        if (isMe || isFollowing) {
-          if (!grouped[s.userId]) {
-            grouped[s.userId] = {
-              userId: s.userId,
-              fullName: s.fullName,
-              username: s.username,
-              photoURL: s.photoURL,
-              updates: []
-            };
-          }
-          grouped[s.userId].updates.push(s);
+      storyData?.forEach((s: any) => {
+        const userId = s.user_id;
+        if (!grouped[userId]) {
+          grouped[userId] = {
+            userId: userId,
+            fullName: s.user?.full_name,
+            username: s.user?.username,
+            photoURL: s.user?.photo_url,
+            updates: []
+          };
         }
+        grouped[userId].updates.push(s);
       });
 
-      const processedStories = Object.values(grouped).map((userStory: any) => {
-        const allSeen = userStory.updates.every((u: any) => 
-          u.viewers && u.viewers.includes(auth.currentUser?.uid)
-        );
-        return { ...userStory, allSeen };
-      });
+      const storyList = Object.values(grouped);
+      LocalDataCache.saveHomeStories(myId, storyList);
+      setStories(storyList);
+    };
 
-      setStories(processedStories);
-    });
+    fetchStories();
+    
+    // Optional: Real-time subscription for new stories
+    const channel = supabase
+      .channel('public:stories')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stories' }, () => {
+        fetchStories();
+      })
+      .subscribe();
 
-    return () => unsubscribe();
-  }, [currentUserData?.following]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserData?.id]);
 
-  // Fetch Feed (Posts Only - Following Only)
+  // Fetch Feed (Posts from people I follow)
   useEffect(() => {
-    if (!auth.currentUser || !currentUserData) return;
+    if (!currentUserData || !supabase) return;
 
-    const following = currentUserData.following || [];
-    const myUid = auth.currentUser.uid;
-    const allowedUserIds = [myUid, ...following];
+    const fetchFeed = async () => {
+      const myId = currentUserData.id;
+      const cached = LocalDataCache.getHomeFeed(myId);
+      if (!cached || cached.length === 0) {
+        setLoading(true);
+      }
 
-    const q = query(
-      collection(db, "posts"),
-      orderBy("createdAt", "desc"),
-      limit(20)
-    );
+      const { data: followData } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', myId);
+      
+      const followingIds = (followData as any[])?.map(f => f.following_id) || [];
+      const allowedIds = [myId, ...followingIds];
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const postItems = snapshot.docs.map(d => ({ 
-        id: d.id, 
-        ...d.data(), 
-        feedType: 'post' 
-      }));
+      const { data: posts, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          user:users (
+            id,
+            username,
+            full_name,
+            photo_url
+          )
+        `)
+        .in('user_id', allowedIds)
+        .order('created_at', { ascending: false })
+        .limit(20);
 
-      // Filter by Following in memory
-      const filtered = postItems
-        .filter((item: any) => allowedUserIds.includes(item.userId))
-        .sort((a: any, b: any) => {
-          const timeA = a.createdAt?.toMillis?.() || a.createdAt || 0;
-          const timeB = b.createdAt?.toMillis?.() || b.createdAt || 0;
-          return timeB - timeA;
-        });
-
-      setFeedItems(filtered);
+      if (error) {
+        console.error('Error fetching posts:', error);
+      } else {
+        // Map to expected frontend structure
+        const mappedPosts = (posts as any[])?.map(p => ({
+          id: p.id,
+          userId: p.user_id,
+          username: p.user?.username,
+          fullName: p.user?.full_name,
+          photoURL: p.user?.photo_url,
+          content: p.caption,
+          mediaUrls: p.media_urls,
+          likesCount: p.likes_count,
+          commentsCount: p.comments_count,
+          createdAt: p.created_at,
+          feedType: 'post'
+        }));
+        LocalDataCache.saveHomeFeed(myId, mappedPosts || []);
+        setFeedItems(mappedPosts || []);
+      }
       setLoading(false);
-    }, (err) => {
-      console.error("Error fetching feed:", err);
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, [currentUserData?.following]);
+    fetchFeed();
 
-  const myStories = stories.find(s => s.userId === auth.currentUser?.uid);
-  const otherStories = stories.filter(s => s.userId !== auth.currentUser?.uid);
+    // Subscribe to post changes/likes
+    const channel = supabase
+      .channel('public:posts')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+        fetchFeed();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserData?.id]);
+
+  const myStories = stories.find(s => s.userId === currentUserData?.id);
+  const otherStories = stories.filter(s => s.userId !== currentUserData?.id);
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-main)] font-sans overflow-y-auto no-scrollbar pb-24" ref={scrollContainerRef}>
@@ -176,7 +252,7 @@ export default function HomeTab() {
               >
                 {myStories && (
                   <button 
-                    onClick={() => { setShowStoryMenu(false); navigate(`/stories/view/${auth.currentUser?.uid}`); }}
+                    onClick={() => { setShowStoryMenu(false); navigate(`/stories/view/${currentUserData?.id}`); }}
                     className="w-full px-4 py-3 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors"
                   >
                     <User size={18} className="text-blue-500" />

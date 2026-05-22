@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Send, Heart, Loader2 } from 'lucide-react';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
-import { db, auth } from '../../../services/firebase.ts';
-import { toDate } from '../../../utils/dateUtils.ts';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../providers/AuthProvider.tsx';
 
 interface CommentSheetProps {
   postId: string;
@@ -14,48 +13,80 @@ interface CommentSheetProps {
 }
 
 export default function CommentSheet({ postId, isOpen, onClose, currentUserData, collectionName = 'posts' }: CommentSheetProps) {
+  const { user: authUser } = useAuth();
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!postId || !isOpen) return;
+    if (!postId || !isOpen || !supabase) return;
 
     setLoading(true);
-    const q = query(
-      collection(db, collectionName, postId, 'comments'),
-      orderBy('createdAt', 'desc')
-    );
-
-    const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setComments(list);
+    
+    // Initial fetch
+    const fetchComments = async () => {
+      if (!supabase) return;
+      const { data, error } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('post_id', postId)
+        .order('created_at', { ascending: true });
+      
+      if (!error && data) {
+        setComments(data.map(c => ({
+          id: c.id,
+          userId: c.user_id,
+          userName: c.user_name || 'User',
+          userAvatar: c.user_avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+          text: c.text,
+          likesCount: c.likes_count,
+          createdAt: c.created_at
+        })));
+      }
       setLoading(false);
-    });
+    };
 
-    return () => unsub();
-  }, [postId, isOpen, collectionName]);
+    fetchComments();
+
+    // Subscription
+    const channel = supabase
+      .channel(`comments-${postId}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'comments',
+        filter: `post_id=eq.${postId}`
+      }, () => {
+        fetchComments();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [postId, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !auth.currentUser || submitting) return;
+    if (!newComment.trim() || !authUser || submitting || !supabase) return;
 
     setSubmitting(true);
     try {
-      await addDoc(collection(db, collectionName, postId, 'comments'), {
-        userId: auth.currentUser.uid,
-        userName: currentUserData?.fullName || 'User',
-        userAvatar: currentUserData?.photoURL || '',
+      const { error } = await supabase.from('comments').insert({
+        post_id: postId,
+        user_id: authUser.id,
+        user_name: currentUserData?.username || currentUserData?.fullName || 'User',
+        user_avatar: currentUserData?.photoURL || '',
         text: newComment.trim(),
-        createdAt: serverTimestamp(),
-        likes: 0
-      });
+        likes_count: 0
+      } as any);
 
-      // Update comment count on parent doc
-      await updateDoc(doc(db, collectionName, postId), {
-        comments: increment(1)
-      });
+      if (error) throw error;
+
+      // Update comment count on parent table using RPC
+      const tableName = collectionName === 'tube_videos' ? 'tube_videos' : 'posts';
+      await supabase.rpc('increment_comments', { target_id: postId, target_table: tableName, amount: 1 });
 
       setNewComment('');
     } catch (err) {
@@ -127,7 +158,7 @@ export default function CommentSheet({ postId, isOpen, onClose, currentUserData,
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-[var(--text-primary)]">{comment.userName}</span>
                         <span className="text-[10px] text-[var(--text-secondary)] uppercase font-bold tracking-tighter">
-                          {comment.createdAt ? toDate(comment.createdAt)?.toLocaleDateString() : 'Just now'}
+                          {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString() : 'Just now'}
                         </span>
                       </div>
                       <p className="text-sm text-[var(--text-primary)] leading-relaxed">

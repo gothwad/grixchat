@@ -19,9 +19,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { doc, updateDoc, arrayUnion, arrayRemove, collection, addDoc, serverTimestamp, onSnapshot, getDoc, deleteDoc } from 'firebase/firestore';
-import { auth, db } from '../../../services/firebase.ts';
-import { toDate } from '../../../utils/dateUtils.ts';
+import { supabase } from '../../../lib/supabase';
+import { profileService } from '../../profile/services/profileService';
+import { useAuth } from '../../../providers/AuthProvider.tsx';
 
 interface PostCardProps {
   post: any;
@@ -34,19 +34,21 @@ const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
 export default function PostCard({ post, currentUserData, onCommentClick }: PostCardProps) {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  const [likeCount, setLikeCount] = useState(post.likes || 0);
+  const [likeCount, setLikeCount] = useState(post.likesCount || post.likes_count || 0);
   const [isFollowing, setIsFollowing] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
-  const isOwner = auth.currentUser?.uid === post.userId;
+  const isOwner = authUser?.id === post.userId;
 
   const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this post?")) return;
+    if (!window.confirm("Are you sure you want to delete this post?") || !supabase) return;
     try {
-      await deleteDoc(doc(db, "posts", post.id));
+      const { error } = await supabase.from('posts').delete().eq('id', post.id);
+      if (error) throw error;
       setShowOptions(false);
-      // Optional: Add a callback to refresh parent list or navigate away if in viewer
+      // Optional: window.location.reload() or internal state update
     } catch (err) {
       console.error("Error deleting post:", err);
     }
@@ -60,76 +62,110 @@ export default function PostCard({ post, currentUserData, onCommentClick }: Post
   };
 
   useEffect(() => {
-    if (auth.currentUser && post.likedBy) {
-      setIsLiked(post.likedBy.includes(auth.currentUser.uid));
-    }
-    if (currentUserData?.savedPosts) {
-      setIsSaved(currentUserData.savedPosts.includes(post.id));
-    }
-    if (currentUserData?.following && post.userId) {
-      setIsFollowing(currentUserData.following.includes(post.userId));
-    }
-  }, [post, currentUserData]);
+    const checkStatus = async () => {
+      if (!authUser || !supabase) return;
+      
+      // Check if liked
+      const { data: likeData } = await supabase
+        .from('likes')
+        .select('id')
+        .match({ user_id: authUser.id, target_id: post.id, target_type: 'post' } as any)
+        .maybeSingle();
+      
+      setIsLiked(!!likeData);
+
+      // Check if following
+      if (post.userId) {
+        const { data: followData } = await supabase
+          .from('follows')
+          .select('follower_id')
+          .match({ follower_id: authUser.id, following_id: post.userId } as any)
+          .maybeSingle();
+        setIsFollowing(!!followData);
+      }
+
+      // Check if saved
+      const { data: userData } = await supabase
+        .from('users')
+        .select('saved_posts')
+        .eq('id', authUser.id)
+        .single();
+      
+      if (userData?.saved_posts) {
+        setIsSaved(userData.saved_posts.includes(post.id));
+      }
+    };
+
+    checkStatus();
+  }, [post.id, authUser, post.userId]);
 
   const handleLike = async () => {
-    if (!auth.currentUser) return;
-    const postRef = doc(db, "posts", post.id);
+    if (!authUser || !supabase) return;
     
-    try {
-      if (isLiked) {
-        setLikeCount(prev => Math.max(0, prev - 1));
-        setIsLiked(false);
-        await updateDoc(postRef, {
-          likes: Math.max(0, (post.likes || 1) - 1),
-          likedBy: arrayRemove(auth.currentUser.uid)
-        });
-      } else {
-        setLikeCount(prev => prev + 1);
-        setIsLiked(true);
-        await updateDoc(postRef, {
-          likes: (post.likes || 0) + 1,
-          likedBy: arrayUnion(auth.currentUser.uid)
-        });
+    // Optimistic UI
+    const wasLiked = isLiked;
+    setIsLiked(!wasLiked);
+    setLikeCount(prev => wasLiked ? Math.max(0, prev - 1) : prev + 1);
 
-        // Add Notification
-        if (post.userId !== auth.currentUser.uid) {
-          await addDoc(collection(db, "notifications"), {
-            userId: post.userId,
-            fromUserId: auth.currentUser.uid,
-            fromUserName: currentUserData?.fullName || 'User',
-            fromUserAvatar: currentUserData?.photoURL || '',
+    try {
+      if (wasLiked) {
+        // Unlike
+        await supabase
+          .from('likes')
+          .delete()
+          .match({ user_id: authUser.id, target_id: post.id, target_type: 'post' } as any);
+        
+        // Update count in post table
+        await supabase.rpc('increment_likes', { target_id: post.id, target_table: 'posts', amount: -1 });
+      } else {
+        // Like
+        await supabase
+          .from('likes')
+          .insert({ 
+            user_id: authUser.id, 
+            target_id: post.id, 
+            target_type: 'post' 
+          } as any);
+        
+        // Update count in post table
+        await supabase.rpc('increment_likes', { target_id: post.id, target_table: 'posts', amount: 1 });
+
+        // Notification
+        if (post.userId !== authUser.id) {
+          await supabase.from('notifications').insert({
+            user_id: post.userId,
+            from_user_id: authUser.id,
             type: 'like',
-            postId: post.id,
-            text: 'liked your post',
-            read: false,
-            createdAt: serverTimestamp()
-          });
+            post_id: post.id,
+            text: 'liked your post'
+          } as any);
         }
       }
     } catch (err) {
       console.error("Error liking post:", err);
-      // Revert UI on error
-      setIsLiked(!isLiked);
-      setLikeCount(prev => isLiked ? prev + 1 : Math.max(0, prev - 1));
+      // Revert optimistic UI
+      setIsLiked(wasLiked);
+      setLikeCount(prev => wasLiked ? prev + 1 : Math.max(0, prev - 1));
     }
   };
 
   const handleSave = async () => {
-    if (!auth.currentUser) return;
-    const userRef = doc(db, "users", auth.currentUser.uid);
+    if (!authUser || !supabase) return;
     
     try {
+      const { data: userProfile } = await supabase.from('users').select('saved_posts').eq('id', authUser.id).single();
+      const currentSaved = userProfile?.saved_posts || [];
+      
+      let newSaved;
       if (isSaved) {
         setIsSaved(false);
-        await updateDoc(userRef, {
-          savedPosts: arrayRemove(post.id)
-        });
+        newSaved = currentSaved.filter((id: string) => id !== post.id);
       } else {
         setIsSaved(true);
-        await updateDoc(userRef, {
-          savedPosts: arrayUnion(post.id)
-        });
+        newSaved = [...currentSaved, post.id];
       }
+      
+      await supabase.from('users').update({ saved_posts: newSaved } as any).eq('id', authUser.id);
     } catch (err) {
       console.error("Error saving post:", err);
     }
@@ -137,32 +173,22 @@ export default function PostCard({ post, currentUserData, onCommentClick }: Post
 
   const handleFollow = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!auth.currentUser || post.userId === auth.currentUser.uid) return;
-
-    const myUserRef = doc(db, "users", auth.currentUser.uid);
-    const targetUserRef = doc(db, "users", post.userId);
+    if (!authUser || post.userId === authUser.id) return;
 
     try {
       if (isFollowing) {
+        await profileService.unfollowUser(authUser.id, post.userId);
         setIsFollowing(false);
-        await updateDoc(myUserRef, { following: arrayRemove(post.userId) });
-        await updateDoc(targetUserRef, { followers: arrayRemove(auth.currentUser.uid) });
       } else {
+        await profileService.followUser(authUser.id, post.userId);
         setIsFollowing(true);
-        await updateDoc(myUserRef, { following: arrayUnion(post.userId) });
-        await updateDoc(targetUserRef, { followers: arrayUnion(auth.currentUser.uid) });
 
-        // Add Notification
-        await addDoc(collection(db, "notifications"), {
-          userId: post.userId,
-          fromUserId: auth.currentUser.uid,
-          fromUserName: currentUserData?.fullName || 'User',
-          fromUserAvatar: currentUserData?.photoURL || '',
+        await supabase.from('notifications').insert({
+          user_id: post.userId,
+          from_user_id: authUser.id,
           type: 'follow',
-          text: 'started following you',
-          read: false,
-          createdAt: serverTimestamp()
-        });
+          text: 'started following you'
+        } as any);
       }
     } catch (err) {
       console.error("Error following user:", err);
@@ -184,15 +210,15 @@ export default function PostCard({ post, currentUserData, onCommentClick }: Post
       <div className="flex items-center justify-between px-4 py-2">
         <div className="flex items-center gap-2.5" onClick={() => navigate(`/user/${post.userId}`)}>
           <img 
-            src={post.userAvatar || DEFAULT_LOGO} 
+            src={post.photoURL || post.userAvatar || DEFAULT_LOGO} 
             className="w-8 h-8 rounded-full object-cover border border-[var(--border-color)]/20" 
             referrerPolicy="no-referrer"
-            alt={`${post.userName || 'User'}'s avatar`}
+            alt={`${post.username || post.userName || 'User'}'s avatar`}
           />
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="text-[13px] font-bold text-[var(--text-primary)] tracking-tight">{post.userName || 'User'}</span>
-              {post.userId !== auth.currentUser?.uid && (
+              <span className="text-[13px] font-bold text-[var(--text-primary)] tracking-tight">{post.username || post.userName || 'User'}</span>
+              {post.userId !== authUser?.id && (
                 <>
                   <span className="w-0.5 h-0.5 rounded-full bg-[var(--text-secondary)]/50" />
                   <button 
@@ -278,11 +304,11 @@ export default function PostCard({ post, currentUserData, onCommentClick }: Post
         onDoubleClick={handleLike}
       >
         <img 
-          src={post.imageUrl || `https://picsum.photos/seed/${post.id}/800/800`} 
+          src={post.mediaUrls?.[0] || post.imageUrl || `https://picsum.photos/seed/${post.id}/800/800`} 
           className="w-full h-full object-cover" 
           referrerPolicy="no-referrer"
           loading="lazy"
-          alt={post.caption || "GrixChat post content"}
+          alt={post.caption || post.content || "GrixChat post content"}
         />
       </div>
 
@@ -324,22 +350,22 @@ export default function PostCard({ post, currentUserData, onCommentClick }: Post
           </p>
         )}
         <div className="flex items-start gap-1.5 flex-wrap">
-          <span className="text-[13px] font-bold text-[var(--text-primary)] whitespace-nowrap">{post.userName}</span>
+          <span className="text-[13px] font-bold text-[var(--text-primary)] whitespace-nowrap">{post.username || post.userName}</span>
           <p className="text-[13px] text-[var(--text-primary)] leading-snug">
-            {post.caption}
+            {post.content || post.caption}
           </p>
         </div>
-        {post.comments > 0 && (
+        {(post.commentsCount || post.comments) > 0 && (
           <button 
             onClick={handleCommentOpen}
             className="text-[13px] text-[var(--text-secondary)] mt-0.5 font-medium hover:underline block"
           >
-            View all {post.comments} comments
+            View all {post.commentsCount || post.comments} comments
           </button>
         )}
         <div className="flex items-center gap-2 mt-0.5">
           <p className="text-[9px] text-[var(--text-secondary)] uppercase tracking-wide font-bold">
-            {post.createdAt ? toDate(post.createdAt)?.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : 'Just now'}
+            {post.createdAt ? new Date(post.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : 'Just now'}
           </p>
         </div>
       </div>

@@ -19,19 +19,14 @@ import {
   Play
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { auth, db } from '../../services/firebase.ts';
-import { 
-  doc, 
-  getDoc, 
-  onSnapshot, 
-  setDoc, 
-  updateDoc 
-} from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function ChatSettingsScreen() {
   const { id: receiverId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [receiver, setReceiver] = useState<any>(null);
   const [chatSettings, setChatSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -43,53 +38,84 @@ export default function ChatSettingsScreen() {
   const [showWatchUrlModal, setShowWatchUrlModal] = useState(false);
   const [watchUrl, setWatchUrl] = useState('');
 
-  const currentUserId = auth.currentUser?.uid;
-
-  const chatId = [currentUserId, receiverId].sort().join('_');
+  const currentUserId = user?.id;
 
   useEffect(() => {
-    if (!receiverId || !currentUserId) return;
+    if (!receiverId || !currentUserId || !supabase) return;
 
-    const fetchReceiver = async () => {
-      const docSnap = await getDoc(doc(db, "users", receiverId));
-      if (docSnap.exists()) {
-        setReceiver(docSnap.data());
+    const fetchData = async () => {
+      setLoading(true);
+      
+      // Fetch Receiver info
+      const { data: recData } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', receiverId)
+        .single();
+      
+      if (recData) {
+        setReceiver({
+          uid: recData.id,
+          username: recData.username,
+          fullName: recData.full_name,
+          photoURL: recData.photo_url
+        });
       }
-    };
 
-    const unsubscribeSettings = onSnapshot(
-      doc(db, "users", currentUserId, "chatSettings", receiverId),
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setChatSettings(data);
-          setNickname(data.nickname || '');
-          setCustomPhotoUrl(data.customPhotoUrl || '');
-          setIsMuted(data.isMuted || false);
+      // Fetch User's Settings for this chat
+      const { data: settsData } = await supabase
+        .from('chat_settings')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .eq('receiver_id', receiverId)
+        .single();
+      
+      if (settsData) {
+        setChatSettings(settsData);
+        setNickname(settsData.nickname || '');
+        setCustomPhotoUrl(settsData.custom_photo_url || '');
+        setIsMuted(settsData.is_muted || false);
+      }
+
+      // Fetch shared conversation data for watchTogetherUrl
+      // Find DM conversation ID
+      const { data: convId } = await supabase.rpc('get_direct_conversation_id', { u1: currentUserId, u2: receiverId });
+      
+      if (convId) {
+        const { data: convData } = await supabase
+          .from('conversations')
+          .select('watch_together_url')
+          .eq('id', convId)
+          .single();
+        
+        if (convData) {
+          setWatchUrl(convData.watch_together_url || '');
         }
-        setLoading(false);
       }
-    );
 
-    fetchReceiver();
-
-    // Fetch shared conversation data for watchTogetherUrl
-    const unsubscribeConversation = onSnapshot(doc(db, "conversations", chatId), (snap) => {
-      if (snap.exists()) {
-        setWatchUrl(snap.data().watchTogetherUrl || '');
-      }
-    });
-
-    return () => {
-      unsubscribeSettings();
-      unsubscribeConversation();
+      setLoading(false);
     };
-  }, [receiverId, currentUserId, chatId]);
+
+    fetchData();
+  }, [receiverId, currentUserId]);
 
   const updateSettings = async (updates: any) => {
-    if (!currentUserId || !receiverId) return;
+    if (!currentUserId || !receiverId || !supabase) return;
     try {
-      await setDoc(doc(db, "users", currentUserId, "chatSettings", receiverId), updates, { merge: true });
+      // Map keys to snake_case
+      const dbUpdates: any = {
+        user_id: currentUserId,
+        receiver_id: receiverId
+      };
+      if ('nickname' in updates) dbUpdates.nickname = updates.nickname;
+      if ('customPhotoUrl' in updates) dbUpdates.custom_photo_url = updates.customPhotoUrl;
+      if ('isMuted' in updates) dbUpdates.is_muted = updates.isMuted;
+
+      const { error } = await supabase
+        .from('chat_settings')
+        .upsert(dbUpdates, { onConflict: 'user_id,receiver_id' });
+      
+      if (error) throw error;
     } catch (error) {
       console.error("Error updating settings:", error);
     }
@@ -106,11 +132,17 @@ export default function ChatSettingsScreen() {
   };
 
   const handleWatchUrlSave = async () => {
-    if (!chatId) return;
+    if (!currentUserId || !receiverId || !supabase) return;
     try {
-      await updateDoc(doc(db, "conversations", chatId), {
-        watchTogetherUrl: watchUrl
-      });
+      const { data: convId } = await supabase.rpc('get_direct_conversation_id', { u1: currentUserId, u2: receiverId });
+      if (convId) {
+        const { error } = await supabase
+          .from('conversations')
+          .update({ watch_together_url: watchUrl } as any)
+          .eq('id', convId);
+        
+        if (error) throw error;
+      }
       setShowWatchUrlModal(false);
     } catch (error) {
       console.error("Error saving watch URL:", error);

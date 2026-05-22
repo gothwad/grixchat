@@ -1,30 +1,21 @@
 import React, { useState, useRef } from 'react';
 import { Image as ImageIcon, MapPin, ChevronRight, User, Music, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { auth, db } from '../../services/firebase.ts';
-import { collection, addDoc, serverTimestamp, doc, onSnapshot } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { ImageService } from '../../services/ImageService.ts';
 import SettingHeader from '../../components/layout/SettingHeader';
 
 export default function CreatePostScreen() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user: authUser, userData } = useAuth();
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
   const [image, setImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [userData, setUserData] = useState<any>(null);
-
-  React.useEffect(() => {
-    if (auth.currentUser) {
-      const unsub = onSnapshot(doc(db, "users", auth.currentUser.uid), (s) => {
-        setUserData(s.data());
-      });
-      return () => unsub();
-    }
-  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -35,23 +26,24 @@ export default function CreatePostScreen() {
   };
 
   const handleShare = async () => {
-    if (!image || !auth.currentUser) return;
+    if (!image || !authUser || !supabase) return;
 
     setLoading(true);
     try {
-      const url = await ImageService.uploadImage(image, (p) => setUploadProgress(p));
+      const url = await ImageService.uploadImage(image, (p) => setUploadProgress(p), 'posts');
       
-      await addDoc(collection(db, "posts"), {
-        userId: auth.currentUser.uid,
-        userName: userData?.username || auth.currentUser.displayName || 'User',
-        userAvatar: userData?.photoURL || '',
-        imageUrl: url,
+      const { error } = await supabase.from('posts').insert({
+        user_id: authUser.id,
+        user_name: userData?.username || 'User',
+        user_avatar: userData?.photoURL || '',
+        media_urls: [url],
         caption,
         location,
-        likes: 0,
-        comments: 0,
-        createdAt: serverTimestamp()
-      });
+        likes_count: 0,
+        comments_count: 0
+      } as any);
+
+      if (error) throw error;
 
       navigate('/');
     } catch (error) {

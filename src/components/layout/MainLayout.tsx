@@ -1,18 +1,27 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import TopNav from './TopNav.tsx';
 import TabBottom from './TabBottom.tsx';
 import ResourcesNav, { TabType } from './ResourcesNav.tsx';
 import { useNav } from '../../contexts/NavContext.tsx';
-import { motion, AnimatePresence } from 'motion/react';
+import PWAInstallPrompt from './PWAInstallPrompt.tsx';
+import { useAuth } from '../../providers/AuthProvider';
+
+// Lazy loading our 5 tabs for keep-alive container
+const HomeTab = React.lazy(() => import('../../features/home/HomeTab'));
+const ChatsTab = React.lazy(() => import('../../features/chat/ChatsTab'));
+const HubTab = React.lazy(() => import('../../features/hub/HubTab'));
+const TubeScreen = React.lazy(() => import('../../features/tube/GrixTubeScreen'));
+const ProfileTab = React.lazy(() => import('../../features/profile/ProfileTab'));
 
 // Paths where BottomNav should be visible
 const TAB_PATHS = ['/', '/chats', '/hub', '/reels', '/profile', '/notifications', '/tube'];
+const MAIN_TABS = ['/', '/chats', '/hub', '/tube', '/profile'];
 
 export default function MainLayout() {
   const location = useLocation();
   const { isResourcesNavOpen, setIsResourcesNavOpen } = useNav();
-  const lastScrollY = useRef(0);
+  const { user } = useAuth();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   const isChatScreen = location.pathname.startsWith('/chat/');
@@ -21,9 +30,26 @@ export default function MainLayout() {
   // Paths where TopNav should be visible
   const showTopNav = TAB_PATHS.includes(location.pathname);
 
+  // Keep-Alive state
+  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (user && MAIN_TABS.includes(path)) {
+      setVisitedTabs((prev) => {
+        if (prev[path]) return prev;
+        return { ...prev, [path]: true };
+      });
+    }
+  }, [location.pathname, user]);
+
+  const isMainTab = !!user && MAIN_TABS.includes(location.pathname);
+
   // Determine current tab for ResourcesNav
   const getTab = (path: string): TabType | null => {
     if (path === '/chats') return 'chats';
+    if (path === '/tube') return 'vibe';
+    if (path === '/hub') return 'hub';
     return null;
   };
 
@@ -42,28 +68,62 @@ export default function MainLayout() {
     <div className="h-full flex flex-col overflow-hidden">
       {showTopNav && <TopNav />}
       
+      {/* Static header bar without any slide heights and delays */}
+      {showTopNav && currentTab && isResourcesNavOpen && (
+        <div className="shrink-0 z-40 bg-[var(--bg-card)]">
+          <ResourcesNav tab={currentTab} />
+        </div>
+      )}
+      
       <div 
         ref={scrollContainerRef}
-        className={`flex-1 overflow-x-hidden relative no-scrollbar ${isChatScreen ? 'overflow-y-hidden' : 'overflow-y-auto'}`}
+        className={`flex-1 overflow-x-hidden relative no-scrollbar ${isChatScreen || TAB_PATHS.includes(location.pathname) ? 'overflow-y-hidden' : 'overflow-y-auto'}`}
       >
-        {showTopNav && (
-          <AnimatePresence>
-            {currentTab && isResourcesNavOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                className="overflow-hidden shrink-0"
-              >
-                <ResourcesNav tab={currentTab} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        )}
-        <Outlet />
+        <Suspense fallback={
+          <div className="h-full flex items-center justify-center bg-[var(--bg-main)]">
+            <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        }>
+          {/* Keep-Alive Tabs: once loaded, we keep them persistent and mounted */}
+          {visitedTabs['/'] && (
+            <div className={location.pathname === '/' ? 'h-full w-full' : 'hidden'}>
+              <HomeTab />
+            </div>
+          )}
+          
+          {visitedTabs['/chats'] && (
+            <div className={location.pathname === '/chats' ? 'h-full w-full' : 'hidden'}>
+              <ChatsTab />
+            </div>
+          )}
+          
+          {visitedTabs['/hub'] && (
+            <div className={location.pathname === '/hub' ? 'h-full w-full' : 'hidden'}>
+              <HubTab />
+            </div>
+          )}
+          
+          {visitedTabs['/tube'] && (
+            <div className={location.pathname === '/tube' ? 'h-full w-full' : 'hidden'}>
+              <TubeScreen />
+            </div>
+          )}
+          
+          {visitedTabs['/profile'] && (
+            <div className={location.pathname === '/profile' ? 'h-full w-full' : 'hidden'}>
+              <ProfileTab />
+            </div>
+          )}
+        </Suspense>
+
+        {/* Regular Routes render inside Outlet ONLY when not a main tab */}
+        {!isMainTab && <Outlet />}
       </div>
+      
       {showBottomNav && <TabBottom />}
+      
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
     </div>
   );
 }

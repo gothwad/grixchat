@@ -13,18 +13,8 @@ import {
   User,
   Lock
 } from 'lucide-react';
-import { auth, db } from '../../services/firebase.ts';
-import { 
-  doc, 
-  onSnapshot, 
-  updateDoc, 
-  collection, 
-  addDoc, 
-  getDoc, 
-  setDoc, 
-  deleteDoc,
-  serverTimestamp 
-} from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 import { motion, AnimatePresence } from 'motion/react';
 
 const servers = {
@@ -40,6 +30,7 @@ export default function CallScreen() {
   const { id: otherUserId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { user: authUser } = useAuth();
   const queryParams = new URLSearchParams(location.search);
   const type = queryParams.get('type') || 'voice'; 
   const isReceiver = queryParams.get('role') === 'receiver';
@@ -60,8 +51,7 @@ export default function CallScreen() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   
-  // Use unique callId if provided in URL, otherwise fall back to legacy format (for compatibility)
-  const callId = urlCallId || [auth.currentUser?.uid, otherUserId].sort().join('_call_');
+  const [currentCallId, setCurrentCallId] = useState<string | null>(urlCallId);
 
   // Timer effect
   useEffect(() => {
@@ -81,15 +71,14 @@ export default function CallScreen() {
   };
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
+    if (!supabase || !authUser || !otherUserId) return;
+    let channel: any;
 
     const initCall = async () => {
-      if (!otherUserId || !auth.currentUser) return;
-
       // 1. Fetch receiver info
       try {
-        const userDoc = await getDoc(doc(db, "users", otherUserId));
-        if (userDoc.exists()) setReceiver(userDoc.data());
+        const { data: userDoc } = await supabase.from('users').select('*').eq('id', otherUserId).single();
+        if (userDoc) setReceiver(userDoc);
       } catch (e) {
         console.error("Error fetching receiver:", e);
       }
@@ -132,141 +121,147 @@ export default function CallScreen() {
       };
 
       // 4. Signaling
-      if (isReceiver) {
-        await handleIncomingCall();
-      } else {
+      if (isReceiver && currentCallId) {
+        await handleIncomingCall(currentCallId);
+      } else if (!isReceiver) {
         await startNewCall();
       }
 
-      // 5. Global Listener for Call Document
-      unsubscribe = onSnapshot(doc(db, "calls", callId), (snapshot) => {
-        const data = snapshot.data();
-        if (!data) return;
+      // 5. Subscription for Call status and Answer
+      if (currentCallId) {
+        channel = supabase
+          .channel(`call-${currentCallId}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'calls', filter: `id=eq.${currentCallId}` }, (payload) => {
+            const data = payload.new as any;
+            if (!data) return;
 
-        if (data.status === 'ended' || data.status === 'denied') {
-          setCallStatus(data.status as any);
-          setTimeout(() => endCallLocally(), 2000);
-        }
-        
-        if (data.status === 'accepted' && !isReceiver) {
-          setCallStatus('connected');
-        }
-      });
+            if (data.status === 'ended' || data.status === 'denied') {
+              setCallStatus(data.status as any);
+              setTimeout(() => endCallLocally(), 2000);
+            }
+            
+            if (data.status === 'accepted' && !isReceiver) {
+              setCallStatus('connected');
+              if (data.answer && !pc.current.currentRemoteDescription) {
+                const answerDescription = new RTCSessionDescription(data.answer);
+                pc.current.setRemoteDescription(answerDescription).then(() => {
+                  pendingCandidates.current.forEach(candidate => {
+                    pc.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error("Error adding queued ice candidate:", e));
+                  });
+                  pendingCandidates.current = [];
+                });
+              }
+            }
+          })
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'call_candidates', filter: `call_id=eq.${currentCallId}` }, (payload) => {
+            const data = payload.new as any;
+            if (data.user_id === authUser.id) return; // Ignore our own candidates
+            
+            const candidate = data.candidate as RTCIceCandidateInit;
+            if (pc.current.currentRemoteDescription) {
+              pc.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error("Error adding ice candidate:", e));
+            } else {
+              pendingCandidates.current.push(candidate);
+            }
+          })
+          .subscribe();
+      }
     };
 
     initCall();
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (channel) channel.unsubscribe();
       endCallLocally();
     };
-  }, [otherUserId, isReceiver, type, callId]);
+  }, [otherUserId, isReceiver, type, currentCallId, authUser]);
 
-  const addMessageToChat = async (status: 'started' | 'ended' | 'missed') => {
-    if (!auth.currentUser || !otherUserId) return;
-    const chatId = [auth.currentUser.uid, otherUserId].sort().join('_');
+  const addMessageToChat = async (status: 'started' | 'ended' | 'missed', cid: string) => {
+    if (!authUser || !otherUserId) return;
+    const conversationId = await getConversationId(authUser.id, otherUserId);
     try {
       const text = status === 'started' ? `📞 Started a ${type} call` : 
                    status === 'missed' ? `📥 Missed ${type} call` : 
                    `🏁 ${type.charAt(0).toUpperCase() + type.slice(1)} call ended`;
       
-      await addDoc(collection(db, "messages"), {
-        chatId,
-        senderId: auth.currentUser.uid,
-        receiverId: otherUserId,
+      await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        sender_id: authUser.id,
         text,
-        timestamp: serverTimestamp(),
-        isRead: false,
         type: 'system',
-        callId: callId
-      });
+        metadata: { callId: cid, callStatus: status, callType: type }
+      } as any);
     } catch (e) {
       console.warn("Error adding call message:", e);
     }
   };
 
+  const getConversationId = async (u1: string, u2: string) => {
+    const { data: convId } = await supabase.rpc('get_direct_conversation_id', { u1, u2 });
+    if (convId) return convId;
+
+    // Create if not exists
+    const { data: newConv, error } = await supabase.from('conversations').insert({
+      type: 'direct'
+    } as any).select().single();
+    
+    if (newConv) {
+      await supabase.from('conversation_participants').insert([
+        { conversation_id: newConv.id, user_id: u1 },
+        { conversation_id: newConv.id, user_id: u2 }
+      ]);
+      return newConv.id;
+    }
+    return null;
+  };
+
   const startNewCall = async () => {
     setCallStatus('ringing');
-    const callDoc = doc(db, "calls", callId);
-    const offerCandidates = collection(callDoc, "offerCandidates");
-    const answerCandidates = collection(callDoc, "answerCandidates");
-
-    pc.current.onicecandidate = (event) => {
-      if (event.candidate) {
-        addDoc(offerCandidates, event.candidate.toJSON()).catch(e => console.error("Error adding offer candidate:", e));
-      }
-    };
-
+    
     const offerDescription = await pc.current.createOffer();
     await pc.current.setLocalDescription(offerDescription);
 
-    const offer = {
-      sdp: offerDescription.sdp,
-      type: offerDescription.type,
-    };
+    const { data: callData, error: callError } = await supabase.from('calls').insert({
+      caller_id: authUser?.id,
+      receiver_id: otherUserId,
+      type,
+      status: 'ringing',
+      offer: { sdp: offerDescription.sdp, type: offerDescription.type }
+    } as any).select().single();
 
-    await setDoc(callDoc, { 
-      offer, 
-      status: 'ringing', 
-      type, 
-      callerId: auth.currentUser?.uid,
-      receiverId: otherUserId,
-      timestamp: serverTimestamp()
-    });
+    if (callError || !callData) {
+      console.error("Error creating call record:", callError);
+      setCallStatus('error');
+      return;
+    }
 
-    onSnapshot(callDoc, (snapshot) => {
-      const data = snapshot.data();
-      if (!pc.current.currentRemoteDescription && data?.answer) {
-        const answerDescription = new RTCSessionDescription(data.answer);
-        pc.current.setRemoteDescription(answerDescription).then(() => {
-          // Add any pending candidates
-          pendingCandidates.current.forEach(candidate => {
-            pc.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error("Error adding queued ice candidate:", e));
-          });
-          pendingCandidates.current = [];
-        });
+    const cid = callData.id;
+    setCurrentCallId(cid);
+
+    pc.current.onicecandidate = (event) => {
+      if (event.candidate) {
+        supabase.from('call_candidates').insert({
+          call_id: cid,
+          user_id: authUser?.id,
+          candidate: event.candidate.toJSON(),
+          type: 'offer'
+        } as any).catch(e => console.error("Error adding offer candidate:", e));
       }
-    });
-
-    onSnapshot(answerCandidates, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'added') {
-          const candidate = change.doc.data() as RTCIceCandidateInit;
-          if (pc.current.currentRemoteDescription) {
-            pc.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error("Error adding ice candidate:", e));
-          } else {
-            pendingCandidates.current.push(candidate);
-          }
-        }
-      });
-    });
+    };
 
     // Auto-hangup after 60 seconds if not answered
     setTimeout(async () => {
-      if (pc.current.iceConnectionState !== 'connected') {
-        const snap = await getDoc(callDoc);
-        if (snap.exists() && snap.data().status === 'ringing') {
-          await updateDoc(callDoc, { status: 'ended', isMissed: true });
-          await addMessageToChat('missed');
-        }
+      const { data: snap } = await supabase.from('calls').select('status').eq('id', cid).single();
+      if (snap && snap.status === 'ringing') {
+        await supabase.from('calls').update({ status: 'ended', is_missed: true } as any).eq('id', cid);
+        await addMessageToChat('missed', cid);
         endCallLocally();
       }
     }, 60000);
   };
 
-  const handleIncomingCall = async () => {
-    const callDoc = doc(db, "calls", callId);
-    const offerCandidates = collection(callDoc, "offerCandidates");
-    const answerCandidates = collection(callDoc, "answerCandidates");
-
-    pc.current.onicecandidate = (event) => {
-      if (event.candidate) {
-        addDoc(answerCandidates, event.candidate.toJSON()).catch(e => console.error("Error adding answer candidate:", e));
-      }
-    };
-
-    const callSnapshot = await getDoc(callDoc);
-    const callData = callSnapshot.data();
+  const handleIncomingCall = async (cid: string) => {
+    const { data: callData } = await supabase.from('calls').select('*').eq('id', cid).single();
     
     if (!callData || !callData.offer) {
       console.error("No offer found for incoming call");
@@ -274,38 +269,36 @@ export default function CallScreen() {
       return;
     }
 
+    pc.current.onicecandidate = (event) => {
+      if (event.candidate) {
+        supabase.from('call_candidates').insert({
+          call_id: cid,
+          user_id: authUser?.id,
+          candidate: event.candidate.toJSON(),
+          type: 'answer'
+        } as any).catch(e => console.error("Error adding answer candidate:", e));
+      }
+    };
+
     const offerDescription = callData.offer;
     await pc.current.setRemoteDescription(new RTCSessionDescription(offerDescription));
 
     const answerDescription = await pc.current.createAnswer();
     await pc.current.setLocalDescription(answerDescription);
 
-    const answer = {
-      type: answerDescription.type,
-      sdp: answerDescription.sdp,
-    };
-
-    await updateDoc(callDoc, { answer, status: 'accepted' });
-    await addMessageToChat('started');
-
-    onSnapshot(offerCandidates, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'added') {
-          const data = change.doc.data() as RTCIceCandidateInit;
-          if (pc.current.currentRemoteDescription) {
-            pc.current.addIceCandidate(new RTCIceCandidate(data)).catch(e => console.error("Error adding ice candidate:", e));
-          } else {
-            pendingCandidates.current.push(data);
-          }
-        }
-      });
-    });
+    await supabase.from('calls').update({ 
+      answer: { type: answerDescription.type, sdp: answerDescription.sdp }, 
+      status: 'accepted' 
+    } as any).eq('id', cid);
+    
+    await addMessageToChat('started', cid);
   };
 
   const endCall = async () => {
+    if (!currentCallId) return;
     try {
-      await updateDoc(doc(db, "calls", callId), { status: 'ended' });
-      await addMessageToChat('ended');
+      await supabase.from('calls').update({ status: 'ended' } as any).eq('id', currentCallId);
+      await addMessageToChat('ended', currentCallId);
     } catch (e) {
       console.warn("Error updating call status to ended:", e);
     }

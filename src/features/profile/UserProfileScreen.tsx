@@ -26,19 +26,17 @@ import {
   Play
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { auth, db } from '../../services/firebase.ts';
-import { toDate } from '../../utils/dateUtils.ts';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, onSnapshot, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { profileService } from './services/profileService';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import ProfileContent from './components/ProfileContent.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import PostCard from '../home/components/PostCard.tsx';
 
-import { useAuth } from '../../providers/AuthProvider.tsx';
-
 export default function UserProfileScreen() {
   const { id: userId } = useParams();
   const navigate = useNavigate();
-  const { userData: myUserData } = useAuth();
+  const { user: authUser, userData: myUserData, followingIds } = useAuth();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isBlocked, setIsBlocked] = useState(false);
@@ -51,49 +49,85 @@ export default function UserProfileScreen() {
   const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !supabase) return;
 
-    // Listen to target user data for real-time counts
-    const unsubscribeUser = onSnapshot(doc(db, "users", userId), (docSnap) => {
-      if (docSnap.exists()) {
-        setUser(docSnap.data());
+    const fetchUser = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+        
+        if (data) {
+          const u = data as any;
+          setUser({
+            uid: u.id,
+            fullName: u.full_name,
+            username: u.username,
+            photoURL: u.photo_url,
+            bio: u.bio,
+            profileType: u.profile_type,
+            hidePhoto: u.hide_photo,
+            followers: [], // Real counts will be handled by follows table
+            following: []
+          });
+
+          // Fetch follow counts
+          const { count: followersCount } = await supabase
+            .from('follows')
+            .select('*', { count: 'exact', head: true })
+            .eq('following_id', userId);
+          
+          const { count: followingCount } = await supabase
+            .from('follows')
+            .select('*', { count: 'exact', head: true })
+            .eq('follower_id', userId);
+
+          setUser((prev: any) => ({
+            ...prev,
+            followers: Array(followersCount || 0).fill(0), // Dummy array for length compatibility
+            following: Array(followingCount || 0).fill(0)
+          }));
+        }
+      } catch (err) {
+        console.error("Error fetching user:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching user:", error);
-      setLoading(false);
-    });
+    };
+
+    fetchUser();
 
     // Sync isBlocked and isFollowing from AuthProvider data
     if (myUserData) {
       setIsBlocked(myUserData.blockedUsers?.includes(userId) || false);
-      setIsFollowing(myUserData.following?.includes(userId) || false);
+      setIsFollowing(followingIds?.includes(userId || '') || false);
     }
 
-    // Fetch user posts
+    // Fetch user content
     const fetchContent = async () => {
-      if (!userId) return;
+      if (!userId || !supabase) return;
       try {
         if (activeFilter === 'posts') {
-          const q = query(collection(db, "posts"), where("userId", "==", userId));
-          const snapshot = await getDocs(q);
-          setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          const { data } = await supabase.from('posts').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+          setPosts((data || []).map(p => ({
+            ...p,
+            imageUrl: p.media_urls?.[0] || p.imageUrl 
+          })));
         } else if (activeFilter === 'reels') {
-          const q = query(collection(db, "reels"), where("userUid", "==", userId));
-          const snapshot = await getDocs(q);
-          setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), imageUrl: (doc.data() as any).cover })));
+          const { data } = await supabase.from('reels').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+          setPosts((data || []).map(d => ({ ...d, imageUrl: d.cover_url || d.thumbnail_url || d.cover })));
         } else if (activeFilter === 'tube') {
-          const q = query(collection(db, "tube_videos"), where("userId", "==", userId));
-          const snapshot = await getDocs(q);
-          setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), imageUrl: (doc.data() as any).thumbnail })));
+          const { data } = await supabase.from('tube_videos').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+          setPosts((data || []).map(d => ({ ...d, imageUrl: d.thumbnail_url || d.thumbnail })));
         } else if (activeFilter === 'saved') {
-          const userDoc = await getDoc(doc(db, "users", userId));
-          const userData = userDoc.data();
-          const savedIds = userData?.savedPosts || [];
-          if (savedIds.length > 0) {
-            const q = query(collection(db, "posts"), where("__name__", "in", savedIds.slice(0, 10)));
-            const snapshot = await getDocs(q);
-            setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          if (myUserData?.saved_posts && myUserData.saved_posts.length > 0) {
+            const { data } = await supabase.from('posts').select('*').in('id', myUserData.saved_posts).order('created_at', { ascending: false });
+            setPosts((data || []).map(p => ({
+              ...p,
+              imageUrl: p.media_urls?.[0] || p.imageUrl 
+            })));
           } else {
             setPosts([]);
           }
@@ -105,45 +139,28 @@ export default function UserProfileScreen() {
     };
     fetchContent();
 
-    return () => {
-      unsubscribeUser();
-    };
   }, [userId, activeFilter, myUserData]);
 
   const handleToggleFollow = async () => {
-    if (!auth.currentUser || !userId || followLoading) return;
+    if (!authUser || !userId || followLoading) return;
     setFollowLoading(true);
     
     try {
-      const myDocRef = doc(db, "users", auth.currentUser.uid);
-      const targetDocRef = doc(db, "users", userId);
-      const newFollowState = !isFollowing;
-      
-      // Update my following list
-      await updateDoc(myDocRef, {
-        following: newFollowState ? arrayUnion(userId) : arrayRemove(userId)
-      });
-      
-      // Update target user's followers list
-      await updateDoc(targetDocRef, {
-        followers: newFollowState ? arrayUnion(auth.currentUser.uid) : arrayRemove(auth.currentUser.uid)
-      });
-
-      // Add Notification if following
-      if (newFollowState) {
-        await addDoc(collection(db, "notifications"), {
-          userId: userId,
-          fromUserId: auth.currentUser.uid,
-          fromUserName: myUserData?.fullName || 'User',
-          fromUserAvatar: myUserData?.photoURL || '',
+      if (isFollowing) {
+        await profileService.unfollowUser(authUser.id, userId);
+      } else {
+        await profileService.followUser(authUser.id, userId);
+        
+        // Add Notification (optional, if table exists)
+        await supabase.from('notifications').insert({
+          user_id: userId,
+          from_user_id: authUser.id,
           type: 'follow',
-          text: 'started following you',
-          read: false,
-          createdAt: serverTimestamp()
-        });
+          text: 'started following you'
+        } as any);
       }
       
-      setIsFollowing(newFollowState);
+      setIsFollowing(!isFollowing);
     } catch (error) {
       console.error("Error toggling follow:", error);
     } finally {
@@ -152,15 +169,16 @@ export default function UserProfileScreen() {
   };
 
   const handleToggleBlock = async () => {
-    if (!auth.currentUser || !userId) return;
+    if (!authUser || !userId) return;
     
     try {
-      const myDocRef = doc(db, "users", auth.currentUser.uid);
       const newBlockedState = !isBlocked;
-      
-      await updateDoc(myDocRef, {
-        blockedUsers: newBlockedState ? arrayUnion(userId) : arrayRemove(userId)
-      });
+      const currentBlocked = myUserData?.blockedUsers || [];
+      const newBlocked = newBlockedState 
+        ? [...currentBlocked, userId] 
+        : currentBlocked.filter((id: string) => id !== userId);
+
+      await supabase.from('users').update({ blocked_users: newBlocked } as any).eq('id', authUser.id);
       
       setIsBlocked(newBlockedState);
       setShowMenu(false);
@@ -186,7 +204,7 @@ export default function UserProfileScreen() {
     );
   }
 
-  const isPrivate = user.profileType === 'private' && !isFollowing && auth.currentUser?.uid !== userId;
+  const isPrivate = user.profileType === 'private' && !isFollowing && authUser?.uid !== userId;
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden font-sans">

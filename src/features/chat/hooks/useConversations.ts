@@ -1,141 +1,211 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, where, onSnapshot, getDocs, orderBy, limit } from 'firebase/firestore';
-import { auth, db } from '../../../services/firebase.ts';
-import { toDate } from '../../../utils/dateUtils.ts';
-import { CacheService } from '../../../services/CacheService.ts';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../providers/AuthProvider.tsx';
+import { LocalDataCache } from '../../../services/LocalDataCache';
 
 export const useConversations = (activeFilter: string) => {
-  const [conversations, setConversations] = useState<any[]>([]);
+  const { user } = useAuth();
+  
+  // Use cached data instantly if it exists to prevent loader flickering
+  const [conversations, setConversations] = useState<any[]>(() => {
+    if (user?.id) {
+      const cached = LocalDataCache.getConversations(user.id);
+      if (cached && Array.isArray(cached)) {
+        return cached;
+      }
+    }
+    return [];
+  });
+  
   const [otherUsers, setOtherUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const usersFetchedRef = useRef(false);
+  
+  // If we already have cached conversations, we don't need a full-screen loading spinner
+  const [loading, setLoading] = useState(() => {
+    if (user?.id) {
+      const cached = LocalDataCache.getConversations(user.id);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   useEffect(() => {
-    if (!auth.currentUser) return;
-    if (activeFilter === 'Calls') return;
+    if (!user || activeFilter === 'Calls' || !supabase) return;
 
-    usersFetchedRef.current = false;
-
-    // Fetch suggested users (others)
-    const fetchOtherUsers = async (chatParticipantIds: string[]) => {
-      try {
-        const qUsers = query(collection(db, "users"), limit(20));
-        const userSnap = await getDocs(qUsers);
-        const others = userSnap.docs
-          .map(d => d.data())
-          .filter(u => u.uid !== auth.currentUser?.uid && !chatParticipantIds.includes(u.uid))
-          .slice(0, 5); // Just show top 5 suggested
-        setOtherUsers(others);
-      } catch (err) {
-        console.warn("Failed to fetch other users", err);
-      }
-    };
-
-    const q = query(
-      collection(db, "conversations"),
-      where("participants", "array-contains", auth.currentUser.uid),
-      orderBy("lastMessageTimestamp", "desc"),
-      limit(30)
-    );
-
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      // Sort docs in-memory to avoid composite index requirement while it's building
-      const convDocs = snapshot.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a: any, b: any) => {
-          const timeA = toDate(a.lastMessageTimestamp)?.getTime() || 0;
-          const timeB = toDate(b.lastMessageTimestamp)?.getTime() || 0;
-          return timeB - timeA;
-        });
-      
-      const otherUserIds = Array.from(new Set(convDocs.map((conv: any) => 
-        conv.participants.find((p: string) => p !== auth.currentUser?.uid)
-      ))).filter(Boolean) as string[];
-
-      // Initial fetch of other users moved outside of frequent snapshot updates in refinement
-      // to reduce read costs. We only fetch once per filter change.
-      if (!usersFetchedRef.current && (otherUserIds.length > 0 || convDocs.length === 0)) {
-        fetchOtherUsers(otherUserIds);
-        usersFetchedRef.current = true;
+    const fetchConversations = async () => {
+      const myId = user.id;
+      const cached = LocalDataCache.getConversations(myId);
+      if (!cached || cached.length === 0) {
+        setLoading(true);
       }
 
-      const userMap = new Map();
-      const uncachedIds = otherUserIds.filter(id => !CacheService.getUser(id));
+      // 1. Fetch conversations I'm part of
+      const { data, error } = await supabase
+        .from('conversation_participants')
+        .select(`
+          conversation:conversations (
+            *,
+            participants:conversation_participants (
+              user:users (*)
+            )
+          )
+        `)
+        .eq('user_id', myId)
+        .order('joined_at', { ascending: false });
 
-      otherUserIds.forEach(id => {
-        const cached = CacheService.getUser(id);
-        if (cached) userMap.set(id, cached);
+      if (error) {
+        console.error('Error fetching conversations:', error);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch unread messages count for all my conversations at once
+      const { data: unreadData } = await supabase
+        .from('messages')
+        .select('conversation_id')
+        .eq('is_read', false)
+        .neq('sender_id', myId);
+
+      const unreadMap: Record<string, number> = {};
+      unreadData?.forEach(m => {
+        unreadMap[m.conversation_id] = (unreadMap[m.conversation_id] || 0) + 1;
       });
 
-      if (uncachedIds.length > 0) {
-        for (let i = 0; i < uncachedIds.length; i += 30) {
-          const chunk = uncachedIds.slice(i, i + 30);
-          const userSnap = await getDocs(query(collection(db, "users"), where("uid", "in", chunk)));
-          userSnap.docs.forEach(d => {
-            const data = d.data();
-            userMap.set(d.id, data);
-            CacheService.saveUser(d.id, data);
-          });
-        }
-      }
+      const rawList = data
+        .map((item: any) => {
+          const conv = item.conversation;
+          if (!conv) return null;
+          const isGroup = conv.type === 'group';
+          const otherParticipants = conv.participants.filter((p: any) => p?.user?.id !== myId);
+          const firstOther = otherParticipants[0]?.user;
 
-      const chatList = await Promise.all(convDocs.map(async (conv: any) => {
-        const isGroup = conv.type === 'group';
-        const unreadCount = conv[`unreadCount_${auth.currentUser?.uid}`] || 0;
-        
-        if (isGroup) {
+          if (!isGroup && !firstOther) return null;
+
+          const unreadCount = unreadMap[conv.id] || 0;
+
           return {
             id: conv.id,
-            type: 'group',
-            user: conv.name || 'Unnamed Group',
-            username: 'Group',
-            fullName: conv.name || 'Unnamed Group',
-            lastMsg: conv.lastMessage,
-            time: toDate(conv.lastMessageTimestamp) ? formatTime(toDate(conv.lastMessageTimestamp)) : 'Recently',
-            avatar: conv.icon || `https://cdn-icons-png.flaticon.com/512/166/166258.png`,
+            type: conv.type,
+            otherUserId: isGroup ? conv.id : firstOther.id,
+            user: isGroup ? (conv.name || 'Group') : (firstOther.full_name || firstOther.username || 'Unknown'),
+            username: isGroup ? 'group' : firstOther?.username,
+            fullName: isGroup ? conv.name : firstOther?.full_name,
+            lastMsg: conv.last_message || 'New conversation',
+            lastMsgAt: conv.last_message_at || conv.created_at,
+            time: formatTime(new Date(conv.last_message_at || conv.created_at)),
+            avatar: isGroup 
+              ? (conv.photo_url || `https://cdn-icons-png.flaticon.com/512/166/166258.png`)
+              : (firstOther?.photo_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`),
             unread: unreadCount > 0,
-            unreadCount,
-            isOnline: false,
-            otherUserId: conv.id // Use internal ID as the routing target
+            unreadCount: unreadCount,
+            isOnline: isGroup ? false : firstOther?.is_online
           };
+        })
+        .filter(Boolean);
+
+      // De-duplicate direct conversations: Keep only the one with the most recent activity / actual messages
+      const seenDict: Record<string, any> = {};
+      rawList.forEach((conv: any) => {
+        if (conv.type !== 'direct') return;
+        const existing = seenDict[conv.otherUserId];
+        if (!existing) {
+          seenDict[conv.otherUserId] = conv;
+        } else {
+          // If one has real messages and the other is empty ('New conversation'), keep the real one
+          const currentHasMsg = conv.lastMsg && conv.lastMsg !== 'New conversation';
+          const existingHasMsg = existing.lastMsg && existing.lastMsg !== 'New conversation';
+
+          if (currentHasMsg && !existingHasMsg) {
+            seenDict[conv.otherUserId] = conv;
+          } else if (!currentHasMsg && existingHasMsg) {
+            // keep existing, do nothing
+          } else {
+            // both have messages or both are empty, keep the one with the more recent lastMsgAt
+            if (new Date(conv.lastMsgAt).getTime() > new Date(existing.lastMsgAt).getTime()) {
+              seenDict[conv.otherUserId] = conv;
+            }
+          }
         }
+      });
 
-        const otherUserId = conv.participants.find((p: string) => p !== auth.currentUser?.uid);
-        if (!otherUserId || otherUserId === 'gx-ai' || otherUserId === 'flow-ai' || otherUserId === 'grix-ai') return null;
+      const formattedList = rawList
+        .filter((conv: any) => {
+          if (conv.type !== 'direct') return true;
+          return seenDict[conv.otherUserId]?.id === conv.id;
+        })
+        .sort((a, b) => {
+          return new Date(b.lastMsgAt).getTime() - new Date(a.lastMsgAt).getTime();
+        });
 
-        const userData = userMap.get(otherUserId);
-
-        return {
-          id: conv.id,
-          type: 'direct',
-          otherUserId,
-          user: userData?.fullName || userData?.username || 'Unknown User',
-          username: userData?.username || '',
-          fullName: userData?.fullName || '',
-          lastMsg: conv.lastMessage,
-          time: toDate(conv.lastMessageTimestamp) ? formatTime(toDate(conv.lastMessageTimestamp)) : 'Recently',
-          avatar: userData?.photoURL || `https://cdn-icons-png.flaticon.com/512/149/149071.png`,
-          unread: unreadCount > 0,
-          unreadCount,
-          isOnline: userData?.isOnline || false
-        };
-      }));
-
-      setConversations(chatList.filter(Boolean));
+      LocalDataCache.saveConversations(myId, formattedList);
+      setConversations(formattedList);
       setLoading(false);
-    });
-
-    const formatTime = (date: Date) => {
-      const now = new Date();
-      const diff = now.getTime() - date.getTime();
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      if (days === 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      if (days === 1) return 'Yesterday';
-      return date.toLocaleDateString();
     };
 
-    return () => unsubscribe();
-  }, [activeFilter]);
+    // Subscribe to Cache Updates for instant off-line updates
+    const unsubscribeCache = LocalDataCache.subscribe('conversations', (updatedList) => {
+      if (updatedList && Array.isArray(updatedList)) {
+        setConversations(updatedList);
+      }
+    });
+
+    fetchConversations();
+
+    // Subscribe to conversation updates and new participants
+    const channel = supabase
+      .channel('conversations-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
+        fetchConversations();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_participants', filter: `user_id=eq.${user.id}` }, () => {
+        fetchConversations();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, () => {
+        fetchConversations();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+        fetchConversations();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      unsubscribeCache();
+    };
+  }, [user, activeFilter]);
+
+  // Suggested users fetch
+  useEffect(() => {
+    if (!user || !supabase) return;
+    const fetchSuggested = async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('*')
+        .neq('id', user.id)
+        .limit(5);
+      
+      if (data) {
+        setOtherUsers(data.map((u: any) => ({
+          uid: u.id,
+          username: u.username,
+          fullName: u.full_name,
+          photoURL: u.photo_url,
+          isOnline: u.is_online
+        })));
+      }
+    };
+    fetchSuggested();
+  }, [user]);
+
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days === 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (days === 1) return 'Yesterday';
+    return date.toLocaleDateString();
+  };
 
   return { conversations, otherUsers, loading };
 };

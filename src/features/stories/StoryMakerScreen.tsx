@@ -1,13 +1,14 @@
 import React, { useState, useRef } from 'react';
 import { X, Camera, Image as ImageIcon, Check, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { auth, db } from '../../services/firebase.ts';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { ImageService } from '../../services/ImageService.ts';
 
 export default function StoryMakerScreen() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user: authUser } = useAuth();
   const [image, setImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -22,20 +23,19 @@ export default function StoryMakerScreen() {
   };
 
   const handleUpload = async () => {
-    if (!image || !auth.currentUser) return;
+    if (!image || !authUser || !supabase) return;
 
     setLoading(true);
     try {
-      const url = await ImageService.uploadImage(image, (p) => setUploadProgress(p));
+      const url = await ImageService.uploadImage(image, (p) => setUploadProgress(p), 'stories');
       
-      await addDoc(collection(db, "stories"), {
-        userId: auth.currentUser.uid,
-        username: auth.currentUser.displayName || 'User',
-        photoURL: auth.currentUser.photoURL || '',
-        imageUrl: url,
-        timestamp: serverTimestamp(),
-        viewers: []
-      });
+      const { error } = await supabase.from('stories').insert({
+        user_id: authUser.id,
+        media_url: url,
+        type: 'image'
+      } as any);
+
+      if (error) throw error;
 
       navigate('/');
     } catch (error) {

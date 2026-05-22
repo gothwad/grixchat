@@ -1,10 +1,9 @@
 /**
  * LockService handles the logic for the App Lock system.
- * It now interacts with Firebase Firestore to ensure the lock is synchronized across devices.
+ * It now interacts with Supabase to ensure the lock is synchronized across devices.
  */
 
-import { auth, db } from './firebase.ts';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 
 export type LockType = 'pin4' | 'pin6' | 'alpha' | null;
 
@@ -24,29 +23,39 @@ export const LockService = {
   },
 
   enableLock: async (type: LockType, value: string) => {
-    if (!auth.currentUser) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
     const lockData: LockData = {
       isEnabled: true,
       type,
       hash: value
     };
     
-    await updateDoc(doc(db, "users", auth.currentUser.uid), {
-      lock: lockData
-    });
+    const { error } = await supabase
+      .from('users')
+      .update({ lock: lockData } as any)
+      .eq('id', user.id);
+    
+    if (error) throw error;
   },
 
   disableLock: async () => {
-    if (!auth.currentUser) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
     const lockData: LockData = {
       isEnabled: false,
       type: null,
       hash: null
     };
     
-    await updateDoc(doc(db, "users", auth.currentUser.uid), {
-      lock: lockData
-    });
+    const { error } = await supabase
+      .from('users')
+      .update({ lock: lockData } as any)
+      .eq('id', user.id);
+    
+    if (error) throw error;
   },
 
   verifyLock: (value: string, hash: string | null): boolean => {

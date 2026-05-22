@@ -1,41 +1,58 @@
 import React, { useEffect, useState } from 'react';
-import { MessageCircle, Compass, LayoutGrid, UserCircle, Clapperboard, Home, Play } from 'lucide-react';
+import { MessageCircle, LayoutGrid, UserCircle, Home, Waves } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import { auth, db } from '../../services/firebase.ts';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 import { motion } from 'motion/react';
 
 export default function TabBottom() {
+  const { user: authUser } = useAuth();
   const location = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!authUser || !supabase) return;
 
-    // Use conversations to count unread instead of all messages (cheaper reads)
-    const q = query(
-      collection(db, "conversations"),
-      where("participants", "array-contains", auth.currentUser.uid)
-    );
+    const fetchUnread = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('conversation_id')
+          .eq('is_read', false)
+          .neq('sender_id', authUser.id);
+        
+        if (!error && data) {
+          const distinctConversations = new Set(data.map(m => m.conversation_id));
+          setUnreadCount(distinctConversations.size);
+        }
+      } catch (err) {
+        console.error("Error fetching unread count:", err);
+      }
+    };
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      let totalUnread = 0;
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        const count = data[`unreadCount_${auth.currentUser?.uid}`] || 0;
-        totalUnread += count;
-      });
-      setUnreadCount(totalUnread);
-    });
+    fetchUnread();
 
-    return () => unsubscribe();
-  }, []);
+    const channel = supabase
+      .channel(`tab-bottom-unread:${authUser.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'messages',
+      }, () => {
+        fetchUnread();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [authUser?.id]);
   
   const navItems = [
     { icon: Home, path: '/', label: 'Home', activeColor: 'text-[var(--header-text)]' },
-    { icon: Clapperboard, path: '/reels', label: 'Reels', activeColor: 'text-[var(--header-text)]' },
+    { icon: Waves, path: '/tube', label: 'Vibe', activeColor: 'text-[var(--header-text)]' },
     { icon: MessageCircle, path: '/chats', label: 'Chats', badge: unreadCount, activeColor: 'text-[var(--header-text)]' },
-    { icon: null, path: '/tube', label: 'Tube', activeColor: 'text-[var(--header-text)]' },
+    { icon: LayoutGrid, path: '/hub', label: 'Hub', activeColor: 'text-[var(--header-text)]' },
     { icon: UserCircle, path: '/profile', label: 'Profile', activeColor: 'text-[var(--header-text)]' },
   ];
 
@@ -59,39 +76,12 @@ export default function TabBottom() {
                 }}
                 className={`transition-colors duration-300 ${isActive ? item.activeColor : 'text-[var(--header-text)]/50 group-hover:text-[var(--header-text)]'}`}
               >
-                {item.label === 'Tube' ? (
-                  <div className="relative flex items-center justify-center h-6 w-6">
-                    <svg 
-                      width="24" 
-                      height="24" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      strokeWidth={isActive ? 2.5 : 2} 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      className="transition-all duration-300"
-                    >
-                      <rect 
-                        x="2" 
-                        y="5" 
-                        width="20" 
-                        height="14" 
-                        rx="3" 
-                        fill={isActive ? 'currentColor' : 'none'} 
-                        fillOpacity={isActive ? 0.15 : 0}
-                      />
-                      <path d="m10 9 5 3-5 3V9z" />
-                    </svg>
-                  </div>
-                ) : (
-                  Icon && <Icon 
-                    size={24} 
-                    strokeWidth={isActive ? 2.5 : 2}
-                    fill={isActive ? 'currentColor' : 'none'}
-                    fillOpacity={isActive ? 0.15 : 0}
-                  />
-                )}
+                {Icon && <Icon 
+                  size={24} 
+                  strokeWidth={isActive ? 2.5 : 2}
+                  fill={isActive ? 'currentColor' : 'none'}
+                  fillOpacity={isActive ? 0.15 : 0}
+                />}
               </motion.div>
               
               {item.badge !== undefined && item.badge > 0 && (

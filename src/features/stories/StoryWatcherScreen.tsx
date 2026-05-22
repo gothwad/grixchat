@@ -1,50 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, query, where, onSnapshot, doc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { db, auth } from '../../services/firebase.ts';
-import { X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider.tsx';
+import { X, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function StoryWatcherScreen() {
   const { userId } = useParams();
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [stories, setStories] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !supabase) return;
 
-    const q = query(
-      collection(db, "stories"),
-      where("userId", "==", userId)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Sort by timestamp
-      list.sort((a: any, b: any) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
-      setStories(list);
+    const fetchStories = async () => {
+      const { data, error } = await supabase
+        .from('stories')
+        .select('*, users:user_id(username, photo_url)')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
+      
+      if (!error && data) {
+        setStories(data.map(s => ({
+          ...s,
+          username: s.users?.username || 'User',
+          photoURL: s.users?.photo_url || '',
+          imageUrl: s.media_url
+        })));
+      }
       setLoading(false);
       
-      if (list.length === 0) {
+      if (!data || data.length === 0) {
         navigate('/');
       }
-    });
+    };
 
-    return () => unsubscribe();
+    fetchStories();
   }, [userId]);
 
   useEffect(() => {
-    if (stories[currentIndex] && auth.currentUser) {
-      const storyId = stories[currentIndex].id;
-      const viewers = stories[currentIndex].viewers || [];
-      if (!viewers.includes(auth.currentUser.uid)) {
-        updateDoc(doc(db, "stories", storyId), {
-          viewers: arrayUnion(auth.currentUser.uid)
-        });
-      }
-    }
+    // Logic for tracking viewers could be added here if needed in Supabase
+    // But for now keeping it simple as we don't have a viewers table yet
   }, [currentIndex, stories]);
 
   // Auto-advance

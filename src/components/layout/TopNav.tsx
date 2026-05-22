@@ -8,24 +8,27 @@ export default function TopNav() {
   const { searchTerm, setSearchTerm, isSearchOpen, setIsSearchOpen } = useSearch();
 
   return (
-    <div className="relative z-50">
+    <div className="relative z-50 min-h-[56px] pt-safe bg-[var(--header-bg)] rounded-b-2xl border-b border-[var(--border-color)] shadow-sm">
       {isSearchOpen ? (
         <div 
-          className="absolute inset-0 bg-[var(--header-bg)] flex items-center px-4 z-[60] min-h-[56px] pt-safe rounded-b-2xl border-b border-[var(--border-color)] shadow-sm"
+          className="flex items-center px-4 h-[56px] gap-3"
         >
-          <div className="flex-1 flex items-center bg-[var(--bg-chat)] rounded-full px-4 py-1.5 border border-[var(--border-color)]">
-            <Search size={18} className="text-[var(--text-secondary)] mr-3" />
+          <div className="flex-1 flex items-center bg-[var(--bg-main)] rounded-xl px-4 h-[44px] border border-[var(--border-color)]">
+            <Search size={18} className="text-[var(--text-secondary)] mr-3 opacity-50" />
             <input 
               autoFocus
               type="text" 
-              placeholder="Search..." 
+              placeholder="Search chats, groups..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 bg-transparent border-none outline-none text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] text-sm font-medium"
+              className="flex-1 bg-transparent border-none outline-none text-[15px] font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50"
             />
             {searchTerm && (
-              <button onClick={() => setSearchTerm('')}>
-                <X size={18} className="text-[var(--text-secondary)]" />
+              <button 
+                onClick={() => setSearchTerm('')}
+                className="p-1 hover:bg-black/5 rounded-full transition-colors"
+              >
+                <X size={16} className="text-[var(--text-secondary)]" />
               </button>
             )}
           </div>
@@ -34,7 +37,7 @@ export default function TopNav() {
               setIsSearchOpen(false);
               setSearchTerm('');
             }}
-            className="ml-4 text-[var(--header-text)] text-sm font-bold"
+            className="text-[var(--primary)] text-[13px] font-black uppercase tracking-widest px-1 py-2 active:scale-95 transition-transform"
           >
             Cancel
           </button>

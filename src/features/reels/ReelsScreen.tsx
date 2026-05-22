@@ -2,49 +2,90 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MoreVertical, Heart, MessageCircle, Send, Music, Camera, ChevronLeft, Loader2, Volume2, VolumeX, Play } from 'lucide-react';
 import TabBottom from '../../components/layout/TabBottom.tsx';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, orderBy, limit, onSnapshot, updateDoc, doc, increment, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function ReelsScreen() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
   const [reels, setReels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [muted, setMuted] = useState(true);
   const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
 
   useEffect(() => {
-    const q = query(collection(db, 'reels'), orderBy('createdAt', 'desc'), limit(15));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const reelsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setReels(reelsData);
-      setLoading(false);
-    });
+    if (!supabase) return;
 
-    return () => unsubscribe();
-  }, []);
+    const fetchReels = async () => {
+      const { data, error } = await supabase
+        .from('reels')
+        .select('*, users:user_id(username, photo_url)')
+        .order('created_at', { ascending: false })
+        .limit(15);
+      
+      if (!error && data) {
+        // Also fetch user's likes for these reels
+        let likedIds: string[] = [];
+        if (authUser) {
+          const { data: likesData } = await supabase
+            .from('likes')
+            .select('target_id')
+            .eq('user_id', authUser.id)
+            .eq('target_type', 'reel')
+            .in('target_id', data.map(r => r.id));
+          if (likesData) likedIds = likesData.map(l => l.target_id);
+        }
+
+        setReels(data.map(r => ({
+          ...r,
+          userName: r.users?.username || 'User',
+          userAvatar: r.users?.photo_url || '',
+          userUid: r.user_id,
+          videoUrl: r.video_url,
+          youtubeId: r.youtube_id,
+          cover: r.thumbnail_url,
+          likes: r.likes_count,
+          comments: r.comments_count,
+          likedBy: likedIds.includes(r.id) ? [authUser?.id] : []
+        })));
+      }
+      setLoading(false);
+    };
+
+    fetchReels();
+
+    const channel = supabase
+      .channel('reels-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reels' }, () => {
+        fetchReels();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [authUser]);
 
   const handleLike = async (reel: any) => {
-    if (!user) return;
-    const isLiked = reel.likedBy?.includes(user.uid);
-    const reelRef = doc(db, 'reels', reel.id);
+    if (!authUser || !supabase) return;
+    const isLiked = reel.likedBy?.includes(authUser.id);
     
     try {
       if (isLiked) {
-        await updateDoc(reelRef, {
-          likes: increment(-1),
-          likedBy: arrayRemove(user.uid)
-        });
+        await supabase.from('likes').delete().eq('user_id', authUser.id).eq('target_id', reel.id).eq('target_type', 'reel');
+        await supabase.from('reels').update({ 
+          likes_count: Math.max(0, (reel.likes || 0) - 1) 
+        } as any).eq('id', reel.id);
       } else {
-        await updateDoc(reelRef, {
-          likes: increment(1),
-          likedBy: arrayUnion(user.uid)
-        });
+        await supabase.from('likes').insert({ 
+          user_id: authUser.id, 
+          target_id: reel.id, 
+          target_type: 'reel' 
+        } as any);
+        await supabase.from('reels').update({ 
+          likes_count: (reel.likes || 0) + 1 
+        } as any).eq('id', reel.id);
       }
     } catch (e) {
       console.error(e);
@@ -136,9 +177,9 @@ export default function ReelsScreen() {
                   <motion.button 
                     whileTap={{ scale: 1.3 }}
                     onClick={() => handleLike(reel)}
-                    className={`p-3 rounded-full transition-all ${reel.likedBy?.includes(user?.uid) ? 'text-red-500' : 'text-white'}`}
+                    className={`p-3 rounded-full transition-all ${reel.likedBy?.includes(authUser?.id) ? 'text-red-500' : 'text-white'}`}
                   >
-                    <Heart size={32} fill={reel.likedBy?.includes(user?.uid) ? "currentColor" : "none"} strokeWidth={2.5} />
+                    <Heart size={32} fill={reel.likedBy?.includes(authUser?.id) ? "currentColor" : "none"} strokeWidth={2.5} />
                   </motion.button>
                   <span className="text-[10px] font-black uppercase tracking-widest drop-shadow-md">
                     {reel.hideLikes ? '--' : (reel.likes || 0)}

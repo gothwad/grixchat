@@ -1,58 +1,73 @@
 import React, { useState, useEffect } from 'react';
 import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Info, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { motion } from 'motion/react';
-import { auth, db } from '../../services/firebase.ts';
-import { collection, query, onSnapshot, getDoc, doc } from 'firebase/firestore';
-import { toDate } from '../../utils/dateUtils.ts';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 import { Link } from 'react-router-dom';
 
 export default function CallsTab() {
+  const { user: authUser } = useAuth();
   const [calls, setCalls] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!authUser || !supabase) return;
 
-    const q = query(collection(db, "calls"));
+    const fetchCalls = async () => {
+      const { data, error } = await supabase
+        .from('calls')
+        .select(`
+          *,
+          caller:caller_id(username, photo_url, full_name),
+          receiver:receiver_id(username, photo_url, full_name)
+        `)
+        .or(`caller_id.eq.${authUser.id},receiver_id.eq.${authUser.id}`)
+        .eq('status', 'ended')
+        .order('created_at', { ascending: false });
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const allCalls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data({ serverTimestamps: 'estimate' }) }));
-      
-      const relevantCalls = allCalls.filter((data: any) => {
-        const isCaller = data.callerId === auth.currentUser?.uid;
-        const isReceiver = data.receiverId === auth.currentUser?.uid;
-        return (isCaller || isReceiver) && data.status === 'ended';
-      }).sort((a: any, b: any) => {
-        const timeA = toDate(a.timestamp)?.getTime() || Date.now();
-        const timeB = toDate(b.timestamp)?.getTime() || Date.now();
-        return timeB - timeA;
-      });
-
-      const callList = await Promise.all(relevantCalls.map(async (data: any) => {
-        const isCaller = data.callerId === auth.currentUser?.uid;
-        const otherUserId = isCaller ? data.receiverId : data.callerId;
-        
-        const userDoc = await getDoc(doc(db, "users", otherUserId || 'unknown'));
-        const userData = userDoc.data();
-
-        return {
-          id: data.id,
-          otherUserId,
-          user: userData?.fullName || userData?.username || 'Unknown User',
-          avatar: userData?.photoURL || `https://cdn-icons-png.flaticon.com/512/149/149071.png`,
-          type: data.type,
-          isIncoming: !isCaller,
-          isMissed: data.isMissed || false,
-          time: toDate(data.timestamp) ? new Date(toDate(data.timestamp)!).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently'
-        };
-      }));
-
-      setCalls(callList);
+      if (!error && data) {
+        const callList = data.map((c: any) => {
+          const isCaller = c.caller_id === authUser.id;
+          const otherUser = isCaller ? c.receiver : c.caller;
+          
+          return {
+            id: c.id,
+            otherUserId: isCaller ? c.receiver_id : c.caller_id,
+            user: otherUser?.full_name || otherUser?.username || 'Unknown',
+            avatar: otherUser?.photo_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`,
+            type: c.type,
+            isIncoming: !isCaller,
+            isMissed: c.is_missed || false,
+            time: c.created_at ? new Date(c.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently'
+          };
+        });
+        setCalls(callList);
+      }
       setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, []);
+    fetchCalls();
+
+    const channel = supabase
+      .channel('calls-updates')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'calls',
+        filter: `caller_id=eq.${authUser.id}`
+      }, () => fetchCalls())
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'calls',
+        filter: `receiver_id=eq.${authUser.id}`
+      }, () => fetchCalls())
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [authUser]);
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-main)]">

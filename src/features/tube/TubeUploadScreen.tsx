@@ -9,22 +9,19 @@ import {
   Link as LinkIcon,
   Type,
   FileText,
-  Layout,
   Clock,
   Hash,
   Loader2
 } from 'lucide-react';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
 import { motion, AnimatePresence } from 'motion/react';
-import { db } from '../../services/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
-
-const TUBE_CATEGORIES = ['All', 'Music', 'Gaming', 'Mixes', 'Live', 'Comedy', 'Programming', 'News', 'Education', 'Vlogs'];
+import { ImageService } from '../../services/ImageService';
 
 export default function TubeUploadScreen() {
   const navigate = useNavigate();
-  const { user, userData } = useAuth();
+  const { user: authUser, userData } = useAuth();
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
@@ -51,24 +48,8 @@ export default function TubeUploadScreen() {
     }
   };
 
-  const uploadToImgBB = async (file: File) => {
-    const apiKey = import.meta.env.VITE_IMGBB_API_KEY;
-    if (!apiKey) throw new Error("ImgBB API key is missing");
-
-    const formData = new FormData();
-    formData.append("image", file);
-
-    const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
-      method: "POST",
-      body: formData
-    });
-
-    const data = await response.json();
-    if (!data.success) throw new Error(data.error?.message || "ImgBB upload failed");
-    return data.data.url;
-  };
-
   const extractYoutubeId = (url: string) => {
+    if (!url) return null;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
@@ -105,7 +86,7 @@ export default function TubeUploadScreen() {
   };
 
   const handleUpload = async () => {
-    if (!user) return;
+    if (!authUser || !supabase) return;
     if (!formData.title.trim()) {
       alert("Please enter a title");
       return;
@@ -124,27 +105,24 @@ export default function TubeUploadScreen() {
     try {
       let thumbnailUrl = thumbnailPreview;
 
-      // If user uploaded a custom file, we need to upload it to storage/imgbb
+      // If user uploaded a custom file, we need to upload it to Supabase
       if (thumbnailFile) {
-        thumbnailUrl = await uploadToImgBB(thumbnailFile);
+        thumbnailUrl = await ImageService.uploadImage(thumbnailFile);
       }
       
-      const videoData = {
-        userId: user.uid,
-        userName: userData?.fullName || user.displayName || 'Anonymous',
-        userAvatar: userData?.photoURL || user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || 'User'}&background=random`,
-        youtubeUrl: formData.youtubeUrl,
+      const { error } = await supabase.from('tube_videos').insert({
+        user_id: authUser.id,
+        youtube_url: formData.youtubeUrl,
         thumbnail: thumbnailUrl,
         title: formData.title,
         description: formData.description,
         category: formData.category,
-        views: 0,
-        likes: 0,
-        createdAt: serverTimestamp(),
+        views_count: 0,
+        likes_count: 0,
         duration: formData.duration || '0:00'
-      };
+      } as any);
 
-      await addDoc(collection(db, 'tube_videos'), videoData);
+      if (error) throw error;
       
       setShowSuccess(true);
       setTimeout(() => {
@@ -252,36 +230,19 @@ export default function TubeUploadScreen() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Category */}
-              <div className="bg-[var(--bg-card)] rounded-2xl p-4 border border-[var(--border-color)]">
-                <div className="flex items-center gap-3 mb-2">
-                  <Layout size={20} className="text-purple-500" />
-                  <span className="text-sm font-bold">Category</span>
-                </div>
-                <select 
-                  value={formData.category}
-                  onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  className="w-full bg-transparent text-[var(--text-primary)] focus:outline-none font-medium"
-                >
-                  {TUBE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
+            {/* Duration */}
+            <div className="bg-[var(--bg-card)] rounded-2xl p-4 border border-[var(--border-color)]">
+              <div className="flex items-center gap-3 mb-2">
+                <Clock size={20} className="text-orange-500" />
+                <span className="text-sm font-bold">Duration (MM:SS)</span>
               </div>
-
-              {/* Duration */}
-              <div className="bg-[var(--bg-card)] rounded-2xl p-4 border border-[var(--border-color)]">
-                <div className="flex items-center gap-3 mb-2">
-                  <Clock size={20} className="text-orange-500" />
-                  <span className="text-sm font-bold">Duration (MM:SS)</span>
-                </div>
-                <input 
-                  type="text"
-                  placeholder="e.g. 10:45"
-                  value={formData.duration}
-                  onChange={(e) => setFormData({...formData, duration: e.target.value})}
-                  className="w-full bg-transparent text-[var(--text-primary)] focus:outline-none placeholder:text-[var(--text-secondary)]/40 font-medium"
-                />
-              </div>
+              <input 
+                type="text"
+                placeholder="e.g. 10:45"
+                value={formData.duration}
+                onChange={(e) => setFormData({...formData, duration: e.target.value})}
+                className="w-full bg-transparent text-[var(--text-primary)] focus:outline-none placeholder:text-[var(--text-secondary)]/40 font-medium"
+              />
             </div>
           </div>
 

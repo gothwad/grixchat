@@ -250,8 +250,17 @@ export default function App() {
   }
 
   // Guard Logic
-  const needsVerification = user && !user.emailVerified && !user.providerData.some((p: any) => p.providerId === 'google.com');
-  const needsProfileCompletion = user && !userData && isAuthReady;
+  const needsVerification = user && !user.email_confirmed_at && !(user.app_metadata?.providers || []).some((p: string) => ['google', 'github'].includes(p));
+  const needsProfileCompletion = user && isAuthReady && (!userData || !userData.username);
+
+  if (user && isAuthReady) {
+    const isPublicRoute = ['/login', '/signup', '/forgot-password', '/privacy-policy', '/terms', '/complete-profile', '/verify-email'].includes(location.pathname);
+    
+    if (!isPublicRoute) {
+      if (needsVerification) return <Navigate to="/verify-email" replace />;
+      if (needsProfileCompletion) return <Navigate to="/complete-profile" replace />;
+    }
+  }
 
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
@@ -295,10 +304,10 @@ export default function App() {
     
                     {/* Other Routes */}
                     <Route path="/verify-email" element={
-                      user && !user.emailVerified ? <VerifyEmailScreen /> : <Navigate to="/" />
+                      user && !user.email_confirmed_at ? <VerifyEmailScreen /> : <Navigate to="/" />
                     } />
                     <Route path="/complete-profile" element={
-                      user && !userData ? <CompleteProfileScreen /> : <Navigate to="/" />
+                      user && (!userData || !userData.username) ? <CompleteProfileScreen /> : <Navigate to="/" />
                     } />
                     <Route path="/camera" element={user ? <CameraTab /> : <Navigate to="/login" />} />
                     <Route path="/call/:id" element={user ? <CallScreen /> : <Navigate to="/login" />} />

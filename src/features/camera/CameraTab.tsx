@@ -1,11 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Camera, X, RefreshCw, Zap, ZapOff, Image as ImageIcon, ArrowLeft, Send, Check, RotateCcw } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { db, auth } from '../../services/firebase.ts';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function CameraTab() {
+  const { user: authUser } = useAuth();
   const [searchParams] = useSearchParams();
   const chatId = searchParams.get('chatId');
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -84,7 +84,7 @@ export default function CameraTab() {
     navigate(-1);
     // Note: Since navigate(-1) doesn't easily pass state, 
     // we'll use a custom event or just update the logic to navigate to the chat with state
-    const receiverId = chatId.split('_').find(id => id !== auth.currentUser?.uid) || chatId.split('_')[0];
+    const receiverId = chatId.split('_').find(id => id !== authUser?.id) || chatId.split('_')[0];
     navigate(`/chat/${receiverId}`, { state: { capturedImage } });
   };
 

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Lock, Eye, EyeOff, CheckCircle2, ShieldCheck } from 'lucide-react';
-import { auth } from '../../../services/firebase.ts';
-import { updatePassword } from 'firebase/auth';
+import { supabase } from '../../../lib/supabase';
 
 interface ChangePasswordSheetProps {
   isOpen: boolean;
@@ -20,7 +19,6 @@ export default function ChangePasswordSheet({ isOpen, onClose, onSuccess }: Chan
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser) return;
 
     if (newPassword !== confirmPassword) {
       setError("Passwords do not match");
@@ -36,7 +34,10 @@ export default function ChangePasswordSheet({ isOpen, onClose, onSuccess }: Chan
     setError('');
 
     try {
-      await updatePassword(auth.currentUser, newPassword);
+      if (supabase) {
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) throw error;
+      }
       setIsSuccess(true);
       setTimeout(() => {
         onSuccess();

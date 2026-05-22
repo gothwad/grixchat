@@ -17,13 +17,14 @@ import {
 } from 'lucide-react';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
 import { motion, AnimatePresence } from 'motion/react';
-import { db } from '../../services/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
+import { ImageService } from '../../services/ImageService';
+import { SupabaseStorageService } from '../../services/SupabaseStorageService';
 
 export default function ReelsMakerScreen() {
   const navigate = useNavigate();
-  const { user, userData } = useAuth();
+  const { user: authUser, userData } = useAuth();
   const videoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   
@@ -48,6 +49,7 @@ export default function ReelsMakerScreen() {
   const [showSuccess, setShowSuccess] = useState(false);
 
   const extractYoutubeId = (url: string) => {
+    if (!url) return null;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
@@ -85,44 +87,6 @@ export default function ReelsMakerScreen() {
     }
   };
 
-  const uploadToImgBB = async (file: File) => {
-    const apiKey = import.meta.env.VITE_IMGBB_API_KEY;
-    if (!apiKey) throw new Error("ImgBB API key is missing");
-
-    const formData = new FormData();
-    formData.append("image", file);
-
-    const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
-      method: "POST",
-      body: formData
-    });
-
-    const data = await response.json();
-    if (!data.success) throw new Error(data.error?.message || "ImgBB upload failed");
-    return data.data.url;
-  };
-
-  const uploadToCloudinary = async (file: File) => {
-    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-    
-    if (!cloudName || !uploadPreset) throw new Error("Cloudinary config is missing");
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", uploadPreset);
-    formData.append("resource_type", "video");
-
-    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/video/upload`, {
-      method: "POST",
-      body: formData
-    });
-
-    const data = await response.json();
-    if (data.error) throw new Error(data.error.message || "Cloudinary upload failed");
-    return data.secure_url;
-  };
-
   const handlePost = async () => {
     if (mode === 'upload' && !videoFile) {
       alert("Please select a video.");
@@ -139,7 +103,7 @@ export default function ReelsMakerScreen() {
       return;
     }
 
-    if (!user) return;
+    if (!authUser || !supabase) return;
 
     setIsPosting(true);
     setUploadProgress(10); 
@@ -148,9 +112,9 @@ export default function ReelsMakerScreen() {
       setUploadProgress(20);
       let coverUrl = coverPreview;
       
-      // Only upload to ImgBB if it's a file
+      // Only upload to Supabase if it's a file
       if (coverFile) {
-        coverUrl = await uploadToImgBB(coverFile);
+        coverUrl = await ImageService.uploadImage(coverFile, (p) => setUploadProgress(20 + (p * 0.2)), 'reels');
       }
       
       setUploadProgress(40);
@@ -158,7 +122,7 @@ export default function ReelsMakerScreen() {
       let youtubeId = null;
 
       if (mode === 'upload' && videoFile) {
-        videoUrl = await uploadToCloudinary(videoFile);
+        videoUrl = await SupabaseStorageService.uploadVideo(videoFile, (p) => setUploadProgress(40 + (p * 0.4)), 'reels');
       } else {
         youtubeId = extractYoutubeId(formData.youtubeUrl);
       }
@@ -167,25 +131,23 @@ export default function ReelsMakerScreen() {
 
       const mentions = formData.mentions.split(',').map(m => m.trim()).filter(Boolean);
 
-      await addDoc(collection(db, 'reels'), {
-        userUid: user.uid,
-        userName: userData?.fullName || user.displayName || 'Anonymous',
-        userAvatar: userData?.photoURL || user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || 'User'}&background=random`,
-        videoUrl,
-        youtubeId,
-        cover: coverUrl,
+      const { error } = await supabase.from('reels').insert({
+        user_id: authUser.id,
+        video_url: videoUrl,
+        youtube_id: youtubeId,
+        thumbnail_url: coverUrl,
         caption: formData.caption,
         description: formData.description,
         location: formData.location,
         mentions,
-        likes: 0,
-        likedBy: [],
-        comments: 0,
-        allowComments: formData.allowComments,
-        hideLikes: formData.hideLikes,
-        createdAt: serverTimestamp(),
-        audio: `Original Audio - ${userData?.fullName || user.displayName || 'User'}`
-      });
+        likes_count: 0,
+        comments_count: 0,
+        allow_comments: formData.allowComments,
+        hide_likes: formData.hideLikes,
+        audio_title: `Original Audio - ${userData?.fullName || 'User'}`
+      } as any);
+
+      if (error) throw error;
 
       setUploadProgress(100);
       setShowSuccess(true);

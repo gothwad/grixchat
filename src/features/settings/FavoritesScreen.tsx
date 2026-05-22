@@ -1,46 +1,76 @@
 import React, { useState, useEffect } from 'react';
 import { Star, Search, UserPlus, Loader2, X } from 'lucide-react';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
-import { auth, db } from '../../services/firebase.ts';
-import { doc, onSnapshot, updateDoc, arrayRemove, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 
 export default function FavoritesScreen() {
+  const { user: authUser, userData: currentUserData } = useAuth();
   const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!authUser || !supabase) return;
 
-    const unsubscribe = onSnapshot(doc(db, "users", auth.currentUser.uid), async (snap) => {
-      if (snap.exists()) {
-        const favoriteIds = snap.data().favorites || [];
+    const fetchFavorites = async () => {
+      // Re-fetch user data to get fresh favorites list or use currentUserData
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('favorites')
+        .eq('id', authUser.id)
+        .single();
+      
+      const favoriteIds = userProfile?.favorites || [];
+      
+      if (favoriteIds.length > 0) {
+        const { data: usersData } = await supabase
+          .from('users')
+          .select('*')
+          .in('id', favoriteIds);
         
-        // Fetch details for each favorite user
-        const details = await Promise.all(favoriteIds.map(async (uid: string) => {
-          const userSnap = await getDoc(doc(db, "users", uid));
-          if (userSnap.exists()) {
-            return { uid, ...userSnap.data() };
-          }
-          return { uid, username: 'Unknown User' };
-        }));
-        
-        setFavorites(details);
+        if (usersData) {
+          setFavorites(usersData);
+        }
+      } else {
+        setFavorites([]);
       }
       setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, []);
+    fetchFavorites();
+
+    const channel = supabase
+      .channel(`favorites:${authUser.id}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'users',
+        filter: `id=eq.${authUser.id}`
+      }, (payload) => {
+        fetchFavorites();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [authUser?.id]);
 
   const handleRemoveFavorite = async (uid: string) => {
-    if (!auth.currentUser) return;
+    if (!authUser || !supabase) return;
     setRemovingId(uid);
     try {
-      await updateDoc(doc(db, "users", auth.currentUser.uid), {
-        favorites: arrayRemove(uid)
-      });
+      const currentFavorites = currentUserData?.favorites || [];
+      const newFavorites = currentFavorites.filter((id: string) => id !== uid);
+      
+      const { error } = await supabase
+        .from('users')
+        .update({ favorites: newFavorites } as any)
+        .eq('id', authUser.id);
+      
+      if (error) throw error;
     } catch (error) {
       console.error("Error removing favorite:", error);
     } finally {
@@ -50,7 +80,7 @@ export default function FavoritesScreen() {
 
   const filteredFavorites = favorites.filter(fav => 
     fav.username?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    fav.fullName?.toLowerCase().includes(searchTerm.toLowerCase())
+    (fav.full_name || fav.fullName)?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -85,27 +115,27 @@ export default function FavoritesScreen() {
             <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden mb-8">
               {filteredFavorites.map((user, index) => (
                 <div 
-                  key={user.uid}
+                  key={user.id}
                   className={`flex items-center justify-between px-6 py-4 ${
                     index !== filteredFavorites.length - 1 ? 'border-b border-[var(--border-color)]/30' : ''
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <img 
-                      src={user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
+                      src={user.photo_url || user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
                       className="w-10 h-10 rounded-full object-cover"
                       alt=""
                     />
                     <div>
                       <h4 className="text-sm font-bold text-[var(--text-primary)]">
-                        {user.fullName || user.username}
+                        {user.full_name || user.username || user.fullName}
                       </h4>
                       <p className="text-[11px] text-[var(--text-secondary)]">@{user.username}</p>
                     </div>
                   </div>
                   <button 
-                    onClick={() => handleRemoveFavorite(user.uid)}
-                    disabled={removingId === user.uid}
+                    onClick={() => handleRemoveFavorite(user.id)}
+                    disabled={removingId === user.id}
                     className="p-2 text-rose-500 hover:bg-rose-50 rounded-full transition-colors disabled:opacity-50"
                   >
                     <X size={18} />

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, getDoc, doc } from 'firebase/firestore';
-import { db } from '../../../services/firebase';
+import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../providers/AuthProvider';
 import { CacheService } from '../../../services/CacheService';
 
@@ -10,51 +9,65 @@ export const useCalls = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !supabase) return;
 
-    const q = query(
-      collection(db, "calls"),
-      where("participants", "array-contains", user.uid)
-    );
+    const fetchCalls = async () => {
+      const { data: docs, error } = await supabase
+        .from('calls')
+        .select(`
+          *,
+          caller:caller_id(id, username, full_name, photo_url),
+          receiver:receiver_id(id, username, full_name, photo_url)
+        `)
+        .or(`caller_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Sort in-memory to avoid index building delays
-      docs.sort((a: any, b: any) => {
-        const timeA = a.timestamp?.seconds || 0;
-        const timeB = b.timestamp?.seconds || 0;
-        return timeB - timeA;
-      });
-
-      const callHistory = await Promise.all(docs.map(async (data: any) => {
-        const otherUserId = data.participants.find((id: string) => id !== user.uid);
-        
-        // Try cache first
-        let otherUser: any = CacheService.getUser(otherUserId);
-        if (!otherUser) {
-          const userDoc = await getDoc(doc(db, "users", otherUserId));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            otherUser = { ...userData, uid: otherUserId, timestamp: Date.now() };
-            CacheService.saveUser(otherUserId, userData);
-          } else {
-            otherUser = null;
-          }
-        }
-
-        return {
-          id: data.id,
-          ...data,
-          otherUserId,
-          user: otherUser
-        };
-      }));
-      setCalls(callHistory);
+      if (!error && docs) {
+        const callHistory = docs.map((data: any) => {
+          const isCaller = data.caller_id === user.id;
+          const otherUser = isCaller ? data.receiver : data.caller;
+          
+          return {
+            id: data.id,
+            ...data,
+            timestamp: data.created_at,
+            otherUserId: otherUser?.id,
+            user: otherUser ? {
+              ...otherUser,
+              uid: otherUser.id,
+              username: otherUser.username,
+              displayName: otherUser.full_name,
+              photoURL: otherUser.photo_url
+            } : null
+          };
+        });
+        setCalls(callHistory);
+      }
       setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, [user]);
+    fetchCalls();
+
+    const channel = supabase
+      .channel(`calls-history:${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'calls',
+        filter: `caller_id=eq.${user.id}`
+      }, () => fetchCalls())
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'calls',
+        filter: `receiver_id=eq.${user.id}`
+      }, () => fetchCalls())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   return { calls, loading };
 };

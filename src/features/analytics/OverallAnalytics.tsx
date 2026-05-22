@@ -23,8 +23,8 @@ import {
   Cell
 } from 'recharts';
 import { motion } from 'motion/react';
-import { auth, db } from '../../services/firebase.ts';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 
 const sampleData = [
   { name: 'Mon', value: 400 },
@@ -37,6 +37,7 @@ const sampleData = [
 ];
 
 export default function OverallAnalytics() {
+  const { user: authUser } = useAuth();
   const [stats, setStats] = useState({
     totalLikes: 0,
     totalComments: 0,
@@ -49,61 +50,64 @@ export default function OverallAnalytics() {
 
   useEffect(() => {
     const fetchAnalytics = async () => {
-      if (!auth.currentUser) return;
+      if (!authUser || !supabase) return;
       
       try {
-        const uid = auth.currentUser.uid;
+        const uid = authUser.id;
         
         // Fetch Posts Stats
-        const postsQuery = query(collection(db, "posts"), where("userId", "==", uid));
-        const postsSnap = await getDocs(postsQuery);
+        const { data: postsData } = await supabase
+          .from('posts')
+          .select('likes_count, comments_count')
+          .eq('user_id', uid);
+        
         let postsLikes = 0;
         let postsComments = 0;
-        postsSnap.forEach(doc => {
-          const data = doc.data();
-          postsLikes += (data.likes || 0);
-          postsComments += (data.comments || 0);
+        postsData?.forEach(p => {
+          postsLikes += (p.likes_count || 0);
+          postsComments += (p.comments_count || 0);
         });
 
         // Fetch Reels Stats
-        const reelsQuery = query(collection(db, "reels"), where("userUid", "==", uid));
-        const reelsSnap = await getDocs(reelsQuery);
+        const { data: reelsData } = await supabase
+          .from('reels')
+          .select('likes_count, comments_count')
+          .eq('user_id', uid);
+        
         let reelsLikes = 0;
         let reelsComments = 0;
-        reelsSnap.forEach(doc => {
-          const data = doc.data();
-          reelsLikes += (data.likes || 0);
-          reelsComments += (data.comments || 0);
+        reelsData?.forEach(r => {
+          reelsLikes += (r.likes_count || 0);
+          reelsComments += (r.comments_count || 0);
         });
 
         // Fetch Tube Stats
-        const tubeQuery = query(collection(db, "tube_videos"), where("userId", "==", uid));
-        const tubeSnap = await getDocs(tubeQuery);
+        const { data: tubeData } = await supabase
+          .from('tube_videos')
+          .select('likes_count, views_count')
+          .eq('user_id', uid);
+        
         let tubeViews = 0;
         let tubeLikes = 0;
-        tubeSnap.forEach(doc => {
-          const data = doc.data();
-          tubeViews += (data.views || 0);
-          tubeLikes += (data.likes || 0);
+        tubeData?.forEach(t => {
+          tubeViews += (t.views_count || 0);
+          tubeLikes += (t.likes_count || 0);
         });
 
-        // Fetch User Stats
-        const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", uid), limit(1)));
-        let followers = 0;
-        let following = 0;
-        if (!userSnap.empty) {
-          const userData = userSnap.docs[0].data();
-          followers = userData.followers?.length || 0;
-          following = userData.following?.length || 0;
-        }
+        // Fetch User Stats (From the users table)
+        const { data: userData } = await supabase
+          .from('users')
+          .select('followers, following')
+          .eq('id', uid)
+          .single();
 
         setStats({
           totalLikes: postsLikes + reelsLikes + tubeLikes,
           totalComments: postsComments + reelsComments,
           totalViews: tubeViews,
-          totalPosts: postsSnap.size + reelsSnap.size + tubeSnap.size,
-          followers,
-          following
+          totalPosts: (postsData?.length || 0) + (reelsData?.length || 0) + (tubeData?.length || 0),
+          followers: userData?.followers?.length || 0,
+          following: userData?.following?.length || 0
         });
       } catch (err) {
         console.error("Error fetching overall analytics:", err);
@@ -113,7 +117,7 @@ export default function OverallAnalytics() {
     };
 
     fetchAnalytics();
-  }, []);
+  }, [authUser]);
 
   const statCards = [
     { label: 'Followers', value: stats.followers, icon: Users, color: 'text-emerald-500', trend: '+12%', up: true },

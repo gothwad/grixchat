@@ -1,20 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  collection, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  doc, 
-  getDoc,
-  getDocs,
-  where,
-  addDoc,
-  setDoc,
-  serverTimestamp,
-  increment
-} from 'firebase/firestore';
-import { auth, db } from '../../services/firebase.ts';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 import { ArrowLeft, Search, Send, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -23,6 +10,7 @@ const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 export default function ShareScreen() {
   const { postId } = useParams();
   const navigate = useNavigate();
+  const { user: authUser, userData: currentUserData } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState<any[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -31,27 +19,27 @@ export default function ShareScreen() {
   const [contentMetadata, setContentMetadata] = useState<any>(null);
 
   useEffect(() => {
-    if (!postId) return;
+    if (!postId || !supabase) return;
 
     const fetchContent = async () => {
       // Try posts
-      let snap = await getDoc(doc(db, "posts", postId));
-      if (snap.exists()) {
-        setContentMetadata({ ...snap.data(), id: snap.id, type: 'post' });
+      let { data: postData } = await supabase.from('posts').select('*').eq('id', postId).single();
+      if (postData) {
+        setContentMetadata({ ...postData, id: postData.id, type: 'post' });
         return;
       }
 
       // Try reels
-      snap = await getDoc(doc(db, "reels", postId));
-      if (snap.exists()) {
-        setContentMetadata({ ...snap.data(), id: snap.id, type: 'reel' });
+      let { data: reelData } = await supabase.from('reels').select('*').eq('id', postId).single();
+      if (reelData) {
+        setContentMetadata({ ...reelData, id: reelData.id, type: 'reel' });
         return;
       }
 
       // Try tube_videos
-      snap = await getDoc(doc(db, "tube_videos", postId));
-      if (snap.exists()) {
-        setContentMetadata({ ...snap.data(), id: snap.id, type: 'video' });
+      let { data: tubeData } = await supabase.from('tube_videos').select('*').eq('id', postId).single();
+      if (tubeData) {
+        setContentMetadata({ ...tubeData, id: tubeData.id, type: 'video' });
         return;
       }
     };
@@ -60,24 +48,32 @@ export default function ShareScreen() {
   }, [postId]);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!authUser || !supabase) return;
 
     // Fetch following users to share with
     const fetchFriends = async () => {
-      const userDoc = await getDoc(doc(db, "users", auth.currentUser!.uid));
-      if (userDoc.exists()) {
-        const following = userDoc.data().following || [];
-        if (following.length > 0) {
-          const q = query(collection(db, "users"), where("__name__", "in", following.slice(0, 10)));
-          const snaps = await getDocs(q);
-          setUsers(snaps.docs.map(d => ({ id: d.id, ...d.data() })));
+      const { data: followings } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', authUser.id);
+      
+      const followingIds = followings?.map(f => f.following_id) || [];
+      
+      if (followingIds.length > 0) {
+        const { data: usersData } = await supabase
+          .from('users')
+          .select('*')
+          .in('id', followingIds.slice(0, 50));
+        
+        if (usersData) {
+          setUsers(usersData);
         }
       }
       setLoading(false);
     };
 
     fetchFriends();
-  }, []);
+  }, [authUser]);
 
   const handleToggleUser = (userId: string) => {
     if (selectedUsers.includes(userId)) {
@@ -88,48 +84,65 @@ export default function ShareScreen() {
   };
 
   const handleShare = async () => {
-    if (selectedUsers.length === 0 || !postId || !contentMetadata || !auth.currentUser) return;
+    if (selectedUsers.length === 0 || !postId || !contentMetadata || !authUser || !supabase) return;
     setSending(true);
 
     try {
-      const batch = [];
-      
-      for (const userId of selectedUsers) {
-        const chatId = [auth.currentUser.uid, userId].sort().join('_');
-        
-        const messageData = {
-          chatId,
-          senderId: auth.currentUser.uid,
-          senderName: auth.currentUser.displayName || 'User',
-          senderAvatar: auth.currentUser.photoURL || '',
-          text: `Shared a ${contentMetadata.type}: ${contentMetadata.caption || contentMetadata.title || ''}`,
-          timestamp: serverTimestamp(),
-          isRead: false,
-          type: 'share',
-          sharedContent: {
+      for (const targetUserId of selectedUsers) {
+        // 1. Get or create conversation
+        const { data: convId, error: rpcError } = await (supabase as any).rpc('get_direct_conversation_id', {
+          u1: authUser.id,
+          u2: targetUserId
+        });
+
+        let chatId = convId;
+
+        if (!chatId) {
+          // Create new direct conversation
+          const { data: newConv, error: newConvError } = await (supabase as any).from('conversations').insert({
+            type: 'direct',
+            last_message: `Shared a ${contentMetadata.type}`,
+            last_message_at: new Date().toISOString()
+          }).select().single();
+
+          if (newConvError) throw newConvError;
+          chatId = newConv.id;
+
+          // Add participants
+          await (supabase as any).from('conversation_participants').insert([
+            { conversation_id: chatId, user_id: authUser.id },
+            { conversation_id: chatId, user_id: targetUserId }
+          ]);
+        } else {
+          // Update existing conversation
+          await (supabase as any).from('conversations').update({
+            last_message: `Shared a ${contentMetadata.type}`,
+            last_message_at: new Date().toISOString()
+          }).eq('id', chatId);
+        }
+
+        // 2. Add share message
+        const messageText = `Shared a ${contentMetadata.type}: ${contentMetadata.caption || contentMetadata.title || ''}`;
+        const mediaData = {
+          share: {
             id: contentMetadata.id,
             type: contentMetadata.type,
-            imageUrl: contentMetadata.imageUrl || contentMetadata.thumbnail || '',
+            imageUrl: contentMetadata.imageUrl || contentMetadata.thumbnail || contentMetadata.thumbnail_url || '',
             title: contentMetadata.title || contentMetadata.caption || '',
             userName: contentMetadata.userName || ''
           }
         };
 
-        // Add message
-        batch.push(addDoc(collection(db, "messages"), messageData));
-
-        // Update/Create conversation
-        const convRef = doc(db, "conversations", chatId);
-        batch.push(setDoc(convRef, {
-          lastMessage: `Shared a ${contentMetadata.type}`,
-          lastMessageTimestamp: serverTimestamp(),
-          lastSenderId: auth.currentUser.uid,
-          participants: [auth.currentUser.uid, userId],
-          [`unreadCount_${userId}`]: increment(1)
-        }, { merge: true }));
+        await (supabase as any).from('messages').insert({
+          conversation_id: chatId,
+          sender_id: authUser.id,
+          content: messageText,
+          media_type: 'share',
+          media_url: mediaData.share.imageUrl,
+          metadata: mediaData
+        });
       }
 
-      await Promise.all(batch);
       navigate(-1);
     } catch (err) {
       console.error("Error sharing post:", err);

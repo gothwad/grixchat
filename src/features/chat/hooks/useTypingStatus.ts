@@ -1,60 +1,50 @@
 import { useState, useEffect, useRef } from 'react';
-import { ref, onValue, set, serverTimestamp } from 'firebase/database';
-import { rtdb, auth } from '../../../services/firebase.ts';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../providers/AuthProvider.tsx';
 
 export const useTypingStatus = (chatId: string, receiverId: string) => {
   const [isOtherTyping, setIsOtherTyping] = useState(false);
   const typingTimeoutRef = useRef<any>(null);
-  const lastTypingUpdateRef = useRef<number>(0);
+  const channelRef = useRef<any>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
-    if (!chatId || !receiverId) return;
+    if (!chatId || !supabase || !user) return;
 
-    const typingRef = ref(rtdb, `typing/${chatId}/${receiverId}`);
-    const unsubscribe = onValue(typingRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const lastTyped = data.timestamp || 0;
-        const now = Date.now();
-        // In RTDB, if we use serverTimestamp, it might be a bit different to compare locally 
-        // but usually it's fine for a 3s window
-        if (data.isTyping && now - lastTyped < 3000) {
-          setIsOtherTyping(true);
-        } else {
-          setIsOtherTyping(false);
-        }
-      } else {
-        setIsOtherTyping(false);
-      }
+    const channel = supabase.channel(`typing:${chatId}`, {
+      config: {
+        presence: {
+          key: user.id,
+        },
+      },
     });
 
-    return () => unsubscribe();
-  }, [chatId, receiverId]);
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const otherTyping = Object.entries(state).some(([key, presence]: [string, any]) => {
+          return key === receiverId && presence[0]?.isTyping;
+        });
+        setIsOtherTyping(otherTyping);
+      })
+      .subscribe();
 
-  const updateTypingStatus = async (typing: boolean) => {
-    if (!auth.currentUser || !chatId) return;
-    const myTypingRef = ref(rtdb, `typing/${chatId}/${auth.currentUser.uid}`);
-    try {
-      await set(myTypingRef, {
-        isTyping: typing,
-        timestamp: serverTimestamp()
-      });
-    } catch (err: any) {
-      console.error("Error updating typing status in RTDB:", err);
-    }
-  };
+    channelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [chatId, receiverId, user?.id]);
 
   const handleTyping = () => {
-    const now = Date.now();
-    if (now - lastTypingUpdateRef.current > 2000) {
-      updateTypingStatus(true);
-      lastTypingUpdateRef.current = now;
-    }
+    if (!channelRef.current) return;
     
+    channelRef.current.track({ isTyping: true });
+
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
-      updateTypingStatus(false);
-      lastTypingUpdateRef.current = 0;
+      channelRef.current?.track({ isTyping: false });
     }, 3000);
   };
 

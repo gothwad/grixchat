@@ -7,13 +7,14 @@ import {
   History,
   Zap
 } from 'lucide-react';
-import { auth, db } from '../../services/firebase.ts';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { motion } from 'motion/react';
 
 export default function StoryAnalytics() {
   const [activeStories, setActiveStories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user: authUser } = useAuth();
   const [summary, setSummary] = useState({
     totalViewers: 0,
     avgCompletion: 0,
@@ -22,28 +23,35 @@ export default function StoryAnalytics() {
 
   useEffect(() => {
     const fetchStoryAnalytics = async () => {
-      if (!auth.currentUser) return;
+      if (!authUser || !supabase) return;
       try {
-        const q = query(
-          collection(db, "stories"), 
-          where("userId", "==", auth.currentUser.uid),
-          orderBy("timestamp", "desc"),
-          limit(10)
-        );
-        const snapshot = await getDocs(q);
-        const stories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setActiveStories(stories);
+        const { data: stories, error, count } = await supabase
+          .from('stories')
+          .select('*', { count: 'exact' })
+          .eq('user_id', authUser.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
 
-        let totalViewers = 0;
-        stories.forEach((s: any) => {
-          totalViewers += (s.viewers?.length || 0);
-        });
+        if (error) throw error;
 
-        setSummary({
-          totalViewers,
-          avgCompletion: Math.floor(Math.random() * 20) + 70, // Mocked for now
-          count: snapshot.size
-        });
+        if (stories) {
+          setActiveStories(stories.map(s => ({
+            ...s,
+            imageUrl: s.media_url,
+            timestamp: s.created_at
+          })));
+
+          let totalViewers = 0;
+          stories.forEach((s: any) => {
+            totalViewers += (s.viewers?.length || 0);
+          });
+
+          setSummary({
+            totalViewers,
+            avgCompletion: Math.floor(Math.random() * 20) + 70, // Mocked for now
+            count: count || 0
+          });
+        }
       } catch (err) {
         console.error("Error fetching story analytics:", err);
       } finally {
@@ -52,7 +60,7 @@ export default function StoryAnalytics() {
     };
 
     fetchStoryAnalytics();
-  }, []);
+  }, [authUser]);
 
   if (loading) return <div className="p-10 text-center text-xs font-bold animate-pulse">Tracking story views...</div>;
 

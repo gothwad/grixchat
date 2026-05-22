@@ -4,7 +4,7 @@ import { Trash2, Sparkles, Zap, Cpu, Settings2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { aiService, AIMessage, AIModelType } from '../../services/AIService.ts';
 import { useTheme } from '../../contexts/ThemeContext';
-import { auth } from '../../services/firebase.ts';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 
 import ChatHeader from '../../components/layout/ChatHeader.tsx';
 import ChatBottom from '../../components/layout/ChatBottom.tsx';
@@ -13,6 +13,7 @@ import { ChatOptionsSheet } from './components/ChatOptionsSheet';
 
 export default function GrixAIScreen() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { chatBackground } = useTheme();
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -114,7 +115,7 @@ export default function GrixAIScreen() {
   const chatMessages = messages.map(m => ({
     id: m.id,
     text: m.text,
-    senderId: m.senderId === 'user' ? (auth.currentUser?.uid || 'user') : 'grix-ai',
+    senderId: m.senderId === 'user' ? (user?.id || 'user') : 'grix-ai',
     timestamp: m.timestamp,
     type: 'text'
   }));
@@ -138,7 +139,7 @@ export default function GrixAIScreen() {
         isTyping={isTyping}
         receiverStatus="online"
         receiverActiveChatId={null}
-        currentUserId={auth.currentUser?.uid}
+        currentUserId={user?.id}
         onWatchTogether={() => {}}
         type="direct"
       />
@@ -209,7 +210,6 @@ export default function GrixAIScreen() {
         loading={false}
         messages={chatMessages}
         messageLimit={999}
-        auth={auth}
         convType="direct"
         receiver={aiReceiver}
         activeMessageMenu={activeMessageMenu}
@@ -233,7 +233,7 @@ export default function GrixAIScreen() {
         setReplyingTo={setReplyingTo}
         startEdit={() => {}}
         deleteMessage={() => {}}
-        currentUserUid={auth.currentUser?.uid}
+        currentUserUid={user?.id}
         setShowReactionPicker={setShowReactionPicker}
         editingMessage={null}
         setEditingMessage={() => {}}

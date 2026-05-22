@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Lock, Eye, EyeOff } from 'lucide-react';
-import { auth } from '../../../services/firebase.ts';
-import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { useAuth } from '../../../providers/AuthProvider';
+import { supabase } from '../../../lib/supabase';
 
 interface ReauthSheetProps {
   isOpen: boolean;
@@ -13,6 +13,7 @@ interface ReauthSheetProps {
 }
 
 export default function ReauthSheet({ isOpen, onClose, onSuccess, title = "Confirm Security", description = "Please enter your current password to continue." }: ReauthSheetProps) {
+  const { user } = useAuth();
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -20,14 +21,19 @@ export default function ReauthSheet({ isOpen, onClose, onSuccess, title = "Confi
 
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser?.email) return;
+    if (!user?.email) return;
 
     setLoading(true);
     setError('');
 
     try {
-      const credential = EmailAuthProvider.credential(auth.currentUser.email, password);
-      await reauthenticateWithCredential(auth.currentUser, credential);
+      if (supabase) {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password
+        });
+        if (error) throw error;
+      }
       onSuccess();
     } catch (err: any) {
       console.error("Reauth error:", err);

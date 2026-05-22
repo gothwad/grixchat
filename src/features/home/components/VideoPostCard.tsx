@@ -19,8 +19,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { doc, updateDoc, arrayUnion, arrayRemove, collection, addDoc, serverTimestamp, getDoc, deleteDoc } from 'firebase/firestore';
-import { auth, db } from '../../../services/firebase.ts';
+import { supabase } from '../../../lib/supabase';
+import { profileService } from '../../profile/services/profileService';
+import { useAuth } from '../../../providers/AuthProvider.tsx';
 import { formatDistanceToNow } from 'date-fns';
 
 interface VideoPostCardProps {
@@ -34,84 +35,72 @@ const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
 export default function VideoPostCard({ video, currentUserData, isActive, onCommentClick }: VideoPostCardProps) {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(video.likes || 0);
+  const [likeCount, setLikeCount] = useState(video.likesCount || 0);
   const [isSaved, setIsSaved] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
-  const isOwner = auth.currentUser?.uid === video.userId;
+  const isOwner = authUser?.uid === video.userId;
 
   useEffect(() => {
-    if (auth.currentUser && video.likedBy) {
-      setIsLiked(video.likedBy.includes(auth.currentUser.uid));
+    if (authUser && Array.isArray(video.likedBy)) {
+      setIsLiked(video.likedBy.includes(authUser.uid));
     }
-    if (currentUserData?.savedVideos) {
+    if (Array.isArray(currentUserData?.savedVideos)) {
       setIsSaved(currentUserData.savedVideos.includes(video.id));
     }
-    if (currentUserData?.following && video.userId) {
+    if (Array.isArray(currentUserData?.following) && video.userId) {
       setIsFollowing(currentUserData.following.includes(video.userId));
     }
-  }, [video, currentUserData]);
+  }, [video, currentUserData, authUser]);
 
   const handleLike = async () => {
-    if (!auth.currentUser) return;
-    const videoRef = doc(db, "tube_videos", video.id);
+    if (!authUser || !supabase) return;
     
     try {
       if (isLiked) {
         setLikeCount(prev => Math.max(0, prev - 1));
         setIsLiked(false);
-        await updateDoc(videoRef, {
-          likes: Math.max(0, (video.likes || 1) - 1),
-          likedBy: arrayRemove(auth.currentUser.uid)
-        });
+        await supabase.from('tube_videos').update({ 
+          likes_count: Math.max(0, (video.likesCount || 1) - 1)
+        } as any).eq('id', video.id);
       } else {
         setLikeCount(prev => prev + 1);
         setIsLiked(true);
-        await updateDoc(videoRef, {
-          likes: (video.likes || 0) + 1,
-          likedBy: arrayUnion(auth.currentUser.uid)
-        });
+        await supabase.from('tube_videos').update({ 
+          likes_count: (video.likesCount || 0) + 1
+        } as any).eq('id', video.id);
 
-        // Add Notification
-        if (video.userId !== auth.currentUser.uid) {
-          await addDoc(collection(db, "notifications"), {
-            userId: video.userId,
-            fromUserId: auth.currentUser.uid,
-            fromUserName: currentUserData?.fullName || 'User',
-            fromUserAvatar: currentUserData?.photoURL || '',
+        if (video.userId !== authUser.uid) {
+          await supabase.from('notifications').insert({
+            user_id: video.userId,
+            from_user_id: authUser.uid,
             type: 'like',
-            postId: video.id, // Reusing postId field for videoId in notifications
-            text: 'liked your video',
-            read: false,
-            createdAt: serverTimestamp()
-          });
+            post_id: video.id,
+            text: 'liked your video'
+          } as any);
         }
       }
     } catch (err) {
       console.error("Error liking video:", err);
-      // Revert UI on error
       setIsLiked(!isLiked);
-      setLikeCount(prev => isLiked ? prev + 1 : Math.max(0, prev - 1));
     }
   };
 
   const handleSave = async () => {
-    if (!auth.currentUser) return;
-    const userRef = doc(db, "users", auth.currentUser.uid);
-    
+    if (!authUser || !supabase) return;
     try {
+      const currentSaved = currentUserData?.savedVideos || [];
+      let newSaved;
       if (isSaved) {
         setIsSaved(false);
-        await updateDoc(userRef, {
-          savedVideos: arrayRemove(video.id)
-        });
+        newSaved = currentSaved.filter((id: string) => id !== video.id);
       } else {
         setIsSaved(true);
-        await updateDoc(userRef, {
-          savedVideos: arrayUnion(video.id)
-        });
+        newSaved = [...currentSaved, video.id];
       }
+      await supabase.from('users').update({ saved_videos: newSaved } as any).eq('id', authUser.uid);
     } catch (err) {
       console.error("Error saving video:", err);
     }
@@ -128,18 +117,15 @@ export default function VideoPostCard({ video, currentUserData, isActive, onComm
 
   const handleFollow = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!auth.currentUser || video.userId === auth.currentUser.uid) return;
-    const myUserRef = doc(db, "users", auth.currentUser.uid);
-    const targetUserRef = doc(db, "users", video.userId);
+    if (!authUser || video.userId === authUser.uid) return;
+
     try {
       if (isFollowing) {
+        await profileService.unfollowUser(authUser.id, video.userId);
         setIsFollowing(false);
-        await updateDoc(myUserRef, { following: arrayRemove(video.userId) });
-        await updateDoc(targetUserRef, { followers: arrayRemove(auth.currentUser.uid) });
       } else {
+        await profileService.followUser(authUser.id, video.userId);
         setIsFollowing(true);
-        await updateDoc(myUserRef, { following: arrayUnion(video.userId) });
-        await updateDoc(targetUserRef, { followers: arrayUnion(auth.currentUser.uid) });
       }
     } catch (err) {
       console.error("Error following user:", err);
@@ -147,8 +133,9 @@ export default function VideoPostCard({ video, currentUserData, isActive, onComm
   };
 
   const extractYoutubeId = (url: string) => {
+    if (!url) return null;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp || '');
+    const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
@@ -258,7 +245,7 @@ export default function VideoPostCard({ video, currentUserData, isActive, onComm
 
         <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-secondary)]">
           <span className="uppercase tracking-tighter">
-            {video.createdAt ? formatDistanceToNow(video.createdAt.toDate(), { addSuffix: true }) : 'just now'}
+            {video.createdAt ? formatDistanceToNow(new Date(video.createdAt), { addSuffix: true }) : 'just now'}
           </span>
         </div>
 

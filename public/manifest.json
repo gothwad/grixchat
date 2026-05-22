@@ -6,10 +6,14 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay"],
   "orientation": "portrait",
   "background_color": "#ffffff",
-  "theme_color": "#ffffff",
-  "categories": ["social", "communication"],
+  "theme_color": "#10b981",
+  "dir": "ltr",
+  "lang": "en-IN",
+  "categories": ["social", "communication", "lifestyle"],
+  "prefer_related_applications": false,
   "shortcuts": [
     {
       "name": "Open Hub",

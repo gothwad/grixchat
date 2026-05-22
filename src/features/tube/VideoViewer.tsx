@@ -8,8 +8,8 @@ import {
   Loader2,
   Play
 } from 'lucide-react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../services/firebase.ts';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 import { formatDistanceToNow } from 'date-fns';
 import { motion } from 'motion/react';
 import LiveChat from './components/LiveChat.tsx';
@@ -30,20 +30,42 @@ interface Video {
 export default function VideoViewer() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [video, setVideo] = useState<Video | null>(null);
+  const { user: authUser } = useAuth();
+  const [video, setVideo] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchVideo = async () => {
-      if (!id) return;
+      if (!id || !supabase) return;
       setLoading(true);
       try {
-        const docRef = doc(db, 'tube_videos', id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setVideo({ id: docSnap.id, ...docSnap.data() } as Video);
+        const { data, error } = await supabase
+          .from('tube_videos')
+          .select(`
+            *,
+            users:user_id(username, photo_url, full_name)
+          `)
+          .eq('id', id)
+          .single();
+
+        if (data) {
+          setVideo({
+            id: data.id,
+            title: data.title,
+            thumbnail: data.thumbnail_url || data.thumbnail,
+            youtubeUrl: data.youtube_url || data.video_url || data.youtubeUrl || '',
+            userName: data.users?.full_name || data.users?.username || 'Unknown',
+            userAvatar: data.users?.photo_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+            views: data.views_count || 0,
+            duration: data.duration || '0:00',
+            createdAt: data.created_at,
+            description: data.description || ''
+          });
+          
+          // Increment view count
+          await supabase.rpc('increment_video_views', { video_id: id });
         } else {
-          console.error("No such video!");
+          console.error("No such video!", error);
           navigate('/tube');
         }
       } catch (err) {
@@ -57,6 +79,7 @@ export default function VideoViewer() {
   }, [id, navigate]);
 
   const extractYoutubeId = (url: string) => {
+    if (!url) return null;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
@@ -155,7 +178,7 @@ export default function VideoViewer() {
             <div className="flex items-center gap-2 mb-2 text-[11px] font-bold text-[var(--text-primary)]">
               <span>{video.views.toLocaleString()} views</span>
               <span className="w-1 h-1 bg-[var(--text-secondary)] rounded-full opacity-30" />
-              <span>{video.createdAt ? formatDistanceToNow(video.createdAt.toDate(), { addSuffix: true }) : 'just now'}</span>
+              <span>{video.createdAt ? formatDistanceToNow(new Date(video.createdAt), { addSuffix: true }) : 'just now'}</span>
             </div>
             <p className="text-[13px] text-[var(--text-secondary)] font-medium leading-relaxed whitespace-pre-wrap">
               {video.description}

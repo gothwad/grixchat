@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
 
@@ -12,55 +11,68 @@ interface CallContextType {
 const CallContext = createContext<CallContextType | undefined>(undefined);
 
 export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
   const navigate = useNavigate();
   const [incomingCall, setIncomingCall] = useState<any>(null);
   const [caller, setCaller] = useState<any>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!authUser || !supabase) return;
 
-    const q = query(
-      collection(db, "calls"),
-      where("receiverId", "==", user.uid),
-      where("status", "==", "ringing")
-    );
+    const fetchIncomingCall = async () => {
+      const { data, error } = await supabase
+        .from('calls')
+        .select('*, users:caller_id(username, photo_url, full_name)')
+        .eq('receiver_id', authUser.id)
+        .eq('status', 'ringing')
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      try {
-        if (!snapshot.empty) {
-          const callData = snapshot.docs[0].data();
-          setIncomingCall({ id: snapshot.docs[0].id, ...callData });
-          
-          try {
-            const userDoc = await getDoc(doc(db, "users", callData.callerId));
-            if (userDoc.exists()) setCaller(userDoc.data());
-          } catch (e) {
-            console.warn('Error fetching caller doc:', e);
-          }
-        } else {
-          setIncomingCall(null);
-          setCaller(null);
-        }
-      } catch (e) {
-        console.error('Call snapshot error:', e);
+      if (!error && data && data.length > 0) {
+        const callData = data[0];
+        setIncomingCall(callData);
+        setCaller({
+          id: callData.caller_id,
+          userName: callData.users?.username,
+          fullName: callData.users?.full_name,
+          photoURL: callData.users?.photo_url
+        });
+      } else {
+        setIncomingCall(null);
+        setCaller(null);
       }
-    }, (err) => console.warn('Call query snapshot error:', err));
+    };
 
-    return () => unsubscribe();
-  }, [user]);
+    fetchIncomingCall();
+
+    const channel = supabase
+      .channel(`calls-for-${authUser.id}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'calls', 
+        filter: `receiver_id=eq.${authUser.id}` 
+      }, () => {
+        fetchIncomingCall();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [authUser]);
 
   const acceptCall = () => {
     if (incomingCall) {
-      navigate(`/call/${incomingCall.callerId}?type=${incomingCall.type}&role=receiver&callId=${incomingCall.id}`);
+      navigate(`/call/${incomingCall.caller_id}?type=${incomingCall.type}&role=receiver&callId=${incomingCall.id}`);
       setIncomingCall(null);
     }
   };
 
   const rejectCall = async () => {
-    if (incomingCall) {
+    if (incomingCall && supabase) {
       try {
-        await updateDoc(doc(db, "calls", incomingCall.id), { status: 'ended' });
+        await supabase.from('calls').update({ status: 'ended' } as any).eq('id', incomingCall.id);
       } catch (e) {
         console.warn('Error rejecting call:', e);
       }

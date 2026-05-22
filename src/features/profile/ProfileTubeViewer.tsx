@@ -1,16 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Loader2, MoreVertical, Play, Edit2, Trash2, X } from 'lucide-react';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  deleteDoc, 
-  doc, 
-  orderBy 
-} from 'firebase/firestore';
-import { auth, db } from '../../services/firebase.ts';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -18,6 +10,7 @@ export default function ProfileTubeViewer() {
   const { id: userId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { user: authUser } = useAuth();
   const searchParams = new URLSearchParams(location.search);
   const startVideoId = searchParams.get('videoId');
   
@@ -27,22 +20,39 @@ export default function ProfileTubeViewer() {
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const videoRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
-  const isOwner = auth.currentUser?.uid === userId;
+  const isOwner = authUser?.id === userId;
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!userId || !supabase) return;
 
     const fetchVideos = async () => {
       setLoading(true);
       try {
-        const q = query(
-          collection(db, "tube_videos"), 
-          where("userId", "==", userId),
-          orderBy("createdAt", "desc")
-        );
+        const { data, error } = await supabase
+          .from('tube_videos')
+          .select(`
+            *,
+            users:user_id(username, photo_url, full_name)
+          `)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
 
-        const snapshot = await getDocs(q);
-        const fetchedVideos = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+        if (error) throw error;
+        
+        const fetchedVideos = (data || []).map((m: any) => ({
+          id: m.id,
+          ...m,
+          title: m.title,
+          thumbnail: m.thumbnail_url || m.thumbnail,
+          youtubeUrl: m.video_url || m.youtubeUrl,
+          userName: m.users?.full_name || m.users?.username || 'User',
+          userAvatar: m.users?.photo_url || '',
+          views: m.views_count || 0,
+          duration: m.duration || '0:00',
+          createdAt: m.created_at,
+          description: m.description || ''
+        }));
+        
         setVideos(fetchedVideos);
       } catch (err) {
         console.error("Error fetching viewer videos:", err);
@@ -103,7 +113,8 @@ export default function ProfileTubeViewer() {
   const handleDelete = async (videoId: string) => {
     if (!window.confirm("Are you sure you want to delete this video?")) return;
     try {
-      await deleteDoc(doc(db, "tube_videos", videoId));
+      const { error } = await supabase.from('tube_videos').delete().eq('id', videoId);
+      if (error) throw error;
       setVideos(prev => prev.filter(v => v.id !== videoId));
       setMenuVideoId(null);
     } catch (err) {
@@ -112,6 +123,7 @@ export default function ProfileTubeViewer() {
   };
 
   const extractYoutubeId = (url: string) => {
+    if (!url) return null;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
@@ -194,7 +206,7 @@ export default function ProfileTubeViewer() {
                         <span className="w-0.5 h-0.5 bg-[var(--text-secondary)] rounded-full" />
                         <span>{video.views || 0} views</span>
                         <span className="w-0.5 h-0.5 bg-[var(--text-secondary)] rounded-full" />
-                        <span>{video.createdAt ? formatDistanceToNow(video.createdAt.toDate(), { addSuffix: true }) : 'just now'}</span>
+                        <span>{video.createdAt ? formatDistanceToNow(new Date(video.createdAt), { addSuffix: true }) : 'just now'}</span>
                       </div>
                     </div>
                     {isOwner && (

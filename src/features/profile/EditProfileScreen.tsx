@@ -5,51 +5,35 @@ import {
   Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { auth, db } from '../../services/firebase.ts';
-import { storage } from '../../services/StorageService';
+import { supabase } from '../../lib/supabase';
 import { ImageService } from '../../services/ImageService';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
 
 export default function EditProfileScreen() {
   const navigate = useNavigate();
+  const { user: authUser, userData: currentAuthUserData, refreshUserData } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [userData, setUserData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Form States
-  const [fullName, setFullName] = useState('');
-  const [username, setUsername] = useState('');
-  const [bio, setBio] = useState('');
-  const [nickname, setNickname] = useState('');
-  const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [photoURL, setPhotoURL] = useState('');
+  const [fullName, setFullName] = useState(currentAuthUserData?.fullName || '');
+  const [username, setUsername] = useState(currentAuthUserData?.username || '');
+  const [bio, setBio] = useState(currentAuthUserData?.bio || 'Available');
+  const [photoURL, setPhotoURL] = useState(currentAuthUserData?.photoURL || '');
 
   const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      if (auth.currentUser) {
-        const docRef = doc(db, "users", auth.currentUser.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setUserData(data);
-          setFullName(data.fullName || '');
-          setUsername(data.username || '');
-          setBio(data.bio || 'Available');
-          setNickname(data.nickname || '');
-          setEmail(data.email || auth.currentUser.email || '');
-          setPhoneNumber(data.phoneNumber || '');
-          setPhotoURL(data.photoURL || DEFAULT_LOGO);
-        }
-      }
-    };
-    fetchUserData();
-  }, []);
+    if (currentAuthUserData) {
+      setFullName(currentAuthUserData.fullName || '');
+      setUsername(currentAuthUserData.username || '');
+      setBio(currentAuthUserData.bio || 'Available');
+      setPhotoURL(currentAuthUserData.photoURL || DEFAULT_LOGO);
+    }
+  }, [currentAuthUserData]);
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,7 +43,7 @@ export default function EditProfileScreen() {
     setError(null);
 
     try {
-      const url = await ImageService.uploadImage(file);
+      const url = await ImageService.uploadImage(file, undefined, 'profiles');
       setPhotoURL(url);
     } catch (err: any) {
       console.error("Image upload failed:", err);
@@ -70,7 +54,7 @@ export default function EditProfileScreen() {
   };
 
   const handleSave = async () => {
-    if (!auth.currentUser || !userData) return;
+    if (!authUser || !supabase) return;
     setLoading(true);
     setError(null);
 
@@ -78,42 +62,31 @@ export default function EditProfileScreen() {
 
     try {
       // Username uniqueness check
-      if (trimmedUsername !== userData.username) {
-        const q = query(collection(db, "users"), where("username", "==", trimmedUsername));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const isTakenByOther = querySnapshot.docs.some(doc => doc.id !== auth.currentUser?.uid);
-          if (isTakenByOther) {
-            throw new Error("This username is already taken. Please try another one.");
-          }
+      if (trimmedUsername !== currentAuthUserData?.username) {
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('username', trimmedUsername)
+          .maybeSingle();
+        
+        if (existingUser && existingUser.id !== authUser.id) {
+          throw new Error("This username is already taken. Please try another one.");
         }
       }
 
-      const userRef = doc(db, "users", auth.currentUser.uid);
-      const updateData = {
-        fullName: fullName.trim(),
-        username: trimmedUsername,
-        bio: bio.trim() || 'Available',
-        nickname: nickname.trim(),
-        email: email.trim(),
-        phoneNumber: phoneNumber.trim(),
-        photoURL: photoURL
-      };
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          full_name: fullName.trim(),
+          username: trimmedUsername,
+          bio: bio.trim() || 'Available',
+          photo_url: photoURL
+        } as any)
+        .eq('id', authUser.id);
 
-      await updateDoc(userRef, updateData);
+      if (updateError) throw updateError;
 
-      // Update local storage cache
-      const cachedData = storage.getItem(`user_data_${auth.currentUser.uid}`);
-      if (cachedData) {
-        try {
-          const parsed = JSON.parse(cachedData);
-          const updatedCache = { ...parsed, ...updateData };
-          storage.setItem(`user_data_${auth.currentUser.uid}`, JSON.stringify(updatedCache));
-        } catch (e) {
-          console.warn('Error updating cached profile data');
-        }
-      }
-
+      await refreshUserData();
       navigate('/profile');
     } catch (err: any) {
       console.error("Error updating profile:", err);
@@ -204,6 +177,14 @@ export default function EditProfileScreen() {
           >
             {uploading ? 'Uploading...' : 'Change profile photo'}
           </button>
+          {photoURL && photoURL !== DEFAULT_LOGO && (
+            <button 
+              onClick={() => setPhotoURL(DEFAULT_LOGO)}
+              className="mt-2 text-xs font-bold text-red-500 active:opacity-70"
+            >
+              Remove profile photo
+            </button>
+          )}
         </div>
 
         <div className="px-8 pb-12 space-y-6">
@@ -218,23 +199,8 @@ export default function EditProfileScreen() {
           {/* Form Fields */}
           <div className="space-y-5">
             {renderField('fullName', 'Name', fullName, setFullName)}
-            {renderField('nickname', 'Nickname', nickname, setNickname)}
             {renderField('username', 'Username', username, setUsername)}
             {renderField('bio', 'Bio', bio, setBio, true)}
-            
-            <div className="pt-4">
-              <h3 className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-4 ml-1">Private Information</h3>
-              <div className="space-y-5">
-                {renderField('email', 'Email Address', email, setEmail, false, 'email')}
-                {renderField('phoneNumber', 'Phone Number', phoneNumber, setPhoneNumber, false, 'tel')}
-              </div>
-            </div>
-          </div>
-
-          {/* Footer Branding */}
-          <div className="pt-12 flex flex-col items-center gap-1 opacity-40">
-            <span className="text-[var(--text-secondary)] text-[10px] font-medium uppercase tracking-widest">Powered by</span>
-            <span className="text-[var(--text-primary)] font-black tracking-[0.3em] uppercase text-[9px]">Gothwad technologies</span>
           </div>
         </div>
       </div>

@@ -26,20 +26,23 @@ export default function SettingHeader({
 
   if (isSearchActive && setSearchTerm) {
     return (
-      <div className="w-full bg-[var(--header-bg)] px-4 h-14 flex items-center z-50 shrink-0 relative border-b border-white/10 shadow-lg rounded-b-2xl">
-        <div className="flex-1 flex items-center bg-white/10 rounded-full px-4 py-1.5 border border-white/5">
-          <Search size={18} className="text-[var(--header-text)] mr-3 opacity-60" />
+      <div className="w-full bg-[var(--header-bg)] px-4 h-14 flex items-center z-50 shrink-0 relative border-b border-[var(--border-color)] shadow-sm rounded-b-2xl">
+        <div className="flex-1 flex items-center bg-[var(--bg-main)] rounded-xl px-4 h-[44px] border border-[var(--border-color)]">
+          <Search size={18} className="text-[var(--text-secondary)] mr-3 opacity-50" />
           <input 
             autoFocus
             type="text" 
             placeholder="Search settings..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 bg-transparent border-none outline-none text-[var(--header-text)] placeholder:text-[var(--header-text)]/50 text-sm font-medium"
+            className="flex-1 bg-transparent border-none outline-none text-[15px] font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50"
           />
           {searchTerm && (
-            <button onClick={() => setSearchTerm('')}>
-              <X size={18} className="text-[var(--header-text)] opacity-60" />
+            <button 
+              onClick={() => setSearchTerm('')}
+              className="p-1 hover:bg-black/5 rounded-full transition-colors"
+            >
+              <X size={16} className="text-[var(--text-secondary)]" />
             </button>
           )}
         </div>
@@ -48,7 +51,7 @@ export default function SettingHeader({
             setIsSearchActive(false);
             setSearchTerm('');
           }}
-          className="ml-4 text-[var(--header-text)] text-sm font-bold uppercase tracking-wider"
+          className="ml-3 text-[var(--primary)] text-[13px] font-black uppercase tracking-widest px-1 py-2 active:scale-95 transition-transform"
         >
           Cancel
         </button>
@@ -57,17 +60,17 @@ export default function SettingHeader({
   }
 
   return (
-    <div className="w-full bg-[var(--header-bg)] px-4 h-14 flex justify-between items-center z-50 shrink-0 relative border-b border-white/10 shadow-lg rounded-b-2xl">
+    <div className="w-full bg-[var(--header-bg)] px-4 h-14 flex justify-between items-center z-50 shrink-0 relative border-b border-[var(--border-color)] shadow-sm rounded-b-2xl">
       <div className="flex items-center gap-3">
         {showBack && (
           <button 
             onClick={onBack || (() => navigate(-1))}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+            className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer"
           >
             <ChevronLeft size={24} className="text-[var(--header-text)]" />
           </button>
         )}
-        <h1 className="text-lg font-black text-[var(--header-text)] tracking-tight uppercase">
+        <h1 className="text-xl font-black text-[var(--header-text)] tracking-tighter">
           {title}
         </h1>
       </div>
@@ -75,9 +78,9 @@ export default function SettingHeader({
         {showSearch && setSearchTerm && (
           <button 
             onClick={() => setIsSearchActive(true)}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            className="p-2 hover:bg-black/5 rounded-full transition-colors"
           >
-            <Search size={22} />
+            <Search size={22} className="group-active:scale-110 transition-transform" />
           </button>
         )}
         {rightElement}

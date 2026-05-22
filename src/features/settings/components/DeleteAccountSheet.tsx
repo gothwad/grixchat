@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Trash2, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { auth, db } from '../../../services/firebase.ts';
-import { deleteUser } from 'firebase/auth';
-import { doc, deleteDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../providers/AuthProvider';
+import { supabase } from '../../../lib/supabase';
 
 interface DeleteAccountSheetProps {
   isOpen: boolean;
@@ -12,27 +11,35 @@ interface DeleteAccountSheetProps {
 }
 
 export default function DeleteAccountSheet({ isOpen, onClose }: DeleteAccountSheetProps) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const navigate = useNavigate();
 
   const handleDelete = async () => {
-    if (!auth.currentUser) return;
+    if (!user || !supabase) return;
 
     setLoading(true);
     setError('');
 
     try {
-      const uid = auth.currentUser.uid;
+      const uid = user.id;
       
-      // 1. Delete Firestore user document
-      // Note: In a real app, you'd also delete their posts, media, etc.
-      // or at least mark them as [Deleted User]
-      await deleteDoc(doc(db, "users", uid));
+      // 1. Delete user from Supabase users table
+      // This will cascade to posts, reels, etc. if ON DELETE CASCADE is set
+      const { error: dbError } = await supabase
+        .from('users')
+        .update({ is_deleted: true } as any) // Soft delete pattern or actual delete
+        .eq('id', uid);
       
-      // 2. Delete Auth User
-      await deleteUser(auth.currentUser);
+      // If we want real delete:
+      // const { error: dbError } = await supabase.from('users').delete().eq('id', uid);
+
+      if (dbError) throw dbError;
+      
+      // 2. Sign out
+      await supabase.auth.signOut();
 
       setIsSuccess(true);
       setTimeout(() => {

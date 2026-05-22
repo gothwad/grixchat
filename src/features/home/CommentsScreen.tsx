@@ -1,21 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  collection, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  addDoc, 
-  serverTimestamp, 
-  doc, 
-  getDoc,
-  updateDoc,
-  increment
-} from 'firebase/firestore';
-import { auth, db } from '../../services/firebase.ts';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider';
 import { ArrowLeft, Send, Heart, MoreHorizontal, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toDate } from '../../utils/dateUtils.ts';
+import { formatDistanceToNow } from 'date-fns';
 
 const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
@@ -26,80 +15,132 @@ export default function CommentsScreen() {
   const [post, setPost] = useState<any>(null);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
-  const [currentUserData, setCurrentUserData] = useState<any>(null);
+  const { user: authUser, userData: currentUserData } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!postId || !auth.currentUser) return;
-
-    // Fetch user data
-    const fetchUser = async () => {
-      const uDoc = await getDoc(doc(db, "users", auth.currentUser!.uid));
-      if (uDoc.exists()) setCurrentUserData(uDoc.data());
-    };
-    fetchUser();
+    if (!postId || !authUser || !supabase) return;
 
     // Fetch post details
     const fetchPost = async () => {
-      const pDoc = await getDoc(doc(db, "posts", postId));
-      if (pDoc.exists()) setPost({ id: pDoc.id, ...pDoc.data() });
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          users:user_id(username, photo_url, full_name)
+        `)
+        .eq('id', postId)
+        .single();
+      
+      if (data) {
+        setPost({
+          id: data.id,
+          ...data,
+          userName: data.users?.full_name || data.users?.username || 'User',
+          userAvatar: data.users?.photo_url || DEFAULT_LOGO,
+          userId: data.user_id
+        });
+      }
     };
     fetchPost();
 
     // Fetch comments
-    const q = query(
-      collection(db, "posts", postId, "comments"),
-      orderBy("createdAt", "asc")
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setComments(list);
+    const fetchComments = async () => {
+      const { data, error } = await supabase
+        .from('comments')
+        .select(`
+          *,
+          users:user_id(username, photo_url, full_name)
+        `)
+        .eq('post_id', postId)
+        .order('created_at', { ascending: true });
+      
+      if (data) {
+        setComments(data.map(c => ({
+          ...c,
+          userName: c.users?.full_name || c.users?.username || 'User',
+          userAvatar: c.users?.photo_url || DEFAULT_LOGO
+        })));
+      }
       setLoading(false);
-    });
+    };
+    fetchComments();
 
-    return () => unsubscribe();
-  }, [postId]);
+    // Subscribe to new comments
+    const channel = supabase
+      .channel(`comments:${postId}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'comments', 
+        filter: `post_id=eq.${postId}` 
+      }, async (payload) => {
+        // Fetch user data for the new comment
+        const { data: userData } = await supabase
+          .from('users')
+          .select('full_name, username, photo_url')
+          .eq('id', payload.new.user_id)
+          .single();
+        
+        const newC = {
+          ...payload.new,
+          userName: userData?.full_name || userData?.username || 'User',
+          userAvatar: userData?.photo_url || DEFAULT_LOGO
+        };
+        setComments(prev => [...prev, newC]);
+        setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [postId, authUser?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !postId || !auth.currentUser) return;
+    if (!newComment.trim() || !postId || !authUser || !supabase) return;
 
     const commentText = newComment.trim();
     setNewComment('');
 
     try {
-      const commentRef = collection(db, "posts", postId, "comments");
-      await addDoc(commentRef, {
-        postId,
-        userId: auth.currentUser.uid,
-        userName: currentUserData?.fullName || 'User',
-        userAvatar: currentUserData?.photoURL || '',
-        text: commentText,
-        createdAt: serverTimestamp()
-      });
+      // 1. Add comment
+      const { data: newC, error } = await supabase
+        .from('comments')
+        .insert({
+          post_id: postId,
+          user_id: authUser.id,
+          text: commentText
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
 
-      // Update post comment count
-      await updateDoc(doc(db, "posts", postId), {
-        comments: increment(1)
-      });
+      // 2. Update post comment count (increment handled by database trigger or manual update)
+      // For now manual update as we don't have triggers set up in supabase_schema.sql for it
+      const { error: updateError } = await (supabase as any).rpc('increment_comments_count', { row_id: postId });
+      // If RPC fails (not defined), try manual update
+      if (updateError) {
+        await supabase
+          .from('posts')
+          .update({ comments_count: (post?.comments_count || 0) + 1 } as any)
+          .eq('id', postId);
+      }
 
-      // Add Notification for post owner
-      if (post && post.userId !== auth.currentUser.uid) {
-        await addDoc(collection(db, "notifications"), {
-          userId: post.userId,
-          fromUserId: auth.currentUser.uid,
-          fromUserName: currentUserData?.fullName || 'User',
-          fromUserAvatar: currentUserData?.photoURL || '',
+      // 3. Add Notification for post owner
+      if (post && post.user_id !== authUser.id) {
+        await supabase.from('notifications').insert({
+          user_id: post.user_id,
+          from_user_id: authUser.id,
           type: 'comment',
-          postId,
+          post_id: postId,
           text: `commented: ${commentText}`,
-          read: false,
-          createdAt: serverTimestamp()
+          is_read: false
         });
       }
 
-      scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
     } catch (err) {
       console.error("Error adding comment:", err);
     }
@@ -127,7 +168,7 @@ export default function CommentsScreen() {
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold">{post.userName}</span>
                 <span className="text-[10px] text-[var(--text-secondary)] font-medium">
-                  {post.createdAt ? toDate(post.createdAt)?.toLocaleDateString() : 'Now'}
+                  {post.created_at ? formatDistanceToNow(new Date(post.created_at), { addSuffix: true }) : 'Now'}
                 </span>
               </div>
               <p className="text-sm leading-relaxed">{post.caption}</p>
@@ -158,7 +199,7 @@ export default function CommentsScreen() {
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold">{comment.userName}</span>
                       <span className="text-[10px] text-[var(--text-secondary)] font-bold">
-                        {comment.createdAt ? toDate(comment.createdAt)?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'}
+                        {comment.created_at ? formatDistanceToNow(new Date(comment.created_at), { addSuffix: true }) : '...'}
                       </span>
                     </div>
                     <button className="opacity-0 group-hover:opacity-100 text-[var(--text-secondary)] p-1">

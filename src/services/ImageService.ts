@@ -3,86 +3,36 @@
  * This is used as an alternative to Firebase Storage.
  */
 
-const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
+import { SupabaseStorageService } from './SupabaseStorageService';
 
 export class ImageService {
   /**
-   * Uploads an image file to ImgBB and returns the direct display URL.
+   * Uploads an image file to Supabase Storage and returns the public URL.
    * @param file The image file to upload.
-   * @param onProgress Callback for upload progress (simulated as ImgBB doesn't provide native progress for fetch).
-   * @returns The direct URL of the uploaded image.
+   * @param onProgress Callback for upload progress.
+   * @returns The public URL of the uploaded image.
    */
   static async uploadImage(
     file: File, 
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    bucket: string = 'chat-media'
   ): Promise<string> {
-    if (!IMGBB_API_KEY) {
-      console.warn("ImgBB API Key missing in environment (VITE_IMGBB_API_KEY)");
-      // Only try proxy if we're sure there's a backend, otherwise fail early with clean message
-      if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-         // Maybe localhost has a proxy? Usually not in this SPA template unless explicitly added
-      }
-      throw new Error("Image upload requires a VITE_IMGBB_API_KEY. Please add it to your environment variables in Settings.");
-    }
-
-    // Simulate progress since fetch doesn't provide it easily for small uploads
-    if (onProgress) {
-      onProgress(10);
-      setTimeout(() => onProgress(40), 200);
-      setTimeout(() => onProgress(70), 500);
-    }
-
-    const formData = new FormData();
-    formData.append('image', file);
-
     try {
-      const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || "Failed to upload image to ImgBB");
-      }
-
-      const data = await response.json();
-      
-      if (!data.data?.url) {
-        throw new Error("ImgBB upload successful but no URL returned");
-      }
-
+      if (onProgress) onProgress(20);
+      const url = await SupabaseStorageService.uploadImage(file, onProgress, bucket);
       if (onProgress) onProgress(100);
-      
-      // Return the direct display URL
-      return data.data.url;
+      return url;
     } catch (error) {
-      console.error("ImgBB Upload Error:", error);
+      console.error("Supabase Image Upload Error:", error);
       throw error;
     }
   }
 
   /**
-   * Fallback to server proxy for image upload
+   * Fallback to server proxy for image upload (still kept but redirects to Supabase conceptually)
    */
-  static async uploadViaProxy(file: File, onProgress?: (progress: number) => void): Promise<string> {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    if (onProgress) onProgress(30);
-    
-    const response = await fetch('/api/upload-file', {
-      method: 'POST',
-      body: formData,
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.message || 'Image upload failed');
-    }
-
-    if (onProgress) onProgress(100);
-    return data.downloadUrl;
+  static async uploadViaProxy(file: File, onProgress?: (progress: number) => void, bucket: string = 'chat-media'): Promise<string> {
+    return this.uploadImage(file, onProgress, bucket);
   }
 
   /**

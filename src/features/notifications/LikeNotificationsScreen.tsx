@@ -1,61 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, onSnapshot, doc, writeBatch } from 'firebase/firestore';
-import { auth, db } from '../../services/firebase.ts';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { Heart, MessageSquare, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { toDate } from '../../utils/dateUtils.ts';
 
 const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
 export default function LikeNotificationsScreen() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user: authUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!authUser || !supabase) return;
 
-    // Use a simpler query that doesn't require composite index
-    const q = query(
-      collection(db, "notifications"),
-      where("userId", "==", auth.currentUser.uid)
-    );
+    const fetchNotifications = async () => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*, from_user:from_user_id(username, full_name, photo_url)')
+        .eq('user_id', authUser.id)
+        .in('type', ['like', 'comment'])
+        .order('created_at', { ascending: false });
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      // Filter for like/comment notifications client-side and sort
-      const list = snapshot.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter((notif: any) => ["like", "comment"].includes(notif.type))
-        .sort((a: any, b: any) => {
-          const timeA = a.createdAt?.seconds || (a.createdAt?.toMillis ? a.createdAt.toMillis() / 1000 : 0);
-          const timeB = b.createdAt?.seconds || (b.createdAt?.toMillis ? b.createdAt.toMillis() / 1000 : 0);
-          return timeB - timeA;
-        });
-      
-      setNotifications(list);
-      setLoading(false);
+      if (!error && data) {
+        setNotifications(data.map(n => ({
+          ...n,
+          fromUserId: n.from_user_id,
+          fromUserName: n.from_user?.username || n.from_user?.full_name || 'User',
+          fromUserAvatar: n.from_user?.photo_url,
+          createdAt: n.created_at,
+          read: n.is_read,
+          postId: n.post_id
+        })));
 
-      // Mark all as read (for the specific types we care about here)
-      const unread = snapshot.docs.filter(d => {
-        const data = d.data();
-        return data.read === false && ["like", "comment"].includes(data.type);
-      });
-
-      if (unread.length > 0) {
-        const batch = writeBatch(db);
-        unread.forEach(d => {
-          batch.update(doc(db, "notifications", d.id), { read: true });
-        });
-        batch.commit().catch(err => console.error("Error marking as read:", err));
+        // Mark as read
+        const unreadIds = data.filter(n => !n.is_read).map(n => n.id);
+        if (unreadIds.length > 0) {
+          await supabase
+            .from('notifications')
+            .update({ is_read: true } as any)
+            .in('id', unreadIds);
+        }
       }
-    }, (error) => {
-      console.error("Firestore Like Notifications Error:", error);
       setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, []);
+    fetchNotifications();
+
+    const channel = supabase
+      .channel(`like-notifications-${authUser.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${authUser.id}`
+      }, () => {
+        fetchNotifications();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [authUser]);
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-main)] font-sans">
@@ -99,7 +108,7 @@ export default function LikeNotificationsScreen() {
                     <span className="font-medium text-[var(--text-secondary)]">{notif.text}</span>
                   </p>
                   <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase mt-1 tracking-tight">
-                    {notif.createdAt ? toDate(notif.createdAt)?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
+                    {notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
                   </p>
                 </div>
               </motion.div>

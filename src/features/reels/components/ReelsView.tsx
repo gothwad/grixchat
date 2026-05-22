@@ -1,30 +1,52 @@
 import React, { useEffect, useState } from 'react';
 import { Play, Heart, MessageCircle, Share2, Music, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { db } from '../../../services/firebase';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { supabase } from '../../../lib/supabase';
+import { LocalDataCache } from '../../../services/LocalDataCache';
 
 export default function ReelsView() {
   const navigate = useNavigate();
-  const [reels, setReels] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [reels, setReels] = useState<any[]>(() => {
+    return LocalDataCache.getReelsFeed() || [];
+  });
+  const [loading, setLoading] = useState(() => {
+    const cached = LocalDataCache.getReelsFeed();
+    return !cached || cached.length === 0;
+  });
 
   useEffect(() => {
-    const q = query(collection(db, 'reels'), orderBy('createdAt', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const reelsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setReels(reelsData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching reels:", error);
-      setLoading(false);
-    });
+    if (!supabase) return;
 
-    return () => unsubscribe();
+    const fetchReels = async () => {
+      const { data, error } = await supabase
+        .from('reels')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (!error && data) {
+        const mapped = data.map(r => ({
+          ...r,
+          cover: r.cover_url,
+          likes: r.likes_count
+        }));
+        LocalDataCache.saveReelsFeed(mapped);
+        setReels(mapped);
+      }
+      setLoading(false);
+    };
+
+    fetchReels();
+
+    const channel = supabase
+      .channel('reels-view')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reels' }, () => {
+        fetchReels();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   if (loading) {

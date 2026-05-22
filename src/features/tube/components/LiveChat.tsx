@@ -7,16 +7,8 @@ import {
   Loader2,
   X
 } from 'lucide-react';
-import { 
-  collection, 
-  query, 
-  orderBy, 
-  limit, 
-  onSnapshot, 
-  addDoc, 
-  serverTimestamp 
-} from 'firebase/firestore';
-import { auth, db } from '../../../services/firebase.ts';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../providers/AuthProvider';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface LiveChatProps {
@@ -33,6 +25,7 @@ interface Message {
 }
 
 export default function LiveChat({ videoId }: LiveChatProps) {
+  const { user: authUser } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -40,27 +33,50 @@ export default function LiveChat({ videoId }: LiveChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!videoId) return;
+    if (!videoId || !supabase) return;
 
-    setLoading(true);
-    const q = query(
-      collection(db, 'tube_videos', videoId, 'live_chat'),
-      orderBy('createdAt', 'desc'),
-      limit(50)
-    );
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from('tube_live_chat')
+        .select(`
+          *,
+          users:user_id(username, photo_url, full_name)
+        `)
+        .eq('video_id', videoId)
+        .order('created_at', { ascending: false })
+        .limit(50);
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Message[];
-      
-      // We reverse because we fetch 'desc' but want to show them in 'asc' order (bottom is newest)
-      setMessages(msgs.reverse());
+      if (!error && data) {
+        const msgs = data.map((m: any) => ({
+          id: m.id,
+          userId: m.user_id,
+          userName: m.users?.full_name || m.users?.username || 'Anonymous',
+          userAvatar: m.users?.photo_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+          text: m.text,
+          createdAt: m.created_at
+        }));
+        setMessages(msgs.reverse());
+      }
       setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    fetchMessages();
+
+    const channel = supabase
+      .channel(`live-chat-${videoId}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'tube_live_chat', 
+        filter: `video_id=eq.${videoId}` 
+      }, () => {
+        fetchMessages();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
   }, [videoId]);
 
   useEffect(() => {
@@ -71,18 +87,17 @@ export default function LiveChat({ videoId }: LiveChatProps) {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !auth.currentUser || sending) return;
+    if (!newMessage.trim() || !authUser || !supabase || sending) return;
 
-    const user = auth.currentUser;
     setSending(true);
     try {
-      await addDoc(collection(db, 'tube_videos', videoId, 'live_chat'), {
-        userId: user.uid,
-        userName: user.displayName || 'Anonymous',
-        userAvatar: user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
-        text: newMessage.trim(),
-        createdAt: serverTimestamp()
-      });
+      const { error } = await supabase.from('tube_live_chat').insert({
+        video_id: videoId,
+        user_id: authUser.id,
+        text: newMessage.trim()
+      } as any);
+
+      if (error) throw error;
       setNewMessage('');
     } catch (err) {
       console.error("Error sending live message:", err);

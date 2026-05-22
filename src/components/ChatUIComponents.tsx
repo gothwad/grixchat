@@ -192,7 +192,7 @@ export const ChatMessageMenu: React.FC<{
   currentUserUid: string | undefined;
   setShowReactionPicker: (msg: any) => void;
 }> = ({ activeMessageMenu, setActiveMessageMenu, setReplyingTo, startEdit, deleteMessage, currentUserUid, setShowReactionPicker }) => {
-  const isMe = activeMessageMenu?.senderId === currentUserUid;
+  const isMe = activeMessageMenu?.sender_id === currentUserUid;
 
   return (
     <AnimatePresence>
@@ -253,8 +253,8 @@ export const ChatMessageMenu: React.FC<{
               )}
               <button 
                 onClick={() => {
-                  if (activeMessageMenu.text) {
-                    navigator.clipboard.writeText(activeMessageMenu.text);
+                  if (activeMessageMenu.content) {
+                    navigator.clipboard.writeText(activeMessageMenu.content);
                   }
                   setActiveMessageMenu(null);
                 }} 
@@ -293,9 +293,9 @@ export const ChatReplyPreview: React.FC<{
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-black text-white uppercase tracking-widest opacity-80">
-            Replying to {replyingTo.senderId === currentUserUid ? 'yourself' : receiver?.fullName}
+            Replying to {replyingTo.sender_id === currentUserUid ? 'yourself' : receiver?.fullName}
           </p>
-          <p className="text-[13px] text-white/70 font-medium truncate italic">"{replyingTo.text}"</p>
+          <p className="text-[13px] text-white/70 font-medium truncate italic">"{replyingTo.content || replyingTo.text}"</p>
         </div>
       </div>
       <button 
@@ -322,7 +322,7 @@ export const ChatEditPreview: React.FC<{
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-black text-white uppercase tracking-widest opacity-80">Editing Message</p>
-          <p className="text-[13px] text-white/70 font-medium truncate italic">"{editingMessage.text}"</p>
+          <p className="text-[13px] text-white/70 font-medium truncate italic">"{editingMessage.content || editingMessage.text}"</p>
         </div>
       </div>
       <button 

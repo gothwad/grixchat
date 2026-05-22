@@ -43,10 +43,10 @@ export default function ProfileContent({ posts, activeTab, userId }: ProfileCont
                 onClick={() => handlePostClick(post)}
               >
                 <img 
-                  src={post.url || post.imageUrl} 
+                  src={post.imageUrl || post.url} 
                   className="w-full h-full object-cover transition-transform duration-500"
                   referrerPolicy="no-referrer"
-                  alt={`Post ${post.id}`}
+                  alt={`Post by ${userId || 'user'}`}
                 />
                 {/* Play Icon overlay for Videos */}
                 {(activeTab === 'reels' || activeTab === 'tube') && (

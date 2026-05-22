@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, onSnapshot, getDoc, doc } from 'firebase/firestore';
-import { db } from '../../../services/firebase';
+import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../providers/AuthProvider';
-import { CacheService } from '../../../services/CacheService';
 
 export const useChatRooms = () => {
   const { user } = useAuth();
@@ -10,51 +8,90 @@ export const useChatRooms = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !supabase) return;
 
-    const q = query(
-      collection(db, "chats"),
-      where("participants", "array-contains", user.uid)
-    );
+    const fetchRooms = async () => {
+      setLoading(true);
+      try {
+        // Fetch conversation IDs the user is part of
+        const { data: participations, error: pError } = await supabase
+          .from('conversation_participants')
+          .select('conversation_id')
+          .eq('user_id', user.id);
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Sort in-memory to avoid index building delays
-      docs.sort((a: any, b: any) => {
-        const timeA = a.lastMessageTime?.seconds || 0;
-        const timeB = b.lastMessageTime?.seconds || 0;
-        return timeB - timeA;
-      });
+        if (pError) throw pError;
 
-      const chatRooms = await Promise.all(docs.map(async (data: any) => {
-        const otherUserId = data.participants.find((id: string) => id !== user.uid);
-        
-        // Try cache first
-        let otherUser: any = CacheService.getUser(otherUserId);
-        if (!otherUser) {
-          const userDoc = await getDoc(doc(db, "users", otherUserId));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            otherUser = { ...userData, uid: otherUserId, timestamp: Date.now() };
-            CacheService.saveUser(otherUserId, userData);
-          } else {
-            otherUser = null;
-          }
+        if (!participations || participations.length === 0) {
+          setRooms([]);
+          setLoading(false);
+          return;
         }
 
-        return {
-          id: data.id,
-          ...data,
-          otherUserId,
-          user: otherUser
-        };
-      }));
-      
-      setRooms(chatRooms);
-      setLoading(false);
-    });
+        const convIds = participations.map(p => p.conversation_id);
 
-    return () => unsubscribe();
+        // Fetch conversations and their participants (other than current user)
+        const { data: convData, error: cError } = await supabase
+          .from('conversations')
+          .select(`
+            *,
+            participants:conversation_participants(
+              user:users(*)
+            )
+          `)
+          .in('id', convIds)
+          .order('last_message_at', { ascending: false });
+
+        if (cError) throw cError;
+
+        const chatRooms = convData.map(conv => {
+          // Flatten participants to find the other user
+          const otherParticipant = conv.participants?.find((p: any) => p.user?.id !== user.id);
+          const otherUser = otherParticipant?.user;
+
+          return {
+            id: conv.id,
+            ...conv,
+            otherUserId: otherUser?.id,
+            user: otherUser ? {
+              uid: otherUser.id,
+              username: otherUser.username,
+              fullName: otherUser.full_name,
+              photoURL: otherUser.photo_url,
+              isOnline: otherUser.is_online,
+              lastSeen: otherUser.last_seen
+            } : null
+          };
+        });
+
+        setRooms(chatRooms);
+      } catch (error) {
+        console.error("Error fetching chat rooms:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRooms();
+
+    // Subscribe to changes in conversations and participants
+    const channel = supabase
+      .channel('chat_rooms_updates')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'conversations' 
+      }, () => fetchRooms())
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'conversation_participants',
+        filter: `user_id=eq.${user.id}`
+      }, () => fetchRooms())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   return { rooms, loading };

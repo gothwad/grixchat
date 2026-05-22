@@ -92,9 +92,12 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
           </p>
           {chat.unread && (
             <div className="min-w-[18px] h-[18px] px-1.5 bg-[var(--primary)] rounded-full flex items-center justify-center shadow-lg shadow-[var(--primary-shadow)]/20 ml-2">
-              <span className="text-[10.5px] text-white font-black leading-none">{chat.unreadCount}</span>
+              <span className="text-[10.5px] text-white font-black leading-none">
+                {chat.unreadCount && chat.unreadCount > 4 ? '4+' : chat.unreadCount}
+              </span>
             </div>
           )}
+
         </div>
       </div>
     </Link>

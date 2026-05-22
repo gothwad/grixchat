@@ -13,22 +13,26 @@ import {
   UserCheck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { db } from '../../services/firebase.ts';
-import { doc, updateDoc } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
 import { motion } from 'motion/react';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 
 export default function PrivacySettingsScreen() {
   const navigate = useNavigate();
-  const { userData, user } = useAuth();
+  const { userData, user, refreshUserData } = useAuth();
 
   const updatePrivacySetting = async (field: string, value: any) => {
-    if (!user) return;
+    if (!user || !supabase) return;
     try {
-      await updateDoc(doc(db, "users", user.uid), {
-        [field]: value
-      });
+      const dbField = field === 'profileType' ? 'profile_type' : field;
+      const { error } = await supabase
+        .from('users')
+        .update({ [dbField]: value } as any)
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      await refreshUserData();
     } catch (error) {
       console.error("Error updating privacy setting:", error);
     }

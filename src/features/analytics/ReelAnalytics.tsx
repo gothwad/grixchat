@@ -4,17 +4,18 @@ import {
   Play, 
   Heart, 
   MessageCircle, 
-  Share2,
-  TrendingUp,
-  Clock
+  Share2, 
+  TrendingUp, 
+  Clock 
 } from 'lucide-react';
-import { auth, db } from '../../services/firebase.ts';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { motion } from 'motion/react';
 
 export default function ReelAnalytics() {
   const [topReels, setTopReels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user: authUser } = useAuth();
   const [summary, setSummary] = useState({
     totalLikes: 0,
     totalComments: 0,
@@ -24,31 +25,39 @@ export default function ReelAnalytics() {
 
   useEffect(() => {
     const fetchReelAnalytics = async () => {
-      if (!auth.currentUser) return;
+      if (!authUser || !supabase) return;
       try {
-        const q = query(
-          collection(db, "reels"), 
-          where("userUid", "==", auth.currentUser.uid),
-          orderBy("likes", "desc"),
-          limit(5)
-        );
-        const snapshot = await getDocs(q);
-        const reels = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setTopReels(reels);
+        const { data: reels, error, count } = await supabase
+          .from('reels')
+          .select('*', { count: 'exact' })
+          .eq('user_id', authUser.id)
+          .order('likes_count', { ascending: false })
+          .limit(5);
 
-        let likes = 0;
-        let comments = 0;
-        reels.forEach((r: any) => {
-          likes += r.likes || 0;
-          comments += r.comments || 0;
-        });
+        if (error) throw error;
 
-        setSummary({
-          totalLikes: likes,
-          totalComments: comments,
-          count: snapshot.size,
-          avgLikes: snapshot.size > 0 ? Math.floor(likes / snapshot.size) : 0
-        });
+        if (reels) {
+          setTopReels(reels.map(r => ({
+            ...r,
+            cover: r.thumbnail_url,
+            likes: r.likes_count,
+            comments: r.comments_count
+          })));
+
+          let likes = 0;
+          let comments = 0;
+          reels.forEach((r: any) => {
+            likes += r.likes_count || 0;
+            comments += r.comments_count || 0;
+          });
+
+          setSummary({
+            totalLikes: likes,
+            totalComments: comments,
+            count: count || 0,
+            avgLikes: count && count > 0 ? Math.floor(likes / count) : 0
+          });
+        }
       } catch (err) {
         console.error("Error fetching reels analytics:", err);
       } finally {
@@ -57,7 +66,7 @@ export default function ReelAnalytics() {
     };
 
     fetchReelAnalytics();
-  }, []);
+  }, [authUser]);
 
   if (loading) return <div className="p-10 text-center text-xs font-bold animate-pulse">Scanning Reels...</div>;
 
