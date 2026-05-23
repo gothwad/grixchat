@@ -11,7 +11,7 @@ export default function DesktopSidebar() {
   const navItems = [
     { icon: MessageCircle, path: '/', label: 'Chats' },
     { icon: Compass, path: '/stories', label: 'Stories' },
-    { icon: LayoutGrid, path: '/hub', label: 'Hub' },
+    { icon: LayoutGrid, path: '/tools', label: 'Tools' },
     { icon: Phone, path: '/calls', label: 'Calls' },
     { icon: UserCircle, path: '/profile', label: 'Profile' },
   ];

@@ -1,209 +1,241 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  Grid,
-  Bookmark,
-  UserSquare,
-  Camera,
-  Clapperboard,
-  Upload,
   Pencil,
-  Play
+  AtSign,
+  Info as InfoIcon,
+  ChevronRight,
+  Shield,
+  Bell,
+  Clock,
+  Star,
+  VolumeX,
+  Lock,
+  UserMinus,
+  Smartphone,
+  HelpCircle,
+  LogOut,
+  Check,
+  Copy
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'motion/react';
-
 import { useAuth } from '../../providers/AuthProvider';
+import { authService } from '../auth/services/authService.ts';
 
 export default function ProfileTab() {
   const { user: authUser, userData: authUserData } = useAuth();
-  const [posts, setPosts] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'posts' | 'reels' | 'tube' | 'saved'>('posts');
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  
   const navigate = useNavigate();
 
   const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
   const userData = authUserData;
 
-  // Fetch posts based on active tab
-  useEffect(() => {
-    if (!authUser || !supabase) return;
+  // Use a highly reliable profile image finder
+  const profilePic = userData?.photoURL || (userData as any)?.photo_url || authUser?.user_metadata?.avatar_url || DEFAULT_LOGO;
 
-    const fetchContent = async () => {
-      try {
-        if (activeTab === 'posts') {
-          const { data } = await supabase.from('posts').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false });
-          setPosts((data || []).map(p => ({
-            ...p,
-            imageUrl: p.media_urls?.[0] || p.imageUrl 
-          })));
-        } else if (activeTab === 'reels') {
-          const { data } = await supabase.from('reels').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false });
-          setPosts((data || []).map(d => ({ ...d, imageUrl: d.cover_url || d.thumbnail_url || d.cover })));
-        } else if (activeTab === 'tube') {
-          const { data } = await supabase.from('tube_videos').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false });
-          setPosts((data || []).map(d => ({ ...d, imageUrl: d.thumbnail_url || d.thumbnail })));
-        } else if (activeTab === 'saved') {
-          if (userData?.saved_posts && userData.saved_posts.length > 0) {
-            const { data } = await supabase.from('posts').select('*').in('id', userData.saved_posts).order('created_at', { ascending: false });
-            setPosts((data || []).map(p => ({
-              ...p,
-              imageUrl: p.media_urls?.[0] || p.imageUrl 
-            })));
-          } else {
-            setPosts([]);
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching tab content:", err);
-        setPosts([]);
-      }
-    };
-    
-    fetchContent();
-  }, [activeTab, userData?.saved_posts, authUser]);
+  const handleCopy = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      navigate('/login');
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  const settingsOptions = [
+    {
+      title: 'Account & Security',
+      items: [
+        { icon: Lock, label: 'Privacy & Security', sub: userData?.isPrivate ? 'Private Account' : 'Public Account', color: 'bg-indigo-500/10 text-indigo-500', onClick: () => navigate('/privacy-settings') },
+        { icon: Shield, label: 'App Lock', sub: 'Enable PIN/Passcode protection', color: 'bg-emerald-500/10 text-emerald-500', onClick: () => navigate('/app-lock') },
+      ]
+    },
+    {
+      title: 'Grix Settings & Sounds',
+      items: [
+        { icon: Bell, label: 'Notifications & Sounds', sub: 'Ringtones, Vibrations & Alerts', color: 'bg-amber-500/10 text-amber-500', onClick: () => navigate('/notifications-settings') },
+        { icon: Smartphone, label: 'Chat Preferences', sub: 'OLED Black, chat wall & cache clean', color: 'bg-purple-500/10 text-purple-500', onClick: () => navigate('/app-preferences') },
+        { icon: Clock, label: 'Usage Stats & Time', sub: 'Daily usage log tracker', color: 'bg-teal-500/10 text-teal-500', onClick: () => navigate('/time-spent') },
+      ]
+    },
+    {
+      title: 'Privacy & Filters',
+      items: [
+        { icon: Star, label: 'Favorites Feed', sub: 'Manage star list curation', color: 'bg-yellow-500/10 text-yellow-500', onClick: () => navigate('/favorites') },
+        { icon: VolumeX, label: 'Muted Accounts', sub: 'Silenced chat channels', color: 'bg-pink-500/10 text-pink-500', onClick: () => navigate('/muted-accounts') },
+        { icon: UserMinus, label: 'Blocked Accounts', sub: 'Banned chat list users', color: 'bg-red-500/10 text-red-500', onClick: () => navigate('/blocked-accounts') },
+      ]
+    },
+    {
+      title: 'Help & Info',
+      items: [
+        { icon: HelpCircle, label: 'GrixChat FAQ & Support', sub: 'Knowledgebase and system status', color: 'bg-cyan-500/10 text-cyan-500', onClick: () => navigate('/help') },
+        { icon: InfoIcon, label: 'About App', sub: 'GrixChat V 1.0.0 Stable Build', color: 'bg-sky-500/10 text-sky-500', onClick: () => navigate('/app-info') },
+      ]
+    }
+  ];
 
   return (
-    <div className="flex flex-col bg-[var(--bg-main)] font-sans h-full overflow-y-auto no-scrollbar">
-      <div className="flex-1 pb-24">
-        {/* Profile Header */}
-        <div className="px-4 pt-6 pb-4">
-          <div className="flex items-center gap-6 mb-6">
-            {/* Profile Picture */}
-            <div className="relative shrink-0">
-              <div className="w-20 h-20 rounded-full p-0.5 bg-[var(--primary)]">
-                <div className="w-full h-full rounded-full border-2 border-[var(--bg-main)] overflow-hidden bg-zinc-100">
-                  <img 
-                    src={userData?.photoURL || DEFAULT_LOGO} 
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                    alt="Profile"
-                  />
+    <div className="flex flex-col bg-[var(--bg-main)] font-sans h-full overflow-y-auto no-scrollbar pb-24 animate-fade-in">
+      {/* Beautiful Dynamic Profile Header Section (Unified Mobile Card style) */}
+      <div className="px-4 pt-4 mb-4">
+        <div 
+          onClick={() => navigate('/edit-profile')}
+          className="relative bg-[var(--bg-card)] text-[var(--text-primary)] py-4 px-5 border border-[var(--border-color)]/50 rounded-2xl shadow-sm overflow-hidden shrink-0 cursor-pointer hover:bg-[var(--bg-card)]/90 transition-colors"
+        >
+          {/* Soft elegant ambient flares that work on both light and dark OLED themes */}
+          <div className="absolute top-0 right-0 w-44 h-44 bg-indigo-500/5 rounded-full blur-[40px] pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-36 h-36 bg-rose-500/5 rounded-full blur-[30px] pointer-events-none" />
+
+          <div className="relative flex flex-col gap-3">
+            {/* Top Row: Avatar on Left, Name and Username on Right */}
+            <div className="flex items-center gap-4">
+              {/* Solid Avatar Wrapper with Edit Pencil icon overlay */}
+              <div className="relative group shrink-0">
+                <div className="w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-tr from-indigo-500 via-sky-400 to-rose-400 shadow-md transition-transform duration-200 group-hover:scale-[1.03] flex items-center justify-center shrink-0 aspect-square">
+                  <div className="w-full h-full rounded-full border-2 border-[var(--bg-card)] overflow-hidden bg-[var(--bg-main)] flex items-center justify-center shrink-0">
+                    <img 
+                      src={profilePic || DEFAULT_LOGO} 
+                      className="w-full h-full rounded-full object-cover shrink-0"
+                      referrerPolicy="no-referrer"
+                      alt="Profile Avatar"
+                    />
+                  </div>
                 </div>
+                {/* Pencil Edit Icon replacing online dot */}
+                <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-md border-2 border-[var(--bg-card)]">
+                  <Pencil size={11} strokeWidth={2.5} />
+                </span>
               </div>
-              <button 
-                onClick={() => navigate('/edit-profile')}
-                className="absolute bottom-0 right-0 w-6 h-6 bg-[var(--primary)] text-white rounded-full border-2 border-[var(--bg-main)] flex items-center justify-center shadow-sm"
-              >
-                <Pencil size={12} />
-              </button>
+
+              {/* Name & Username Column */}
+              <div className="flex flex-col min-w-0">
+                <h2 className="text-base font-extrabold tracking-tight text-[var(--text-primary)] leading-tight truncate">
+                  {userData?.fullName || 'GrixChat User'}
+                </h2>
+                <span className="text-[11px] text-[var(--text-secondary)] font-mono tracking-wide mt-1 select-none">
+                  @{userData?.username || 'user'}
+                </span>
+              </div>
             </div>
 
-            {/* Bio Box (Fixed height to match profile pic 80px) */}
-            <div className="flex-1 bg-[var(--box-bg)] rounded-xl p-3 flex flex-col justify-center h-20 overflow-hidden">
-              <p className="text-[12px] leading-tight text-[var(--box-text)] font-medium line-clamp-3">
-                {userData?.bio || 'Available'}
+            {/* Bottom column: Bio section */}
+            <div className="pt-3 border-t border-[var(--border-color)]/30">
+              <span className="text-[9px] font-black text-[var(--text-secondary)] uppercase tracking-wider block mb-0.5 font-mono">
+                Bio & status
+              </span>
+              <p className="text-xs text-[var(--text-primary)] leading-relaxed break-words whitespace-pre-line">
+                {userData?.bio || 'Tap to describe yourself & write a custom bio.'}
               </p>
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Grid Layout */}
-          <div className="grid grid-cols-2 gap-2 mb-6">
-            {/* Name & Username Box */}
-            <div className="bg-[var(--box-bg)] p-3 rounded-xl text-[var(--box-text)] flex flex-col justify-center min-h-[60px] col-span-2">
-              <h2 className="text-[14px] font-bold leading-tight truncate">
-                {userData?.fullName || 'GrixChat User'}
-              </h2>
-              <p className="text-[12px] opacity-80 truncate">
+      {/* Account Quick-Info Block (Telegram Account section style) */}
+      <div className="px-4 mb-4">
+        <h3 className="px-2 mb-2 text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em]">
+          Account info
+        </h3>
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)]/50 divide-y divide-[var(--border-color)]/30 overflow-hidden shadow-sm">
+          {/* Username item */}
+          <div 
+            onClick={() => handleCopy(`@${userData?.username || 'username'}`, 'username')}
+            className="flex items-center gap-4 px-5 py-3.5 hover:bg-[var(--bg-main)]/35 active:bg-[var(--bg-main)]/50 transition-colors cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center shrink-0">
+              <AtSign size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[14px] font-semibold text-[var(--text-primary)] font-mono">
                 @{userData?.username || 'username'}
-              </p>
+              </div>
+              <div className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-medium">Username</div>
             </div>
-
-            {/* Followers Box */}
-            <button 
-              onClick={() => navigate(`/user/${authUser?.id}/followers`)}
-              className="bg-[var(--box-bg)] p-3 rounded-xl text-[var(--box-text)] flex flex-col items-center justify-center min-h-[60px] active:scale-[0.98] transition-all"
-            >
-              <span className="text-sm font-bold">{userData?.followers?.length || 0}</span>
-              <span className="text-[10px] opacity-80 uppercase font-bold tracking-wider">Followers</span>
-            </button>
-
-            {/* Following Box */}
-            <button 
-              onClick={() => navigate(`/user/${authUser?.id}/following`)}
-              className="bg-[var(--box-bg)] p-3 rounded-xl text-[var(--box-text)] flex flex-col items-center justify-center min-h-[60px] active:scale-[0.98] transition-all"
-            >
-              <span className="text-sm font-bold">{userData?.following?.length || 0}</span>
-              <span className="text-[10px] opacity-80 uppercase font-bold tracking-wider">Following</span>
-            </button>
+            <div className="opacity-0 group-hover:opacity-40 transition-opacity">
+              {copiedField === 'username' ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
+            </div>
           </div>
 
-          {/* Tabs Strip */}
-          <div className="flex bg-[var(--box-bg)] rounded-xl mb-4 overflow-hidden h-[46px] items-stretch">
+          {/* Biography item */}
+          <div 
+            onClick={() => navigate('/edit-profile')}
+            className="flex items-center gap-4 px-5 py-3.5 hover:bg-[var(--bg-main)]/35 active:bg-[var(--bg-main)]/50 transition-colors cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+              <InfoIcon size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[14px] font-medium text-[var(--text-primary)] leading-normal break-words whitespace-pre-line">
+                {userData?.bio || 'No bio described yet. Tap to set up a short description.'}
+              </div>
+              <div className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-medium">Bio & current status</div>
+            </div>
+            <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-20 group-hover:opacity-45 transition-opacity" />
+          </div>
+        </div>
+      </div>
+
+      {/* Settings list dynamically displayed directly */}
+      <div className="px-4 space-y-6">
+        {settingsOptions.map((section) => (
+          <div key={section.title} className="space-y-2">
+            <h3 className="px-2 text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em]">
+              {section.title}
+            </h3>
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl divide-y divide-[var(--border-color)]/30 overflow-hidden shadow-sm">
+              {section.items.map((item) => (
+                <button 
+                  key={item.label}
+                  onClick={item.onClick}
+                  className="w-full flex items-center gap-4 px-5 py-4 hover:bg-[var(--bg-main)]/35 active:bg-[var(--bg-main)]/50 transition-colors group text-left cursor-pointer"
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.color} group-active:scale-95 transition-transform shrink-0`}>
+                    <item.icon size={18} strokeWidth={2.2} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-[13.5px] font-bold text-[var(--text-primary)] tracking-wide">{item.label}</h4>
+                    {item.sub && <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate font-medium">{item.sub}</p>}
+                  </div>
+                  <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-40 transition-opacity" />
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {/* Telegram Styled Authentication Section */}
+        <div className="space-y-2">
+          <h3 className="px-2 text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em]">
+            Session
+          </h3>
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl overflow-hidden shadow-sm">
             <button 
-              onClick={() => setActiveTab('posts')}
-              className={`flex-1 flex justify-center items-center transition-colors ${activeTab === 'posts' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
-              title="Posts"
+              onClick={handleLogout}
+              className="w-full flex items-center gap-4 px-5 py-4 hover:bg-red-500/5 transition-colors text-red-500 font-bold text-sm text-left flex justify-between items-center cursor-pointer group"
             >
-              <Grid size={20} />
-            </button>
-            <button 
-              onClick={() => setActiveTab('reels')}
-              className={`flex-1 flex justify-center items-center transition-colors ${activeTab === 'reels' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
-              title="Reels"
-            >
-              <Clapperboard size={20} />
-            </button>
-            <button 
-              onClick={() => setActiveTab('tube')}
-              className={`flex-1 flex justify-center items-center transition-colors ${activeTab === 'tube' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
-              title="Tube"
-            >
-              <Play size={20} className="fill-current" />
-            </button>
-            <button 
-              onClick={() => setActiveTab('saved')}
-              className={`flex-1 flex justify-center items-center transition-colors ${activeTab === 'saved' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
-              title="Saved"
-            >
-              <Bookmark size={20} />
+              <div className="flex items-center gap-3">
+                <LogOut size={18} />
+                <span>Log out of GrixChat</span>
+              </div>
+              <ChevronRight size={18} className="text-red-500 opacity-20 group-hover:opacity-60 transition-opacity" />
             </button>
           </div>
         </div>
 
-        {/* Posts Grid */}
-        <div className="grid grid-cols-3 gap-0.5">
-          {posts.length > 0 ? (
-            posts.map((post) => (
-              <div 
-                key={post.id} 
-                className={`${activeTab === 'tube' ? 'aspect-video' : 'aspect-square'} bg-zinc-100 relative group overflow-hidden cursor-pointer`}
-                onClick={() => {
-                  if (activeTab === 'posts' || activeTab === 'saved') {
-                    navigate(`/user/${authUser?.id}/posts?postId=${post.id}&tab=${activeTab}`);
-                  } else if (activeTab === 'reels') {
-                    navigate(`/user/${authUser?.id}/reels?reelId=${post.id}`);
-                  } else if (activeTab === 'tube') {
-                    navigate(`/user/${authUser?.id}/tube?videoId=${post.id}`);
-                  }
-                }}
-              >
-                <img 
-                  src={post.imageUrl || `https://picsum.photos/seed/${post.id}/400/400`} 
-                  className="w-full h-full object-cover"
-                  alt="Post"
-                />
-              </div>
-            ))
-          ) : (
-            <div className="col-span-3 py-20 flex flex-col items-center justify-center text-[var(--text-secondary)]">
-              <div className="w-16 h-16 rounded-full border-2 border-[var(--text-secondary)] flex items-center justify-center mb-4">
-                {activeTab === 'posts' && <Camera size={32} />}
-                {activeTab === 'reels' && <Clapperboard size={32} />}
-                {activeTab === 'tube' && <Play size={32} />}
-                {activeTab === 'saved' && <Bookmark size={32} />}
-              </div>
-              <p className="text-sm font-bold uppercase tracking-wider">
-                {activeTab === 'posts' && 'No posts yet'}
-                {activeTab === 'reels' && 'No reels yet'}
-                {activeTab === 'tube' && 'No videos yet'}
-                {activeTab === 'saved' && 'No saved posts'}
-              </p>
-            </div>
-          )}
+        {/* Unified Branding Footer */}
+        <div className="py-8 flex flex-col items-center gap-1 opacity-35 text-center">
+          <span className="text-[var(--text-primary)] font-black tracking-[0.15em] uppercase text-[10px]">GrixChat</span>
+          <span className="text-[var(--text-secondary)] text-[9px] uppercase tracking-wider font-semibold">Made In India</span>
         </div>
       </div>
     </div>
   );
 }
-
-

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MessageCircle, LayoutGrid, UserCircle, Home, Waves } from 'lucide-react';
+import { MessageCircle, LayoutGrid, UserCircle, Home, Waves, Phone, Settings } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
@@ -49,10 +49,10 @@ export default function TabBottom() {
   }, [authUser?.id]);
   
   const navItems = [
-    { icon: Home, path: '/', label: 'Home', activeColor: 'text-[var(--header-text)]' },
-    { icon: Waves, path: '/tube', label: 'Vibe', activeColor: 'text-[var(--header-text)]' },
-    { icon: MessageCircle, path: '/chats', label: 'Chats', badge: unreadCount, activeColor: 'text-[var(--header-text)]' },
-    { icon: LayoutGrid, path: '/hub', label: 'Hub', activeColor: 'text-[var(--header-text)]' },
+    { icon: MessageCircle, path: '/', label: 'Chats', badge: unreadCount, activeColor: 'text-[var(--header-text)]' },
+    { icon: Waves, path: '/vibe', label: 'Vibe', activeColor: 'text-[var(--header-text)]' },
+    { icon: LayoutGrid, path: '/tools', label: 'Tools', activeColor: 'text-[var(--header-text)]' },
+    { icon: Phone, path: '/calls', label: 'Calls', activeColor: 'text-[var(--header-text)]' },
     { icon: UserCircle, path: '/profile', label: 'Profile', activeColor: 'text-[var(--header-text)]' },
   ];
 

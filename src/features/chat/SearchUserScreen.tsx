@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
-import { profileService } from '../profile/services/profileService';
-import { Search, X, ArrowLeft, Loader2, Play, Clapperboard, Users } from 'lucide-react';
+import { Search, X, ArrowLeft, Loader2, Play, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface UserProfile {
@@ -18,16 +17,10 @@ type SearchTab = 'users' | 'videos' | 'reels';
 
 const UserItem = ({ 
   user, 
-  navigate, 
-  isFollowing, 
-  onToggleFollow,
-  followLoading 
+  navigate
 }: { 
   user: UserProfile; 
   navigate: any; 
-  isFollowing: boolean;
-  onToggleFollow: (userId: string, isFollowing: boolean) => void;
-  followLoading: boolean;
 }) => (
   <div 
     onClick={() => navigate(`/user/${user.uid}`)}
@@ -51,22 +44,12 @@ const UserItem = ({
     <button 
       onClick={(e) => {
         e.stopPropagation();
-        onToggleFollow(user.uid, isFollowing);
+        navigate(`/chat/${user.uid}`);
       }}
-      disabled={followLoading}
-      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center justify-center min-w-[80px] ${
-        isFollowing 
-          ? 'bg-[var(--bg-main)] text-[var(--text-primary)] border border-[var(--border-color)]' 
-          : 'bg-[var(--primary)] text-white'
-      }`}
+      className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-550 text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1 min-w-[85px] shadow-sm shrink-0"
     >
-      {followLoading ? (
-        <Loader2 size={14} className="animate-spin" />
-      ) : isFollowing ? (
-        'Following'
-      ) : (
-        'Follow'
-      )}
+      <MessageSquare size={12} strokeWidth={2.5} />
+      <span>Message</span>
     </button>
   </div>
 );
@@ -103,13 +86,12 @@ const ReelGridItem = ({ reel, onClick }: { reel: any, onClick: () => void }) => 
 
 export default function SearchUserScreen() {
   const navigate = useNavigate();
-  const { user: authUser, userData, followingIds, refreshUserData } = useAuth();
+  const { user: authUser, userData } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   
   const [userResults, setUserResults] = useState<UserProfile[]>([]);
   const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
-  const [followLoadingId, setFollowLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchInitialData();
@@ -183,24 +165,6 @@ export default function SearchUserScreen() {
     }
   };
 
-  const handleToggleFollow = async (targetUserId: string, currentlyFollowing: boolean) => {
-    if (!authUser || !supabase || followLoadingId) return;
-    setFollowLoadingId(targetUserId);
-    try {
-      if (currentlyFollowing) {
-        await profileService.unfollowUser(authUser.id, targetUserId);
-      } else {
-        await profileService.followUser(authUser.id, targetUserId);
-      }
-      // Explicitly refresh user data for immediate UI feedback
-      await refreshUserData();
-    } catch (error) { 
-      console.error('Error following:', error); 
-    } finally { 
-      setFollowLoadingId(null); 
-    }
-  };
-
   return (
     <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden font-sans">
       {/* Header (TabHeader style) */}
@@ -260,9 +224,6 @@ export default function SearchUserScreen() {
             {(searchTerm ? userResults : suggestedUsers).map(user => (
               <UserItem 
                 key={user.uid} user={user} navigate={navigate} 
-                isFollowing={followingIds.includes(user.uid)}
-                onToggleFollow={handleToggleFollow}
-                followLoading={followLoadingId === user.uid}
               />
             ))}
             

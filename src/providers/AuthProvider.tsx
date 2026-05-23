@@ -99,38 +99,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const supabaseUser = session?.user ?? null;
-      const currentUser = supabaseUser ? { ...supabaseUser, uid: supabaseUser.id } as CustomUser : null;
-      
-      if (event === 'SIGNED_OUT') {
-        // Explicitly set offline when signing out
-        if (user?.id) {
-          await supabase.from('users')
-            .update({ is_online: false, last_seen: new Date().toISOString() } as any)
-            .eq('id', user.id);
+      try {
+        const supabaseUser = session?.user ?? null;
+        const currentUser = supabaseUser ? { ...supabaseUser, uid: supabaseUser.id } as CustomUser : null;
+        
+        if (event === 'SIGNED_OUT') {
+          // Explicitly set offline when signing out
+          if (user?.id) {
+            supabase.from('users')
+              .update({ is_online: false, last_seen: new Date().toISOString() } as any)
+              .eq('id', user.id)
+              .then(() => {}, (e) => console.warn('Signout offline status update error:', e));
+          }
+          setUserData(null);
+          setUser(null);
+          setLoading(false);
+          setIsAuthReady(true);
+        } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || (event as string) === 'USER_UPDATED') {
+          if (supabaseUser) {
+            supabase.from('users')
+              .update({ is_online: true, last_seen: new Date().toISOString() } as any)
+              .eq('id', supabaseUser.id)
+              .then(() => {}, (e) => console.warn('Signin online status update error:', e));
+          }
+          setUser(currentUser);
+          // If there's no user, we're ready. If there is, the profile effect will handle it.
+          if (!supabaseUser) {
+            setLoading(false);
+            setIsAuthReady(true);
+          }
+        } else {
+          setUser(currentUser);
+          if (!supabaseUser) {
+            setLoading(false);
+            setIsAuthReady(true);
+          }
         }
-        setUserData(null);
-        setUser(null);
+      } catch (err) {
+        console.error('onAuthStateChange execution catch:', err);
         setLoading(false);
         setIsAuthReady(true);
-      } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || (event as string) === 'USER_UPDATED') {
-        if (supabaseUser) {
-          await supabase.from('users')
-            .update({ is_online: true, last_seen: new Date().toISOString() } as any)
-            .eq('id', supabaseUser.id);
-        }
-        setUser(currentUser);
-        // If there's no user, we're ready. If there is, the profile effect will handle it.
-        if (!supabaseUser) {
-          setLoading(false);
-          setIsAuthReady(true);
-        }
-      } else {
-        setUser(currentUser);
-        if (!supabaseUser) {
-          setLoading(false);
-          setIsAuthReady(true);
-        }
       }
     });
 
@@ -306,6 +314,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [user?.id]);
+
+  // 4. Failsafe to guarantee auth ready state and prevent page freeze under slow/blocked connections
+  useEffect(() => {
+    const backupTimer = setTimeout(() => {
+      if (!isAuthReady) {
+        console.warn('Auth system initialization is taking too long. Activating failsafe auth-ready fallback.');
+        setLoading(false);
+        setIsAuthReady(true);
+      }
+    }, 6000);
+    return () => clearTimeout(backupTimer);
+  }, [isAuthReady]);
 
   const authContextValue = React.useMemo(() => ({ 
     user, 

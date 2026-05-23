@@ -33,7 +33,7 @@ app.get("/sitemap.xml", (req, res) => {
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://grixchat.gothwad.workers.dev/</loc><priority>1.0</priority><changefreq>daily</changefreq></url>
-  <url><loc>https://grixchat.gothwad.workers.dev/hub</loc><priority>0.8</priority><changefreq>weekly</changefreq></url>
+  <url><loc>https://grixchat.gothwad.workers.dev/tools</loc><priority>0.8</priority><changefreq>weekly</changefreq></url>
   <url><loc>https://grixchat.gothwad.workers.dev/chats</loc><priority>0.9</priority><changefreq>always</changefreq></url>
   <url><loc>https://grixchat.gothwad.workers.dev/reels</loc><priority>0.8</priority><changefreq>always</changefreq></url>
 </urlset>`);
