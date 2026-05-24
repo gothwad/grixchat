@@ -190,14 +190,14 @@ class LocalDataCacheService {
     }
   }
 
-  // --- Specific Conveniences for Vibe Feeds ---
+  // --- Specific Conveniences for GrixTube Videos ---
 
-  public getVibeVideos(): any[] | null {
-    return this.get<any[]>('gx_vibe_feed', 1000 * 60 * 30); // 30 minutes video feed cache
+  public getTubeVideos(): any[] | null {
+    return this.get<any[]>('gx_tube_feed', 1000 * 60 * 30); // 30 minutes video feed cache
   }
 
-  public saveVibeVideos(videos: any[]): void {
-    this.set('gx_vibe_feed', videos);
+  public saveTubeVideos(videos: any[]): void {
+    this.set('gx_tube_feed', videos);
   }
 
   // --- Specific Conveniences for Home Feed & Stories ---

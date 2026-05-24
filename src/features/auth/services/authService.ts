@@ -32,6 +32,10 @@ export const authService = {
     if (!supabase) throw new Error("Supabase is not initialized");
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
+      options: {
+        skipBrowserRedirect: true,
+        redirectTo: `${window.location.origin}/api/auth/supabase/callback`
+      }
     });
     if (error) throw error;
     return data;
@@ -41,6 +45,10 @@ export const authService = {
     if (!supabase) throw new Error("Supabase is not initialized");
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
+      options: {
+        skipBrowserRedirect: true,
+        redirectTo: `${window.location.origin}/api/auth/supabase/callback`
+      }
     });
     if (error) throw error;
     return data;

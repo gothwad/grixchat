@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  X, 
   User, 
   Archive, 
   ArchiveRestore, 
@@ -58,135 +57,112 @@ export const ChatOptionsSheet: React.FC<ChatOptionsSheetProps> = ({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+          {/* Transparent full-screen outside click catcher, exact like WhatsApp */}
+          <div 
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 z-[9998] backdrop-blur-sm"
+            className="fixed inset-0 z-[9998] bg-black/[0.01] dark:bg-black/[0.1] cursor-default"
           />
 
-          {/* Sheet */}
+          {/* Floating Popup Dropdown aligned to WhatsApp Style */}
           <motion.div 
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ 
-              type: 'spring', 
-              damping: 40, 
-              stiffness: 1200, 
-              mass: 0.2,
-              restDelta: 0.001 
-            }}
-            className="fixed bottom-0 left-0 right-0 bg-[var(--bg-card)] z-[9999] rounded-t-[32px] border-t border-[var(--border-color)] flex flex-col overflow-hidden shadow-2xl safe-bottom max-h-[85vh]"
+            initial={{ opacity: 0, scale: 0.95, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -8 }}
+            transition={{ duration: 0.12, ease: 'easeOut' }}
+            className="fixed top-14 right-3 w-60 bg-[var(--bg-card)] z-[9999] rounded-xl border border-[var(--border-color)] overflow-hidden shadow-xl"
           >
-            {/* Handle */}
-            <div className="w-full flex justify-center py-2 shrink-0">
-              <div className="w-10 h-1 bg-[var(--border-color)] rounded-full opacity-40" />
-            </div>
-
-            {/* Header */}
-            <div className="px-6 py-1 flex items-center justify-between border-b border-[var(--border-color)]/20 shrink-0">
-              <div className="flex items-center gap-3">
-                <img 
-                  src={receiver?.photoURL || `https://cdn-icons-png.flaticon.com/512/149/149071.png`}
-                  className="w-8 h-8 rounded-full object-cover border border-black/5"
-                  referrerPolicy="no-referrer"
-                  alt=""
-                />
-                <h3 className="text-[18px] font-black text-[var(--text-primary)] tracking-tight">Chat Options</h3>
-              </div>
-              <button 
-                onClick={onClose}
-                className="p-2 hover:bg-[var(--bg-main)] rounded-full transition-colors text-[var(--text-secondary)]"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Options List */}
-            <div className="p-2 space-y-1 pb-10 overflow-y-auto no-scrollbar">
+            {/* Options List Container */}
+            <div className="py-1 flex flex-col">
               {children ? children : (
                 <>
                   <button 
                     onClick={() => handleAction(() => receiverId === 'gx-ai' || receiverId === 'grix-ai' ? navigate('/profile/grix-ai') : navigate(`/user/${receiverId}`))} 
-                    className="w-full px-5 py-3.5 text-left text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors text-ellipsis overflow-hidden whitespace-nowrap"
                   >
-                    <div className="w-9 h-9 rounded-full bg-[var(--bg-main)] flex items-center justify-center text-[var(--text-secondary)]">
-                      <User size={20} />
-                    </div>
+                    <User size={15} className="text-[var(--text-secondary)] shrink-0" />
                     <span>View Profile</span>
                   </button>
 
                   <button 
                     onClick={() => handleAction(archiveChat)} 
-                    className="w-full px-5 py-3.5 text-left text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors text-ellipsis overflow-hidden whitespace-nowrap"
                   >
-                    <div className="w-9 h-9 rounded-full bg-[var(--bg-main)] flex items-center justify-center text-[var(--text-secondary)]">
-                      {isArchived ? <ArchiveRestore size={20} /> : <Archive size={20} />}
-                    </div>
-                    <span>{isArchived ? 'Unarchive Chat' : 'Archive Chat'}</span>
+                    {isArchived ? (
+                      <>
+                        <ArchiveRestore size={15} className="text-[var(--text-secondary)] shrink-0" />
+                        <span>Unarchive Chat</span>
+                      </>
+                    ) : (
+                      <>
+                        <Archive size={15} className="text-[var(--text-secondary)] shrink-0" />
+                        <span>Archive Chat</span>
+                      </>
+                    )}
                   </button>
 
                   <button 
                     onClick={() => handleAction(onWatchTogether)}
-                    className="w-full px-5 py-3.5 text-left text-sm font-bold text-blue-500 hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-blue-500 hover:bg-blue-500/5 flex items-center gap-3 transition-colors text-ellipsis overflow-hidden whitespace-nowrap"
                   >
-                    <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
-                      <Play size={20} fill="currentColor" />
-                    </div>
+                    <Play size={15} className="fill-current text-blue-500 shrink-0" />
                     <span>Watch Together</span>
                   </button>
 
                   <button 
                     onClick={() => handleAction(hideChat)} 
-                    className="w-full px-5 py-3.5 text-left text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors text-ellipsis overflow-hidden whitespace-nowrap"
                   >
-                    <div className="w-9 h-9 rounded-full bg-[var(--bg-main)] flex items-center justify-center text-[var(--text-secondary)]">
-                      {isHidden ? <Eye size={20} /> : <EyeOff size={20} />}
-                    </div>
-                    <span>{isHidden ? 'Unhide Chat' : 'Hide Chat'}</span>
+                    {isHidden ? (
+                      <>
+                        <Eye size={15} className="text-[var(--text-secondary)] shrink-0" />
+                        <span>Unhide Chat</span>
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff size={15} className="text-[var(--text-secondary)] shrink-0" />
+                        <span>Hide Chat</span>
+                      </>
+                    )}
                   </button>
 
                   <button 
                     onClick={() => handleAction(() => setIsMuted(!isMuted))} 
-                    className="w-full px-5 py-3.5 text-left text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors text-ellipsis overflow-hidden whitespace-nowrap"
                   >
-                    <div className="w-9 h-9 rounded-full bg-[var(--bg-main)] flex items-center justify-center text-[var(--text-secondary)]">
-                      {isMuted ? <Volume2 size={20} /> : <VolumeX size={20} />}
-                    </div>
-                    <span>{isMuted ? 'Unmute Notifications' : 'Mute Notifications'}</span>
+                    {isMuted ? (
+                      <>
+                        <Volume2 size={15} className="text-[var(--text-secondary)] shrink-0" />
+                        <span>Unmute Alerts</span>
+                      </>
+                    ) : (
+                      <>
+                        <VolumeX size={15} className="text-[var(--text-secondary)] shrink-0" />
+                        <span>Mute Alerts</span>
+                      </>
+                    )}
                   </button>
 
-                  <div className="h-px bg-[var(--border-color)]/20 mx-4 my-2" />
+                  <div className="h-px bg-[var(--border-color)]/30 my-1" />
 
                   <button 
                     onClick={() => handleAction(deleteChat)} 
-                    className="w-full px-5 py-3.5 text-left text-sm font-bold text-red-500 hover:bg-red-50 flex items-center gap-4 transition-colors rounded-2xl"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-rose-500 hover:bg-rose-500/5 flex items-center gap-3 transition-colors text-ellipsis overflow-hidden whitespace-nowrap"
                   >
-                    <div className="w-9 h-9 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
-                      <Trash size={20} />
-                    </div>
-                    <span>Delete Conversation</span>
+                    <Trash size={15} className="text-rose-500 shrink-0" />
+                    <span>Delete Chat</span>
                   </button>
 
                   <button 
-                    className="w-full px-5 py-3.5 text-left text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors text-ellipsis overflow-hidden whitespace-nowrap"
                   >
-                    <div className="w-9 h-9 rounded-full bg-[var(--bg-main)] flex items-center justify-center text-[var(--text-secondary)]">
-                      <UserX size={20} />
-                    </div>
+                    <UserX size={15} className="text-[var(--text-secondary)] shrink-0" />
                     <span>Block User</span>
                   </button>
 
                   <button 
-                    className="w-full px-5 py-3.5 text-left text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors text-ellipsis overflow-hidden whitespace-nowrap"
                   >
-                    <div className="w-9 h-9 rounded-full bg-[var(--bg-main)] flex items-center justify-center text-[var(--text-secondary)]">
-                      <AlertTriangle size={20} />
-                    </div>
+                    <AlertTriangle size={15} className="text-[var(--text-secondary)] shrink-0" />
                     <span>Report User</span>
                   </button>
                 </>

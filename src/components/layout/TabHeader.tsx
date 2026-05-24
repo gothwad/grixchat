@@ -89,17 +89,18 @@ export default function TabHeader() {
   const menuOptions = [
     { label: 'New group', icon: Users, path: '/new-group' },
     { label: 'Archived', icon: Archive, path: '/chats/archived' },
-    { label: 'Tools', icon: LayoutGrid, path: '/tools' },
+    { label: 'GrixHub', icon: LayoutGrid, path: '/hub' },
     ...(userData?.hiddenChatSettings?.showMenuEntry !== false ? [
       { label: 'Hidden chats', icon: EyeOff, path: '/chats/hidden' }
     ] : []),
     { label: 'Settings', icon: Settings, path: '/settings' },
   ];
 
-  const isChatsPage = location.pathname === '/';
-  const isHubPage = location.pathname === '/tools';
+  const isHomePage = location.pathname === '/';
+  const isChatsPage = location.pathname === '/chats';
+  const isHubPage = location.pathname === '/hub';
   const isReelsPage = location.pathname === '/reels';
-  const isTubePage = location.pathname === '/vibe';
+  const isTubePage = location.pathname === '/tube';
   const isProfilePage = location.pathname === '/profile';
 
   return (
@@ -132,8 +133,8 @@ export default function TabHeader() {
           </button>
         )}
 
-        {/* Heart Icon - Show on Reels */}
-        {isReelsPage && (
+        {/* Heart Icon - Show on Home and Reels */}
+        {(isHomePage || isReelsPage) && (
           <Link to="/notifications/likes" className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group relative">
             <Heart size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" fill="currentColor" fillOpacity={0.1} />
             {hasUnreadLikes && (
@@ -142,8 +143,8 @@ export default function TabHeader() {
           </Link>
         )}
 
-        {/* Bell Icon - Show on Reels and Tube */}
-        {(isReelsPage || isTubePage) && (
+        {/* Bell Icon - Show on Home, Reels and Tube */}
+        {(isHomePage || isReelsPage || isTubePage) && (
           <Link to="/notifications" className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group relative">
             <Bell size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
             {hasUnreadNotifs && (
@@ -162,7 +163,15 @@ export default function TabHeader() {
           </button>
         )}
 
-
+        {/* Settings Icon - Show on Profile */}
+        {isProfilePage && (
+          <button 
+            onClick={() => navigate('/settings')}
+            className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group"
+          >
+            <Settings size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
+          </button>
+        )}
 
         {/* 3 Dots Menu - Show on Chats */}
         {isChatsPage && (

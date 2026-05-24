@@ -17,6 +17,46 @@ export default function LoginScreen() {
   const [showSocial, setShowSocial] = useState(false);
   const navigate = useNavigate();
 
+  React.useEffect(() => {
+    const handleMessage = async (event: MessageEvent) => {
+      // Validate origin matches current origin, or ends with trusted origins
+      const origin = event.origin;
+      const isTrusted = 
+        origin === window.location.origin ||
+        origin.endsWith('.run.app') || 
+        origin.includes('localhost') || 
+        origin.endsWith('.vercel.app') || 
+        origin.endsWith('.workers.dev');
+
+      if (!isTrusted) {
+        return;
+      }
+
+      if (event.data?.type === 'SUPABASE_AUTH_SUCCESS' && event.data.session) {
+        setGoogleLoading(true);
+        setGithubLoading(true);
+        const { access_token, refresh_token } = event.data.session;
+        try {
+          const { data, error: setSessionError } = await supabase.auth.setSession({
+            access_token,
+            refresh_token
+          });
+          if (setSessionError) throw setSessionError;
+          if (data.user) {
+            navigate('/');
+          }
+        } catch (err: any) {
+          setError("Failed to set authentication session: " + err.message);
+        } finally {
+          setGoogleLoading(false);
+          setGithubLoading(false);
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [navigate]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase) return;
@@ -57,8 +97,20 @@ export default function LoginScreen() {
     setGoogleLoading(true);
     setError('');
     try {
-      await authService.loginWithGoogle();
-      // Supabase OAuth will redirect the page automatically
+      const data = await authService.loginWithGoogle();
+      if (data?.url) {
+        const width = 600;
+        const height = 700;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+        window.open(
+          data.url,
+          'google_oauth',
+          `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes`
+        );
+      } else {
+        throw new Error("Could not construct Sign-In URL from database client");
+      }
     } catch (err: any) {
       setError(err.message);
       setGoogleLoading(false);
@@ -69,12 +121,22 @@ export default function LoginScreen() {
     setGithubLoading(true);
     setError('');
     try {
-      await authService.loginWithGithub();
-      // Redirect behavior for OAuth is handled automatically by Supabase 
-      // but let's keep consistent formatting
+      const data = await authService.loginWithGithub();
+      if (data?.url) {
+        const width = 600;
+        const height = 700;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+        window.open(
+          data.url,
+          'github_oauth',
+          `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes`
+        );
+      } else {
+        throw new Error("Could not construct Sign-In URL from database client");
+      }
     } catch (err: any) {
       setError(err.message);
-    } finally {
       setGithubLoading(false);
     }
   };

@@ -1,239 +1,376 @@
 import React, { useEffect, useState } from 'react';
 import { 
+  Grid,
+  Bookmark,
+  Camera,
+  Clapperboard,
+  Play,
   Pencil,
-  AtSign,
-  Info as InfoIcon,
-  ChevronRight,
-  Shield,
-  Bell,
-  Clock,
-  Star,
-  VolumeX,
-  Lock,
-  UserMinus,
-  Smartphone,
-  HelpCircle,
-  LogOut,
+  Share2,
   Check,
-  Copy
+  ChevronRight,
+  Heart
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../providers/AuthProvider';
-import { authService } from '../auth/services/authService.ts';
 
 export default function ProfileTab() {
   const { user: authUser, userData: authUserData } = useAuth();
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-  
+  const [posts, setPosts] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'posts' | 'reels' | 'tube' | 'saved'>('posts');
+  const [copied, setCopied] = useState(false);
+  const [showToast, setShowToast] = useState(false);
   const navigate = useNavigate();
 
   const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
   const userData = authUserData;
 
-  // Use a highly reliable profile image finder
-  const profilePic = userData?.photoURL || (userData as any)?.photo_url || authUser?.user_metadata?.avatar_url || DEFAULT_LOGO;
+  // Track item counts dynamically
+  const [counts, setCounts] = useState({
+    posts: 0,
+    reels: 0,
+    tube: 0,
+    saved: 0
+  });
 
-  const handleCopy = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
+  // Fetch counts on load/update
+  useEffect(() => {
+    if (!authUser || !supabase) return;
+
+    const fetchCounts = async () => {
+      try {
+        // Posts count
+        const { count: postCount } = await supabase
+          .from('posts')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', authUser.id);
+        
+        // Reels count
+        const { count: reelsCount } = await supabase
+          .from('reels')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', authUser.id);
+
+        // Tube videos count
+        const { count: tubeCount } = await supabase
+          .from('tube_videos')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', authUser.id);
+
+        // Saved count from local state or context
+        const savedCount = userData?.saved_posts?.length || 0;
+
+        setCounts({
+          posts: postCount || 0,
+          reels: reelsCount || 0,
+          tube: tubeCount || 0,
+          saved: savedCount
+        });
+      } catch (err) {
+        console.error("Error fetching creator metrics:", err);
+      }
+    };
+
+    fetchCounts();
+  }, [authUser, userData?.saved_posts]);
+
+  // Fetch main content based on active tab
+  useEffect(() => {
+    if (!authUser || !supabase) return;
+
+    const fetchContent = async () => {
+      try {
+        if (activeTab === 'posts') {
+          const { data } = await supabase.from('posts').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false });
+          setPosts((data || []).map(p => ({
+            ...p,
+            imageUrl: p.media_urls?.[0] || p.imageUrl 
+          })));
+        } else if (activeTab === 'reels') {
+          const { data } = await supabase.from('reels').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false });
+          setPosts((data || []).map(d => ({ ...d, imageUrl: d.cover_url || d.thumbnail_url || d.cover })));
+        } else if (activeTab === 'tube') {
+          const { data } = await supabase.from('tube_videos').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false });
+          setPosts((data || []).map(d => ({ ...d, imageUrl: d.thumbnail_url || d.thumbnail })));
+        } else if (activeTab === 'saved') {
+          if (userData?.saved_posts && userData.saved_posts.length > 0) {
+            const { data } = await supabase.from('posts').select('*').in('id', userData.saved_posts).order('created_at', { ascending: false });
+            setPosts((data || []).map(p => ({
+              ...p,
+              imageUrl: p.media_urls?.[0] || p.imageUrl 
+            })));
+          } else {
+            setPosts([]);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching tab content:", err);
+        setPosts([]);
+      }
+    };
+    
+    fetchContent();
+  }, [activeTab, userData?.saved_posts, authUser]);
+
+  // Robust Clipboard share profile utility
+  const handleShareProfile = () => {
+    if (!userData?.username) return;
+    const profileLink = `${window.location.origin}/user/${authUser?.id}`;
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(profileLink).then(() => {
+        setCopied(true);
+        setShowToast(true);
+        setTimeout(() => {
+          setCopied(false);
+          setShowToast(false);
+        }, 2500);
+      }).catch((err) => {
+        executeFallbackCopy();
+      });
+    } else {
+      executeFallbackCopy();
+    }
   };
 
-  const handleLogout = async () => {
+  const executeFallbackCopy = () => {
     try {
-      await authService.logout();
-      navigate('/login');
-    } catch (error) {
-      console.error("Logout error:", error);
+      const textToCopy = `@${userData?.username || 'grix_user'}`;
+      const tempInput = document.createElement("input");
+      tempInput.value = textToCopy;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand("copy");
+      document.body.removeChild(tempInput);
+      setCopied(true);
+      setShowToast(true);
+      setTimeout(() => {
+        setCopied(false);
+        setShowToast(false);
+      }, 2500);
+    } catch (e) {
+      console.error("Copy operation disabled due to frame sandbox restriction.");
     }
   };
 
-  const settingsOptions = [
-    {
-      title: 'Account & Security',
-      items: [
-        { icon: Lock, label: 'Privacy & Security', sub: userData?.isPrivate ? 'Private Account' : 'Public Account', color: 'bg-indigo-500/10 text-indigo-500', onClick: () => navigate('/privacy-settings') },
-        { icon: Shield, label: 'App Lock', sub: 'Enable PIN/Passcode protection', color: 'bg-emerald-500/10 text-emerald-500', onClick: () => navigate('/app-lock') },
-      ]
-    },
-    {
-      title: 'Grix Settings & Sounds',
-      items: [
-        { icon: Bell, label: 'Notifications & Sounds', sub: 'Ringtones, Vibrations & Alerts', color: 'bg-amber-500/10 text-amber-500', onClick: () => navigate('/notifications-settings') },
-        { icon: Smartphone, label: 'Chat Preferences', sub: 'OLED Black, chat wall & cache clean', color: 'bg-purple-500/10 text-purple-500', onClick: () => navigate('/app-preferences') },
-        { icon: Clock, label: 'Usage Stats & Time', sub: 'Daily usage log tracker', color: 'bg-teal-500/10 text-teal-500', onClick: () => navigate('/time-spent') },
-      ]
-    },
-    {
-      title: 'Privacy & Filters',
-      items: [
-        { icon: Star, label: 'Favorites Feed', sub: 'Manage star list curation', color: 'bg-yellow-500/10 text-yellow-500', onClick: () => navigate('/favorites') },
-        { icon: VolumeX, label: 'Muted Accounts', sub: 'Silenced chat channels', color: 'bg-pink-500/10 text-pink-500', onClick: () => navigate('/muted-accounts') },
-        { icon: UserMinus, label: 'Blocked Accounts', sub: 'Banned chat list users', color: 'bg-red-500/10 text-red-500', onClick: () => navigate('/blocked-accounts') },
-      ]
-    },
-    {
-      title: 'Help & Info',
-      items: [
-        { icon: HelpCircle, label: 'GrixChat FAQ & Support', sub: 'Knowledgebase and system status', color: 'bg-cyan-500/10 text-cyan-500', onClick: () => navigate('/help') },
-        { icon: InfoIcon, label: 'About App', sub: 'GrixChat V 1.0.0 Stable Build', color: 'bg-sky-500/10 text-sky-500', onClick: () => navigate('/app-info') },
-      ]
-    }
-  ];
+  const renderMediaCardItem = (post: any) => {
+    const isVideoOrTube = activeTab === 'tube' || activeTab === 'reels';
+    const hasImage = !!post.imageUrl;
+    
+    return (
+      <div 
+        key={post.id} 
+        className={`relative group overflow-hidden cursor-pointer rounded-xl border border-[var(--border-color)] bg-[var(--box-bg)] transition-all duration-200 active:scale-[0.98] ${
+          activeTab === 'tube' ? 'aspect-video' : 'aspect-square'
+        }`}
+        onClick={() => {
+          if (activeTab === 'posts' || activeTab === 'saved') {
+            navigate(`/user/${authUser?.id}/posts?postId=${post.id}&tab=${activeTab}`);
+          } else if (activeTab === 'reels') {
+            navigate(`/user/${authUser?.id}/reels?reelId=${post.id}`);
+          } else if (activeTab === 'tube') {
+            navigate(`/user/${authUser?.id}/tube?videoId=${post.id}`);
+          }
+        }}
+      >
+        {hasImage ? (
+          <img 
+            src={post.imageUrl} 
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            referrerPolicy="no-referrer"
+            alt="Upload"
+          />
+        ) : (
+          /* Text note/quote card stylized layout fallback */
+          <div className="absolute inset-0 p-3.5 flex flex-col justify-between text-[var(--text-primary)]">
+            <div className="flex items-center justify-between opacity-50">
+              {activeTab === 'posts' && <Camera size={13} />}
+              {activeTab === 'saved' && <Bookmark size={13} />}
+              <span className="text-[8.5px] font-bold bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded tracking-wider uppercase">Text</span>
+            </div>
+            <p className="text-[11.5px] font-normal leading-relaxed line-clamp-4 text-[var(--text-primary)] my-auto">
+              {post.content || post.title || 'No caption'}
+            </p>
+            <div className="text-[8.5px] opacity-40 font-mono">
+              {post.created_at ? new Date(post.created_at).toLocaleDateString() : 'Now'}
+            </div>
+          </div>
+        )}
+        
+        {/* Simple and elegant tap overlay */}
+        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          {isVideoOrTube ? (
+            <div className="w-8 h-8 rounded-full bg-white/90 shadow text-black flex items-center justify-center">
+              <Play size={14} className="fill-current text-zinc-900 ml-0.5" />
+            </div>
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-white/90 shadow text-black flex items-center justify-center">
+              <Heart size={14} className="fill-current text-rose-500" />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="flex flex-col bg-[var(--bg-main)] font-sans h-full overflow-y-auto no-scrollbar pb-24 animate-fade-in">
-      {/* Beautiful Dynamic Profile Header Section (Unified Mobile Card style) */}
-      <div className="px-4 pt-4 mb-4">
-        <div 
-          onClick={() => navigate('/edit-profile')}
-          className="relative bg-[var(--bg-card)] text-[var(--text-primary)] py-4 px-5 border border-[var(--border-color)]/50 rounded-2xl shadow-sm overflow-hidden shrink-0 cursor-pointer hover:bg-[var(--bg-card)]/90 transition-colors"
-        >
-          {/* Soft elegant ambient flares that work on both light and dark OLED themes */}
-          <div className="absolute top-0 right-0 w-44 h-44 bg-indigo-500/5 rounded-full blur-[40px] pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-36 h-36 bg-rose-500/5 rounded-full blur-[30px] pointer-events-none" />
+    <div className="flex flex-col bg-[var(--bg-main)] font-sans h-full overflow-y-auto no-scrollbar">
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-md flex items-center gap-2 border border-zinc-800"
+          >
+            <Check size={13} className="text-emerald-400 shrink-0" />
+            <span>Profile link copied</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          <div className="relative flex flex-col gap-3">
-            {/* Top Row: Avatar on Left, Name and Username on Right */}
-            <div className="flex items-center gap-4">
-              {/* Solid Avatar Wrapper with Edit Pencil icon overlay */}
-              <div className="relative group shrink-0">
-                <div className="w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-tr from-indigo-500 via-sky-400 to-rose-400 shadow-md transition-transform duration-200 group-hover:scale-[1.03] flex items-center justify-center shrink-0 aspect-square">
-                  <div className="w-full h-full rounded-full border-2 border-[var(--bg-card)] overflow-hidden bg-[var(--bg-main)] flex items-center justify-center shrink-0">
-                    <img 
-                      src={profilePic || DEFAULT_LOGO} 
-                      className="w-full h-full rounded-full object-cover shrink-0"
-                      referrerPolicy="no-referrer"
-                      alt="Profile Avatar"
-                    />
-                  </div>
-                </div>
-                {/* Pencil Edit Icon replacing online dot */}
-                <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-md border-2 border-[var(--bg-card)]">
-                  <Pencil size={11} strokeWidth={2.5} />
-                </span>
-              </div>
-
-              {/* Name & Username Column */}
-              <div className="flex flex-col min-w-0">
-                <h2 className="text-base font-extrabold tracking-tight text-[var(--text-primary)] leading-tight truncate">
-                  {userData?.fullName || 'GrixChat User'}
-                </h2>
-                <span className="text-[11px] text-[var(--text-secondary)] font-mono tracking-wide mt-1 select-none">
-                  @{userData?.username || 'user'}
-                </span>
+      <div className="flex-1 pb-24">
+        {/* Profile Card Block */}
+        <div className="px-4 pt-5 pb-2">
+          {/* Unified Profile Card Header */}
+          <div className="bg-[var(--box-bg)] border border-[var(--border-color)] p-4 rounded-xl mb-3 flex items-center gap-3.5 shadow-sm">
+            {/* Elegant Flat Minimal Profile Picture */}
+            <div className="relative shrink-0">
+              <div className="w-14 h-14 rounded-full overflow-hidden bg-neutral-100 border border-[var(--border-color)] shadow-sm">
+                <img 
+                  src={userData?.photoURL || DEFAULT_LOGO} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                  alt="Avatar"
+                />
               </div>
             </div>
 
-            {/* Bottom column: Bio section */}
-            <div className="pt-3 border-t border-[var(--border-color)]/30">
-              <span className="text-[9px] font-black text-[var(--text-secondary)] uppercase tracking-wider block mb-0.5 font-mono">
-                Bio & status
-              </span>
-              <p className="text-xs text-[var(--text-primary)] leading-relaxed break-words whitespace-pre-line">
-                {userData?.bio || 'Tap to describe yourself & write a custom bio.'}
+            {/* Profile Info Details */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-[15.5px] font-bold text-[var(--text-primary)] tracking-tight truncate leading-none">
+                  {userData?.fullName || 'GrixChat User'}
+                </h2>
+                
+                {/* Premium Action Buttons next to Name */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button 
+                    onClick={handleShareProfile}
+                    className="w-[30px] h-[30px] rounded-lg bg-[var(--bg-main)] text-[var(--text-secondary)] border border-[var(--border-color)] flex items-center justify-center active:scale-95 transition-all hover:text-[var(--text-primary)]"
+                    title="Share Profile"
+                  >
+                    {copied ? <Check size={13} className="text-emerald-500" /> : <Share2 size={13} />}
+                  </button>
+                  <button 
+                    onClick={() => navigate('/edit-profile')}
+                    className="w-[30px] h-[30px] rounded-lg bg-[var(--bg-main)] text-[var(--text-secondary)] border border-[var(--border-color)] flex items-center justify-center active:scale-95 transition-all hover:text-[var(--text-primary)]"
+                    title="Edit Profile"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                </div>
+              </div>
+              <p className="text-[11.5px] text-[var(--text-secondary)] font-mono font-medium truncate mt-1">
+                @{userData?.username || 'profile'}
               </p>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Account Quick-Info Block (Telegram Account section style) */}
-      <div className="px-4 mb-4">
-        <h3 className="px-2 mb-2 text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em]">
-          Account info
-        </h3>
-        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)]/50 divide-y divide-[var(--border-color)]/30 overflow-hidden shadow-sm">
-          {/* Username item */}
-          <div 
-            onClick={() => handleCopy(`@${userData?.username || 'username'}`, 'username')}
-            className="flex items-center gap-4 px-5 py-3.5 hover:bg-[var(--bg-main)]/35 active:bg-[var(--bg-main)]/50 transition-colors cursor-pointer group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center shrink-0">
-              <AtSign size={18} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[14px] font-semibold text-[var(--text-primary)] font-mono">
-                @{userData?.username || 'username'}
-              </div>
-              <div className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-medium">Username</div>
-            </div>
-            <div className="opacity-0 group-hover:opacity-40 transition-opacity">
-              {copiedField === 'username' ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
-            </div>
+          {/* Solid Minimal Biography Layout (Dynamic Height wrapper) */}
+          <div className="bg-[var(--box-bg)] border border-[var(--border-color)] px-4 py-3 rounded-xl mb-3 min-h-[44px] flex flex-col justify-center shadow-sm">
+            <p className="text-[11.5px] text-[var(--text-primary)] leading-normal font-normal whitespace-pre-line break-words">
+              {userData?.bio || 'Active GrixChat member. Exploring chats, posts and reels.'}
+            </p>
           </div>
 
-          {/* Biography item */}
-          <div 
-            onClick={() => navigate('/edit-profile')}
-            className="flex items-center gap-4 px-5 py-3.5 hover:bg-[var(--bg-main)]/35 active:bg-[var(--bg-main)]/50 transition-colors cursor-pointer group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-              <InfoIcon size={18} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[14px] font-medium text-[var(--text-primary)] leading-normal break-words whitespace-pre-line">
-                {userData?.bio || 'No bio described yet. Tap to set up a short description.'}
-              </div>
-              <div className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-medium">Bio & current status</div>
-            </div>
-            <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-20 group-hover:opacity-45 transition-opacity" />
-          </div>
-        </div>
-      </div>
-
-      {/* Settings list dynamically displayed directly */}
-      <div className="px-4 space-y-6">
-        {settingsOptions.map((section) => (
-          <div key={section.title} className="space-y-2">
-            <h3 className="px-2 text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em]">
-              {section.title}
-            </h3>
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl divide-y divide-[var(--border-color)]/30 overflow-hidden shadow-sm">
-              {section.items.map((item) => (
-                <button 
-                  key={item.label}
-                  onClick={item.onClick}
-                  className="w-full flex items-center gap-4 px-5 py-4 hover:bg-[var(--bg-main)]/35 active:bg-[var(--bg-main)]/50 transition-colors group text-left cursor-pointer"
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.color} group-active:scale-95 transition-transform shrink-0`}>
-                    <item.icon size={18} strokeWidth={2.2} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-[13.5px] font-bold text-[var(--text-primary)] tracking-wide">{item.label}</h4>
-                    {item.sub && <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate font-medium">{item.sub}</p>}
-                  </div>
-                  <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-40 transition-opacity" />
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-
-        {/* Telegram Styled Authentication Section */}
-        <div className="space-y-2">
-          <h3 className="px-2 text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em]">
-            Session
-          </h3>
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl overflow-hidden shadow-sm">
+          {/* Android Style Clean Connection Stats Layout */}
+          <div className="grid grid-cols-2 gap-2 mb-4">
             <button 
-              onClick={handleLogout}
-              className="w-full flex items-center gap-4 px-5 py-4 hover:bg-red-500/5 transition-colors text-red-500 font-bold text-sm text-left flex justify-between items-center cursor-pointer group"
+              onClick={() => navigate(`/user/${authUser?.id}/followers`)}
+              className="flex items-center justify-between bg-[var(--box-bg)] px-3.5 py-2.5 rounded-xl border border-[var(--border-color)] active:scale-[0.98] transition-all"
             >
-              <div className="flex items-center gap-3">
-                <LogOut size={18} />
-                <span>Log out of GrixChat</span>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">Followers</span>
+                <span className="text-sm font-extrabold text-[var(--text-primary)]">{userData?.followers?.length || 0}</span>
               </div>
-              <ChevronRight size={18} className="text-red-500 opacity-20 group-hover:opacity-60 transition-opacity" />
+              <ChevronRight size={13} className="text-[var(--text-secondary)] opacity-50" />
+            </button>
+
+            <button 
+              onClick={() => navigate(`/user/${authUser?.id}/following`)}
+              className="flex items-center justify-between bg-[var(--box-bg)] px-3.5 py-2.5 rounded-xl border border-[var(--border-color)] active:scale-[0.98] transition-all"
+            >
+              <div className="flex flex-col">
+                <span className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">Following</span>
+                <span className="text-sm font-extrabold text-[var(--text-primary)]">{userData?.following?.length || 0}</span>
+              </div>
+              <ChevronRight size={13} className="text-[var(--text-secondary)] opacity-50" />
             </button>
           </div>
+
+          {/* Flat Segments Control (Both Icon and Text) */}
+          <div className="grid grid-cols-4 bg-[var(--box-bg)] p-1 rounded-xl gap-1 border border-[var(--border-color)] select-none">
+            {[
+              { id: 'posts', label: 'Posts', icon: Grid, count: counts.posts },
+              { id: 'reels', label: 'Reels', icon: Clapperboard, count: counts.reels },
+              { id: 'tube', label: 'Videos', icon: Play, count: counts.tube },
+              { id: 'saved', label: 'Saved', icon: Bookmark, count: counts.saved }
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`relative py-1.5 rounded-lg flex flex-col items-center justify-center transition-all duration-150 ${
+                    isActive 
+                      ? 'bg-[var(--bg-main)] text-[var(--text-primary)] font-semibold border border-[var(--border-color)] shadow-sm' 
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] opacity-80'
+                  }`}
+                >
+                  <div className="flex items-center gap-1">
+                    <Icon size={13} className={isActive ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)]'} />
+                    <span className="text-[9.5px] font-bold font-mono text-[var(--text-primary)]">{tab.count}</span>
+                  </div>
+                  <span className="text-[10px] font-medium mt-0.5 tracking-tight">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Unified Branding Footer */}
-        <div className="py-8 flex flex-col items-center gap-1 opacity-35 text-center">
-          <span className="text-[var(--text-primary)] font-black tracking-[0.15em] uppercase text-[10px]">GrixChat</span>
-          <span className="text-[var(--text-secondary)] text-[9px] uppercase tracking-wider font-semibold">Made In India</span>
+        {/* Media Grid Section */}
+        <div className="px-4">
+          <div className="grid grid-cols-3 gap-2">
+            {posts.length > 0 ? (
+              posts.map((post) => renderMediaCardItem(post))
+            ) : (
+              <div className="col-span-3 py-10 flex flex-col items-center justify-center text-[var(--text-secondary)] bg-[var(--box-bg)] rounded-xl border border-[var(--border-color)]">
+                <div className="w-10 h-10 rounded-full bg-[var(--bg-main)] border border-[var(--border-color)] flex items-center justify-center mb-2.5 text-[var(--text-secondary)]">
+                  {activeTab === 'posts' && <Camera size={16} />}
+                  {activeTab === 'reels' && <Clapperboard size={16} />}
+                  {activeTab === 'tube' && <Play size={16} />}
+                  {activeTab === 'saved' && <Bookmark size={16} />}
+                </div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-primary)] mb-0.5">
+                  {activeTab === 'posts' && 'Empty Feed'}
+                  {activeTab === 'reels' && 'No Reels'}
+                  {activeTab === 'tube' && 'No Videos'}
+                  {activeTab === 'saved' && 'No Saved Posts'}
+                </p>
+                <p className="text-[10.5px] opacity-65 text-center px-4 max-w-[220px]">
+                  {activeTab === 'posts' && 'Your photos and written updates will appear here.'}
+                  {activeTab === 'reels' && 'Share short-form vertical videos with Grix.'}
+                  {activeTab === 'tube' && 'Publish custom widescreen video files.'}
+                  {activeTab === 'saved' && 'Post items saved from your feed.'}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

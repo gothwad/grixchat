@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { aiService } from '../../services/AIService';
+import { storage } from '../../services/StorageService';
 
 export interface QnaAnswer {
   id: string;
@@ -110,7 +111,7 @@ export default function QnaView() {
           .order('created_at', { ascending: false });
 
         if (error || !data || data.length === 0) {
-          const cached = localStorage.getItem('grix_memory_qna');
+          const cached = storage.getItem('grix_memory_qna');
           if (cached) {
             setQuestions(JSON.parse(cached));
           } else {
@@ -123,7 +124,7 @@ export default function QnaView() {
             upvoted_by_me: q.upvoters ? q.upvoters.includes(user?.id) : false
           }));
           setQuestions(formatted);
-          localStorage.setItem('grix_memory_qna', JSON.stringify(formatted));
+          storage.setItem('grix_memory_qna', JSON.stringify(formatted));
         }
       } catch (e) {
         setQuestions(SEED_QUESTIONS);
@@ -136,7 +137,7 @@ export default function QnaView() {
   const saveQnaState = (updated: QnaQuestion[]) => {
     setQuestions(updated);
     try {
-      localStorage.setItem('grix_memory_qna', JSON.stringify(updated));
+      storage.setItem('grix_memory_qna', JSON.stringify(updated));
     } catch (e) {
       // Ignored if local storage or offline iframe sandboxing blocks it
     }

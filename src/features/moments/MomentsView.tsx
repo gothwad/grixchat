@@ -3,6 +3,7 @@ import { Heart, MessageCircle, Send, Plus, Image as ImageIcon, Smile, Sparkles, 
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
+import { storage } from '../../services/StorageService';
 
 export interface MomentComment {
   id: string;
@@ -95,7 +96,7 @@ export default function MomentsView() {
 
         if (error || !data || data.length === 0) {
           // Fallback to local memory feed (which is fully functional)
-          const stored = localStorage.getItem('grix_memory_moments');
+          const stored = storage.getItem('grix_memory_moments');
           if (stored) {
             setMoments(JSON.parse(stored));
           } else {
@@ -109,7 +110,7 @@ export default function MomentsView() {
             liked_by_me: item.liked_users ? item.liked_users.includes(user?.id) : false
           }));
           setMoments(parsed);
-          localStorage.setItem('grix_memory_moments', JSON.stringify(parsed));
+          storage.setItem('grix_memory_moments', JSON.stringify(parsed));
         }
       } catch (e) {
         // Safe Catch for environments blocking local storage
@@ -124,7 +125,7 @@ export default function MomentsView() {
   const saveMomentsState = (updatedList: MomentType[]) => {
     setMoments(updatedList);
     try {
-      localStorage.setItem('grix_memory_moments', JSON.stringify(updatedList));
+      storage.setItem('grix_memory_moments', JSON.stringify(updatedList));
     } catch (e) {
       // Ignored if local storage is disabled
     }

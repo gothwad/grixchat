@@ -159,43 +159,47 @@ export default function GrixAIScreen() {
         onWatchTogether={() => {}}
       >
         <div className="py-1">
-          <div className="px-5 py-2 border-b border-[var(--border-color)]/30 mb-2">
-            <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest">Select AI Model</p>
+          <div className="px-4 py-1.5 border-b border-[var(--border-color)]/30 mb-1">
+            <p className="text-[9px] font-black text-[var(--text-secondary)] uppercase tracking-wider">Select AI Model</p>
           </div>
           <button 
-            onClick={() => toggleModel('grix-ai')}
-            className={`w-full flex items-center justify-between px-5 py-4 text-sm font-bold transition-colors ${currentModel === 'grix-ai' ? 'text-[var(--primary)] bg-[var(--primary)]/5' : 'text-[var(--text-primary)] hover:bg-[var(--bg-main)]'}`}
+            onClick={() => {
+              toggleModel('grix-ai');
+              setShowOptions(false);
+            }}
+            className={`w-full flex items-center justify-between px-4 py-2.5 text-[13px] font-semibold transition-colors ${currentModel === 'grix-ai' ? 'text-[var(--primary)] bg-[var(--primary)]/5' : 'text-[var(--text-primary)] hover:bg-[var(--bg-main)]'}`}
           >
-            <div className="flex items-center gap-4">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center ${currentModel === 'grix-ai' ? 'bg-[var(--primary)]/10' : 'bg-[var(--bg-main)]'}`}>
-                <Zap size={20} className={currentModel === 'grix-ai' ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)]'} />
-              </div>
+            <div className="flex items-center gap-3">
+              <Zap size={15} className={`shrink-0 ${currentModel === 'grix-ai' ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)]'}`} />
               <span>Grix AI (Llama 3.1)</span>
             </div>
-            {currentModel === 'grix-ai' && <div className="w-2 h-2 rounded-full bg-[var(--primary)]" />}
+            {currentModel === 'grix-ai' && <div className="w-1.5 h-1.5 rounded-full bg-[var(--primary)]" />}
           </button>
+          
           <button 
-            onClick={() => toggleModel('grix-ai-pro')}
-            className={`w-full flex items-center justify-between px-5 py-4 text-sm font-bold transition-colors ${currentModel === 'grix-ai-pro' ? 'text-indigo-500 bg-indigo-500/5' : 'text-[var(--text-primary)] hover:bg-[var(--bg-main)]'}`}
+            onClick={() => {
+              toggleModel('grix-ai-pro');
+              setShowOptions(false);
+            }}
+            className={`w-full flex items-center justify-between px-4 py-2.5 text-[13px] font-semibold transition-colors ${currentModel === 'grix-ai-pro' ? 'text-indigo-500 bg-indigo-500/5' : 'text-[var(--text-primary)] hover:bg-[var(--bg-main)]'}`}
           >
-            <div className="flex items-center gap-4">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center ${currentModel === 'grix-ai-pro' ? 'bg-indigo-500/10' : 'bg-[var(--bg-main)]'}`}>
-                <Cpu size={20} className={currentModel === 'grix-ai-pro' ? 'text-indigo-500' : 'text-[var(--text-secondary)]'} />
-              </div>
+            <div className="flex items-center gap-3">
+              <Cpu size={15} className={`shrink-0 ${currentModel === 'grix-ai-pro' ? 'text-indigo-500' : 'text-[var(--text-secondary)]'}`} />
               <span>Grix AI Pro (Llama 3.3)</span>
             </div>
-            {currentModel === 'grix-ai-pro' && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
+            {currentModel === 'grix-ai-pro' && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />}
           </button>
           
-          <div className="h-px bg-[var(--border-color)]/20 mx-5 my-2" />
+          <div className="h-px bg-[var(--border-color)]/20 mx-4 my-1" />
           
           <button 
-            onClick={clearChat}
-            className="w-full flex items-center gap-4 px-5 py-4 text-sm font-bold text-rose-500 hover:bg-rose-500/5 transition-colors"
+            onClick={() => {
+              clearChat();
+              setShowOptions(false);
+            }}
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-semibold text-rose-500 hover:bg-rose-500/5 transition-colors"
           >
-            <div className="w-9 h-9 rounded-full bg-rose-500/10 flex items-center justify-center">
-              <Trash2 size={20} />
-            </div>
+            <Trash2 size={15} className="text-rose-500 shrink-0" />
             <span>Clear History</span>
           </button>
         </div>

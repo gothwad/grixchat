@@ -11,7 +11,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({
     home: 'For You',
     post: 'For You',
-    tools: 'All',
+    hub: 'All',
     chats: 'Chats',
     reels: 'Trending',
     vibe: 'Videos',

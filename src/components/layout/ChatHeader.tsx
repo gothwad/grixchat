@@ -147,7 +147,7 @@ export default function ChatHeader({
             onClick={() => setShowOptions(true)}
             className="p-2 hover:bg-white/10 rounded-full transition-colors"
           >
-            <Settings size={22} className="text-[var(--header-text)]" />
+            <MoreVertical size={22} className="text-[var(--header-text)]" />
           </button>
         </div>
       </div>
