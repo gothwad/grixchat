@@ -1,6 +1,6 @@
 import React from 'react';
 import { APP_CONFIG } from '../../config/appConfig';
-import { ArrowLeft, Info, ShieldCheck, Globe, Code } from 'lucide-react';
+import { ArrowLeft, Info, ShieldCheck, Globe, Code, Github } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
 
@@ -9,7 +9,18 @@ export default function AppInfoScreen() {
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden">
-      <SettingHeader title="App Info" />
+      <SettingHeader 
+        title="App Info" 
+        rightElement={
+          <button 
+            onClick={() => navigate('/github')} 
+            className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group"
+            title="GitHub Integration"
+          >
+            <Github size={21} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
+          </button>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto no-scrollbar py-10">
         <div className="flex flex-col items-center justify-center mb-12">

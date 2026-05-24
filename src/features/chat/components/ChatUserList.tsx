@@ -216,7 +216,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
             </p>
           </div>
           <button 
-            onClick={() => navigate('/search-user')}
+            onClick={() => navigate('/search')}
             className="mt-2 bg-[var(--primary)] text-white px-8 py-3 rounded-xl text-xs font-bold shadow-lg shadow-[var(--primary-shadow)]/30 hover:shadow-xl hover:-translate-y-0.5 transition-all"
           >
             Find Friends
@@ -224,17 +224,6 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
         </div>
       )}
 
-      {/* Other Users / Suggested */}
-      {otherUsers.length > 0 && (
-        <div className="flex flex-col mt-4">
-          <div className="px-4 py-2 border-y border-[var(--border-color)]/10 bg-[var(--bg-main)]/50">
-            <h4 className="text-[10px] font-black text-[var(--text-secondary)]/50 uppercase tracking-[0.2em]">
-              Others you may know
-            </h4>
-          </div>
-          {otherUsers.map(renderOtherUser)}
-        </div>
-      )}
     </div>
   );
 };

@@ -26,7 +26,7 @@ import {
 
 import { useLayout } from '../../contexts/LayoutContext.tsx';
 
-export type TabType = 'post' | 'hub' | 'chats' | 'reels' | 'profile' | 'vibe';
+export type TabType = 'post' | 'chats' | 'reels' | 'profile';
 
 interface ResourcesNavProps {
   tab: TabType;
@@ -39,14 +39,7 @@ const tabFilters: Record<TabType, { id: string; label: string; icon: any }[]> = 
     { id: 'Stories', label: 'Stories', icon: Compass },
     { id: 'Updates', label: 'Updates', icon: Bell }
   ],
-  hub: [
-    { id: 'All', label: 'All', icon: LayoutGrid },
-    { id: 'Apps', label: 'Apps', icon: Globe },
-    { id: 'Tools', label: 'Tools', icon: Wrench },
-    { id: 'Arena', label: 'Arena', icon: Gamepad2 }
-  ],
   chats: [
-    { id: 'Calls', label: 'Calls', icon: Phone },
     { id: 'Chats', label: 'Chats', icon: MessageSquare },
     { id: 'Groups', label: 'Groups', icon: Users },
     { id: 'Requests', label: 'Requests', icon: UserPlus }
@@ -54,12 +47,6 @@ const tabFilters: Record<TabType, { id: string; label: string; icon: any }[]> = 
   reels: [
     { id: 'Trending', label: 'Trending', icon: TrendingUp },
     { id: 'Following', label: 'Following', icon: Users }
-  ],
-  vibe: [
-    { id: 'Videos', label: 'Videos', icon: Video },
-    { id: 'Reels', label: 'Reels', icon: Clapperboard },
-    { id: 'Moments', label: 'Moments', icon: Camera },
-    { id: 'Q&A', label: 'Q&A', icon: HelpCircle }
   ],
   profile: [
     { id: 'Post', label: 'Post', icon: Grid },
@@ -74,7 +61,7 @@ export default function ResourcesNav({ tab }: ResourcesNavProps) {
   const activeFilter = activeFilters[tab] || '';
   const filters = tabFilters[tab] || [];
 
-  if (tab === 'chats' || tab === 'vibe' || tab === 'hub') {
+  if (tab === 'chats') {
     return (
       <div className="w-full bg-[var(--header-bg)] border-b border-[var(--border-color)] shrink-0 z-40">
         <div className="flex items-center gap-2 px-4 h-[35px] overflow-x-auto no-scrollbar">

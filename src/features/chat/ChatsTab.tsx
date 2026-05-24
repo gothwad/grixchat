@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSearch } from '../../contexts/SearchContext.tsx';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, Phone, Video, ArrowUpRight, ArrowDownLeft, PhoneMissed, Info, Lock, Users } from 'lucide-react';
+import { MessageCircle, Phone, Video, ArrowUpRight, ArrowDownLeft, PhoneMissed, Info, Lock, Users, Search, X } from 'lucide-react';
 import { useLayout } from '../../contexts/LayoutContext.tsx';
 import { motion } from 'motion/react';
 import { useConversations } from './hooks/useConversations.ts';
@@ -12,7 +12,7 @@ import { ChatUserList } from './components/ChatUserList.tsx';
 export default function ChatsTab() {
   const navigate = useNavigate();
   const { userData } = useAuth();
-  const { searchTerm } = useSearch();
+  const { searchTerm, setSearchTerm } = useSearch();
   const { activeFilters } = useLayout();
   const activeFilter = activeFilters['chats'] || 'Chats';
   
@@ -23,6 +23,7 @@ export default function ChatsTab() {
   const isSecretCodeEntered = searchTerm && userData?.hiddenChatSettings?.secretCode && searchTerm === userData.hiddenChatSettings.secretCode;
 
   const filteredConversations = conversations.filter(c => {
+    if (c.type === 'group') return false; // Move groups to dedicated groups tab
     const isHidden = Array.isArray(userData?.hiddenChats) && userData.hiddenChats.includes(c.id);
     const isArchived = Array.isArray(userData?.archivedChats) && userData.archivedChats.includes(c.id);
     
@@ -46,6 +47,28 @@ export default function ChatsTab() {
   return (
     <div className="h-full flex flex-col bg-[var(--bg-card)] overflow-hidden">
       <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
+        {/* WhatsApp-style Scrollable Search Bar */}
+        <div className="px-4 pt-3 pb-2.5">
+          <div className="flex items-center bg-[var(--bg-main)] rounded-xl px-3.5 h-10 border border-[var(--border-color)]/25 transition-all">
+            <Search size={15} className="text-[var(--text-secondary)] mr-2.5 opacity-60 shrink-0" />
+            <input 
+              type="text" 
+              placeholder="Search chats or messages..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex-1 bg-transparent border-none outline-none text-[13px] font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/45"
+            />
+            {searchTerm && (
+              <button 
+                onClick={() => setSearchTerm('')}
+                className="p-1 hover:bg-black/5 rounded-full transition-colors cursor-pointer shrink-0"
+              >
+                <X size={13} className="text-[var(--text-secondary)]" />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* User List (Chats or Calls) */}
         <div className="flex flex-col h-full">
           {loading ? (

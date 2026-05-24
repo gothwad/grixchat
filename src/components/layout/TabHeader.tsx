@@ -89,18 +89,16 @@ export default function TabHeader() {
   const menuOptions = [
     { label: 'New group', icon: Users, path: '/new-group' },
     { label: 'Archived', icon: Archive, path: '/chats/archived' },
-    { label: 'GrixHub', icon: LayoutGrid, path: '/hub' },
     ...(userData?.hiddenChatSettings?.showMenuEntry !== false ? [
       { label: 'Hidden chats', icon: EyeOff, path: '/chats/hidden' }
     ] : []),
     { label: 'Settings', icon: Settings, path: '/settings' },
   ];
 
-  const isHomePage = location.pathname === '/';
-  const isChatsPage = location.pathname === '/chats';
-  const isHubPage = location.pathname === '/hub';
+  const isChatsPage = location.pathname === '/';
+  const isGroupsPage = location.pathname === '/groups';
   const isReelsPage = location.pathname === '/reels';
-  const isTubePage = location.pathname === '/tube';
+  const isSearchPage = location.pathname === '/search';
   const isProfilePage = location.pathname === '/profile';
 
   return (
@@ -113,28 +111,30 @@ export default function TabHeader() {
         </Link>
       </div>
       <div className="flex items-center gap-1">
-        {/* Plus Icon - Show on Chats */}
-        {isChatsPage && (
+        {/* Archived Chats Shortcut - Show on Chats and Groups */}
+        {(isChatsPage || isGroupsPage) && (
           <button 
-            onClick={() => navigate('/search-user')}
+            onClick={() => navigate('/chats/archived')}
             className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group"
+            title="Archived Chats"
           >
-            <Users size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
+            <Archive size={21} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
           </button>
         )}
 
-        {/* Search Icon - Show on Chats, Hub, and Tube */}
-        {(isChatsPage || isHubPage || isTubePage) && (
+        {/* Hidden Chats Shortcut - Show on Chats and Groups if allowed */}
+        {(isChatsPage || isGroupsPage) && (userData?.hiddenChatSettings?.showMenuEntry !== false) && (
           <button 
-            onClick={() => setIsSearchOpen(true)}
+            onClick={() => navigate('/chats/hidden')}
             className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group"
+            title="Hidden Chats"
           >
-            <Search size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
+            <EyeOff size={21} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
           </button>
         )}
 
-        {/* Heart Icon - Show on Home and Reels */}
-        {(isHomePage || isReelsPage) && (
+        {/* Heart Icon - Show on Reels */}
+        {isReelsPage && (
           <Link to="/notifications/likes" className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group relative">
             <Heart size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" fill="currentColor" fillOpacity={0.1} />
             {hasUnreadLikes && (
@@ -143,8 +143,8 @@ export default function TabHeader() {
           </Link>
         )}
 
-        {/* Bell Icon - Show on Home, Reels and Tube */}
-        {(isHomePage || isReelsPage || isTubePage) && (
+        {/* Bell Icon - Show on Reels */}
+        {isReelsPage && (
           <Link to="/notifications" className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group relative">
             <Bell size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
             {hasUnreadNotifs && (
@@ -163,45 +163,8 @@ export default function TabHeader() {
           </button>
         )}
 
-        {/* Settings Icon - Show on Profile */}
-        {isProfilePage && (
-          <button 
-            onClick={() => navigate('/settings')}
-            className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group"
-          >
-            <Settings size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
-          </button>
-        )}
 
-        {/* 3 Dots Menu - Show on Chats */}
-        {isChatsPage && (
-          <div className="relative" ref={menuRef}>
-            <button 
-              onClick={() => setShowMenu(!showMenu)}
-              className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer"
-            >
-              <MoreVertical size={22} className="text-[var(--header-text)]" />
-            </button>
 
-            {showMenu && (
-              <div className="absolute right-0 mt-2 w-52 bg-[var(--bg-card)] rounded-xl shadow-2xl border border-[var(--border-color)] py-2 z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                {menuOptions.map((option, index) => (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      setShowMenu(false);
-                      if (option.path) navigate(option.path);
-                    }}
-                    className="w-full px-4 py-3 text-left text-[14px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-3 transition-colors"
-                  >
-                    <option.icon size={18} className="text-[var(--text-secondary)]" />
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

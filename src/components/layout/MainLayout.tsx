@@ -8,15 +8,15 @@ import PWAInstallPrompt from './PWAInstallPrompt.tsx';
 import { useAuth } from '../../providers/AuthProvider';
 
 // Lazy loading our 5 tabs for keep-alive container
-import HubTab from '../../features/hub/HubTab';
-const HomeTab = React.lazy(() => import('../../features/home/HomeTab'));
 const ChatsTab = React.lazy(() => import('../../features/chat/ChatsTab'));
-const TubeScreen = React.lazy(() => import('../../features/tube/GrixTubeScreen'));
+const CallsTab = React.lazy(() => import('../../features/call/CallsTab'));
+const GroupsTab = React.lazy(() => import('../../features/chat/GroupsTab'));
+const SearchTab = React.lazy(() => import('../../features/search/SearchTab'));
 const ProfileTab = React.lazy(() => import('../../features/profile/ProfileTab'));
 
 // Paths where BottomNav should be visible
-const TAB_PATHS = ['/', '/chats', '/hub', '/reels', '/profile', '/notifications', '/tube'];
-const MAIN_TABS = ['/', '/chats', '/hub', '/tube', '/profile'];
+const TAB_PATHS = ['/', '/chats', '/calls', '/reels', '/profile', '/notifications', '/search', '/groups'];
+const MAIN_TABS = ['/', '/groups', '/search', '/calls', '/profile'];
 
 export default function MainLayout() {
   const location = useLocation();
@@ -47,9 +47,6 @@ export default function MainLayout() {
 
   // Determine current tab for ResourcesNav
   const getTab = (path: string): TabType | null => {
-    if (path === '/chats') return 'chats';
-    if (path === '/tube') return 'vibe';
-    if (path === '/hub') return 'hub';
     return null;
   };
 
@@ -87,25 +84,25 @@ export default function MainLayout() {
           {/* Keep-Alive Tabs: once loaded, we keep them persistent and mounted */}
           {visitedTabs['/'] && (
             <div className={location.pathname === '/' ? 'h-full w-full' : 'hidden'}>
-              <HomeTab />
-            </div>
-          )}
-          
-          {visitedTabs['/chats'] && (
-            <div className={location.pathname === '/chats' ? 'h-full w-full' : 'hidden'}>
               <ChatsTab />
             </div>
           )}
           
-          {visitedTabs['/hub'] && (
-            <div className={location.pathname === '/hub' ? 'h-full w-full' : 'hidden'}>
-              <HubTab />
+          {visitedTabs['/calls'] && (
+            <div className={location.pathname === '/calls' ? 'h-full w-full' : 'hidden'}>
+              <CallsTab />
             </div>
           )}
           
-          {visitedTabs['/tube'] && (
-            <div className={location.pathname === '/tube' ? 'h-full w-full' : 'hidden'}>
-              <TubeScreen />
+          {visitedTabs['/groups'] && (
+            <div className={location.pathname === '/groups' ? 'h-full w-full' : 'hidden'}>
+              <GroupsTab />
+            </div>
+          )}
+          
+          {visitedTabs['/search'] && (
+            <div className={location.pathname === '/search' ? 'h-full w-full' : 'hidden'}>
+              <SearchTab />
             </div>
           )}
           

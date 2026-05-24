@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { MessageCircle, LayoutGrid, Compass, Phone, UserCircle, Settings, Bell } from 'lucide-react';
+import { MessageCircle, Users, Search, Phone, UserCircle, Settings, Bell } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export default function DesktopSidebar() {
@@ -10,8 +10,8 @@ export default function DesktopSidebar() {
 
   const navItems = [
     { icon: MessageCircle, path: '/', label: 'Chats' },
-    { icon: Compass, path: '/stories', label: 'Stories' },
-    { icon: LayoutGrid, path: '/hub', label: 'Hub' },
+    { icon: Users, path: '/groups', label: 'Groups' },
+    { icon: Search, path: '/search', label: 'Search' },
     { icon: Phone, path: '/calls', label: 'Calls' },
     { icon: UserCircle, path: '/profile', label: 'Profile' },
   ];

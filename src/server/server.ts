@@ -7,17 +7,10 @@ import FormData from "form-data";
 import fs from "fs";
 import os from "os";
 
-import { createClient } from "@supabase/supabase-js";
-
 dotenv.config();
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
-
-// Supabase Server Initializer
-const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
-const supabaseServerClient = (supabaseUrl && supabaseAnonKey) ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 // GitHub OAuth Config
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
@@ -40,7 +33,7 @@ app.get("/sitemap.xml", (req, res) => {
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://grixchat.gothwad.workers.dev/</loc><priority>1.0</priority><changefreq>daily</changefreq></url>
-  <url><loc>https://grixchat.gothwad.workers.dev/hub</loc><priority>0.8</priority><changefreq>weekly</changefreq></url>
+  <url><loc>https://grixchat.gothwad.workers.dev/tools</loc><priority>0.8</priority><changefreq>weekly</changefreq></url>
   <url><loc>https://grixchat.gothwad.workers.dev/chats</loc><priority>0.9</priority><changefreq>always</changefreq></url>
   <url><loc>https://grixchat.gothwad.workers.dev/reels</loc><priority>0.8</priority><changefreq>always</changefreq></url>
 </urlset>`);
@@ -244,78 +237,6 @@ app.get(["/auth/github/callback", "/auth/github/callback/"], async (req, res) =>
   }
 });
 
-// Supabase OAuth Callback
-app.get(["/api/auth/supabase/callback", "/api/auth/supabase/callback/", "/auth/supabase/callback", "/auth/supabase/callback/"], async (req, res) => {
-  const { code } = req.query;
-  console.log(`Supabase Callback received with code: ${code ? 'PRESENT' : 'MISSING'}`);
-  
-  if (!code) {
-    return res.status(400).send("Authorization code missing");
-  }
-
-  if (!supabaseServerClient) {
-    console.error("Supabase server client not initialized. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
-    return res.status(500).send("Database configuration missing on server");
-  }
-
-  try {
-    const { data, error } = await supabaseServerClient.auth.exchangeCodeForSession(String(code));
-    if (error) {
-      throw error;
-    }
-
-    const { session } = data;
-    if (!session) {
-      throw new Error("No session returned from exchange");
-    }
-
-    const accessToken = session.access_token;
-    const refreshToken = session.refresh_token;
-
-    res.send(`
-      <html>
-        <head>
-          <title>Authenticating...</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-        </head>
-        <body style="margin:0; background:#f4f4f5; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; padding:20px; text-align:center;">
-          <script>
-            try {
-              const session = {
-                access_token: "${accessToken}",
-                refresh_token: "${refreshToken}"
-              };
-              if (window.opener) {
-                window.opener.postMessage({ type: 'SUPABASE_AUTH_SUCCESS', session }, '*');
-                setTimeout(() => {
-                  window.close();
-                }, 500);
-              } else {
-                document.getElementById('status').innerText = 'Authenticated! Please return to GrixChat.';
-                document.getElementById('loader').style.display = 'none';
-                document.getElementById('success-icon').style.display = 'block';
-              }
-            } catch (e) {
-              console.error("Popup script error:", e);
-              document.getElementById('status').innerText = 'Error saving session: ' + e.message;
-            }
-          </script>
-          <div id="loader" style="width:48px;height:48px;border:4px solid #e4e4e7;border-top-color:#10b981;border-radius:50%;animation:spin 1s linear infinite;"></div>
-          <div id="success-icon" style="display:none;width:60px;height:60px;background:#10b981;border-radius:50%;color:white;align-items:center;justify-content:center;font-size:30px;margin-bottom:20px;">✓</div>
-          <p id="status" style="margin-top:24px;font-weight:600;color:#18181b;font-size:16px;">Authenticating with Google/GitHub...</p>
-          <p style="margin-top:8px;color:#71717a;font-size:14px;">Securely connecting to GrixChat</p>
-          <style>
-            @keyframes spin { to { transform: rotate(360deg); } }
-          </style>
-        </body>
-      </html>
-    `);
-  } catch (error: any) {
-    console.error("Supabase OAuth exchange failed:", error);
-    res.status(500).send("Authentication failed: " + error.message);
-  }
-});
-
 // GitHub Push
 app.post("/api/github/push", async (req, res) => {
   const { token, owner, repo, path: filePath, content, message, branch = 'main' } = req.body;
@@ -455,6 +376,53 @@ app.post("/api/github/push-batch", async (req, res) => {
   } catch (error: any) {
     console.error("Smart Batch Push error:", error.response?.data || error.message);
     res.status(error.response?.status || 500).json(error.response?.data || { message: error.message });
+  }
+});
+
+// Retrieve list of codebase files for Sync Tool
+app.get("/api/github/list-files", (req, res) => {
+  const listAllFiles = (dir: string, fileList: string[] = []): string[] => {
+    const files = fs.readdirSync(dir);
+    files.forEach((file) => {
+      const filePath = path.join(dir, file);
+      if (fs.statSync(filePath).isDirectory()) {
+        const baseName = path.basename(file);
+        if (!baseName.startsWith('.') && baseName !== 'node_modules' && baseName !== 'dist' && baseName !== '.git' && baseName !== 'tmp') {
+          listAllFiles(filePath, fileList);
+        }
+      } else {
+        const relativePath = path.relative(process.cwd(), filePath);
+        fileList.push(relativePath);
+      }
+    });
+    return fileList;
+  };
+  try {
+    const allFiles = listAllFiles(process.cwd());
+    res.json({ files: allFiles });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Retrieve localized file content for Sync Tool
+app.get("/api/github/get-file-content", (req, res) => {
+  const filePath = req.query.path as string;
+  if (!filePath) return res.status(400).json({ error: "Path is required" });
+  
+  // Normalize path to prevent directory traversal
+  const resolvedPath = path.resolve(process.cwd(), filePath);
+  if (!resolvedPath.startsWith(process.cwd())) {
+    return res.status(403).json({ error: "Access denied" });
+  }
+  try {
+    if (!fs.existsSync(resolvedPath)) {
+      return res.status(404).json({ error: "File not found" });
+    }
+    const content = fs.readFileSync(resolvedPath, 'base64');
+    res.json({ content });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 

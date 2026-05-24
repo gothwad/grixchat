@@ -32,11 +32,9 @@ function ErrorFallback({ error }: { error: any }) {
 }
 
 import ProfileTab from './features/profile/ProfileTab';
-import SettingsScreen from './features/settings/SettingsScreen';
 
 // Lazy Loading Features & Screens
 const ChatsTab = React.lazy(() => import('./features/chat/ChatsTab'));
-const HomeTab = React.lazy(() => import('./features/home/HomeTab'));
 const ChatLayout = React.lazy(() => import('./features/chat/ChatLayout'));
 const ChatScreen = React.lazy(() => import('./features/chat/ChatScreen'));
 const MessagesListScreen = React.lazy(() => import('./features/chat/MessagesListScreen'));
@@ -47,37 +45,21 @@ const SearchUserScreen = React.lazy(() => import('./features/chat/SearchUserScre
 const GrixAIScreen = React.lazy(() => import('./features/chat/GrixAIScreen'));
 const ChatSettingsScreen = React.lazy(() => import('./features/chat/ChatSettingsScreen'));
 
-const TubeScreen = React.lazy(() => import('./features/tube/GrixTubeScreen'));
-const TubeUploadScreen = React.lazy(() => import('./features/tube/TubeUploadScreen'));
-const VideoViewer = React.lazy(() => import('./features/tube/VideoViewer'));
-const EditTubeScreen = React.lazy(() => import('./features/tube/EditTubeScreen'));
+const SearchTab = React.lazy(() => import('./features/search/SearchTab'));
 
 const StoryMakerScreen = React.lazy(() => import('./features/stories/StoryMakerScreen'));
 const StoryWatcherScreen = React.lazy(() => import('./features/stories/StoryWatcherScreen'));
-const CreatePostScreen = React.lazy(() => import('./features/home/CreatePostScreen'));
-const EditPostScreen = React.lazy(() => import('./features/home/EditPostScreen.tsx'));
 const NotificationsScreen = React.lazy(() => import('./features/notifications/NotificationsScreen.tsx'));
 const LikeNotificationsScreen = React.lazy(() => import('./features/notifications/LikeNotificationsScreen.tsx'));
-const CommentsScreen = React.lazy(() => import('./features/home/CommentsScreen.tsx'));
-const ShareScreen = React.lazy(() => import('./features/home/ShareScreen.tsx'));
 
 // ProfileTab directly imported above
 const EditProfileScreen = React.lazy(() => import('./features/profile/EditProfileScreen'));
 const UserProfileScreen = React.lazy(() => import('./features/profile/UserProfileScreen'));
-const FollowListScreen = React.lazy(() => import('./features/profile/FollowListScreen'));
 const GrixAIProfile = React.lazy(() => import('./features/profile/GrixAIProfile'));
-const ProfilePostViewer = React.lazy(() => import('./features/profile/ProfilePostViewer.tsx'));
-const ProfileReelViewer = React.lazy(() => import('./features/profile/ProfileReelViewer.tsx'));
-const ProfileTubeViewer = React.lazy(() => import('./features/profile/ProfileTubeViewer.tsx'));
 
-const ReelsTab = React.lazy(() => import('./features/reels/ReelsTab'));
-const ReelsScreen = React.lazy(() => import('./features/reels/ReelsScreen'));
-const ReelsMakerScreen = React.lazy(() => import('./features/reels/ReelsMakerScreen'));
-const ReelWatcherScreen = React.lazy(() => import('./features/reels/ReelWatcherScreen'));
 
-import HubTab from './features/hub/HubTab';
 const CallsTab = React.lazy(() => import('./features/call/CallsTab'));
-const GithubScreen = React.lazy(() => import('./features/hub/github/GithubScreen'));
+const GroupsTab = React.lazy(() => import('./features/chat/GroupsTab'));
 const CameraTab = React.lazy(() => import('./features/camera/CameraTab'));
 
 const PrivacySettingsScreen = React.lazy(() => import('./features/settings/PrivacySettingsScreen'));
@@ -87,12 +69,12 @@ const AccountSettingsScreen = React.lazy(() => import('./features/settings/Accou
 const NotificationsSettingsScreen = React.lazy(() => import('./features/settings/NotificationsSettingsScreen'));
 const HelpScreen = React.lazy(() => import('./features/settings/HelpScreen'));
 const AppInfoScreen = React.lazy(() => import('./features/settings/AppInfoScreen'));
+const GithubScreen = React.lazy(() => import('./features/github/GithubScreen'));
 const TimeSpentScreen = React.lazy(() => import('./features/settings/TimeSpentScreen'));
 const FavoritesScreen = React.lazy(() => import('./features/settings/FavoritesScreen'));
 const BlockedAccountsScreen = React.lazy(() => import('./features/settings/BlockedAccountsScreen'));
 const MutedAccountsScreen = React.lazy(() => import('./features/settings/MutedAccountsScreen'));
 const DataUsageScreen = React.lazy(() => import('./features/settings/DataUsageScreen'));
-const AnalyticsScreen = React.lazy(() => import('./features/analytics/AnalyticsScreen'));
 const NewGroupScreen = React.lazy(() => import('./features/chat/NewGroupScreen'));
 const GroupSettingsScreen = React.lazy(() => import('./features/chat/GroupSettingsScreen'));
 
@@ -127,10 +109,11 @@ export default function App() {
   // Centralized Document Title Management
   useEffect(() => {
     const titles: { [key: string]: string } = {
-      '/': 'Home',
-      '/chats': 'Messages',
+      '/': 'Chats',
+      '/chats': 'Chats',
+      '/calls': 'Calls',
       '/reels': 'Reels',
-      '/hub': 'Hub',
+      '/groups': 'Groups',
       '/profile': 'Profile',
       '/settings': 'Settings',
       '/login': 'Login',
@@ -139,7 +122,7 @@ export default function App() {
       '/create': 'New Post',
       '/stories/create': 'New Story',
       '/reels/create': 'New Reel',
-      '/search-user': 'Search',
+      '/search': 'Search',
       '/grix-ai': 'Grix AI',
       '/verify-email': 'Verify Email',
       '/complete-profile': 'Complete Profile',
@@ -283,16 +266,14 @@ export default function App() {
                         !user ? <Navigate to="/login" /> : 
                         needsVerification ? <Navigate to="/verify-email" /> :
                         needsProfileCompletion ? <Navigate to="/complete-profile" /> :
-                        <HomeTab />
+                        <ChatsTab />
                       } />
-                      <Route path="/chats" element={user ? <ChatsTab /> : <Navigate to="/login" />} />
+                      <Route path="/chats" element={<Navigate to="/" replace />} />
                       <Route path="/chats/archived" element={user ? <ArchivedChatScreen /> : <Navigate to="/login" />} />
                       <Route path="/chats/hidden" element={user ? <HideChatScreen /> : <Navigate to="/login" />} />
                       <Route path="/chats/hidden/settings" element={user ? <HideChatSettings /> : <Navigate to="/login" />} />
-                      <Route path="/hub" element={user ? <HubTab /> : <Navigate to="/login" />} />
-                      <Route path="/reels" element={user ? <ReelsTab /> : <Navigate to="/login" />} />
-                      <Route path="/tube" element={user ? <TubeScreen /> : <Navigate to="/login" />} />
-                      <Route path="/tube/upload" element={user ? <TubeUploadScreen /> : <Navigate to="/login" />} />
+                      <Route path="/groups" element={user ? <GroupsTab /> : <Navigate to="/login" />} />
+                      <Route path="/search" element={user ? <SearchTab /> : <Navigate to="/login" />} />
                       <Route element={<ChatLayout />}>
                         <Route path="/chat/grix-ai" element={user ? <GrixAIScreen /> : <Navigate to="/login" />} />
                         <Route path="/chat/:id" element={user ? <ChatScreen /> : <Navigate to="/login" />} />
@@ -311,19 +292,11 @@ export default function App() {
                     } />
                     <Route path="/camera" element={user ? <CameraTab /> : <Navigate to="/login" />} />
                     <Route path="/call/:id" element={user ? <CallScreen /> : <Navigate to="/login" />} />
-                    <Route path="/create" element={user ? <CreatePostScreen /> : <Navigate to="/login" />} />
                     <Route path="/notifications" element={user ? <NotificationsScreen /> : <Navigate to="/login" />} />
                     <Route path="/notifications/likes" element={user ? <LikeNotificationsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/posts/:postId/comments" element={user ? <CommentsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/posts/:postId/share" element={user ? <ShareScreen /> : <Navigate to="/login" />} />
                     <Route path="/stories/create" element={user ? <StoryMakerScreen /> : <Navigate to="/login" />} />
-                    <Route path="/reels/create" element={user ? <ReelsMakerScreen /> : <Navigate to="/login" />} />
-                    <Route path="/posts/:id/edit" element={user ? <EditPostScreen /> : <Navigate to="/login" />} />
-                    <Route path="/reels/watch/:id" element={user ? <ReelWatcherScreen /> : <Navigate to="/login" />} />
-                    <Route path="/tube/watch/:id" element={user ? <VideoViewer /> : <Navigate to="/login" />} />
-                    <Route path="/tube/edit/:id" element={user ? <EditTubeScreen /> : <Navigate to="/login" />} />
                     <Route path="/stories/view/:userId" element={user ? <StoryWatcherScreen /> : <Navigate to="/login" />} />
-                    <Route path="/settings" element={user ? <SettingsScreen /> : <Navigate to="/login" />} />
+                    <Route path="/settings" element={<Navigate to="/profile" replace />} />
                     <Route path="/edit-profile" element={user ? <EditProfileScreen /> : <Navigate to="/login" />} />
                     <Route path="/privacy-settings" element={user ? <PrivacySettingsScreen /> : <Navigate to="/login" />} />
                     <Route path="/app-preferences" element={user ? <AppPreferencesScreen /> : <Navigate to="/login" />} />
@@ -335,11 +308,11 @@ export default function App() {
                     <Route path="/data-usage" element={user ? <DataUsageScreen /> : <Navigate to="/login" />} />
                     <Route path="/help" element={user ? <HelpScreen /> : <Navigate to="/login" />} />
                     <Route path="/app-info" element={user ? <AppInfoScreen /> : <Navigate to="/login" />} />
+                    <Route path="/github" element={user ? <GithubScreen /> : <Navigate to="/login" />} />
                     <Route path="/time-spent" element={user ? <TimeSpentScreen /> : <Navigate to="/login" />} />
                     <Route path="/favorites" element={user ? <FavoritesScreen /> : <Navigate to="/login" />} />
                     <Route path="/blocked-accounts" element={user ? <BlockedAccountsScreen /> : <Navigate to="/login" />} />
                     <Route path="/muted-accounts" element={user ? <MutedAccountsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/analytics" element={user ? <AnalyticsScreen /> : <Navigate to="/login" />} />
                     <Route path="/new-group" element={user ? <NewGroupScreen /> : <Navigate to="/login" />} />
                     <Route path="/group-settings/:id" element={user ? <GroupSettingsScreen /> : <Navigate to="/login" />} />
                     <Route path="/login" element={!user ? <LoginScreen /> : <Navigate to="/" />} />
@@ -348,15 +321,10 @@ export default function App() {
                     <Route path="/privacy-policy" element={<PrivacyPolicyScreen />} />
                     <Route path="/terms" element={<TermsAndConditionsScreen />} />
                     <Route path="/messages" element={user ? <MessagesListScreen /> : <Navigate to="/login" />} />
-                    <Route path="/search-user" element={user ? <SearchUserScreen /> : <Navigate to="/login" />} />
+                    <Route path="/search-user" element={<Navigate to="/search" replace />} />
                     <Route path="/user/:id" element={user ? <UserProfileScreen /> : <Navigate to="/login" />} />
-                    <Route path="/user/:id/posts" element={user ? <ProfilePostViewer /> : <Navigate to="/login" />} />
-                    <Route path="/user/:id/reels" element={user ? <ProfileReelViewer /> : <Navigate to="/login" />} />
-                    <Route path="/user/:id/tube" element={user ? <ProfileTubeViewer /> : <Navigate to="/login" />} />
-                    <Route path="/user/:id/:type" element={user ? <FollowListScreen /> : <Navigate to="/login" />} />
                     <Route path="/chat/preview" element={user ? <ImagePreviewScreen /> : <Navigate to="/login" />} />
                     <Route path="/profile/grix-ai" element={user ? <GrixAIProfile /> : <Navigate to="/login" />} />
-                    <Route path="/hub/github" element={user ? <GithubScreen /> : <Navigate to="/login" />} />
                     <Route path="*" element={<Navigate to="/" />} />
                   </Routes>
                 </React.Suspense>

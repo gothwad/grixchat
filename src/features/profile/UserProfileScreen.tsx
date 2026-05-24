@@ -1,3 +1,4 @@
+// UserProfileScreen.tsx with compact profile info without posts/reels
 import React, { useEffect, useState } from 'react';
 import { 
   ArrowLeft, 
@@ -17,34 +18,23 @@ import {
   UserPlus,
   UserCheck,
   LockKeyhole,
-  PlusSquare,
   X,
-  Loader2,
-  Clapperboard,
-  Bookmark,
-  Grid,
-  Play
+  Loader2
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { profileService } from './services/profileService';
 import { useAuth } from '../../providers/AuthProvider.tsx';
-import ProfileContent from './components/ProfileContent.tsx';
 import { motion, AnimatePresence } from 'motion/react';
-import PostCard from '../home/components/PostCard.tsx';
 
 export default function UserProfileScreen() {
   const { id: userId } = useParams();
   const navigate = useNavigate();
-  const { user: authUser, userData: myUserData, followingIds } = useAuth();
+  const { user: authUser, userData: myUserData } = useAuth();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isBlocked, setIsBlocked] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followLoading, setFollowLoading] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'posts' | 'reels' | 'tube' | 'saved'>('posts');
   const [showMenu, setShowMenu] = useState(false);
-  const [posts, setPosts] = useState<any[]>([]);
 
   const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
@@ -69,26 +59,9 @@ export default function UserProfileScreen() {
             bio: u.bio,
             profileType: u.profile_type,
             hidePhoto: u.hide_photo,
-            followers: [], // Real counts will be handled by follows table
+            followers: [],
             following: []
           });
-
-          // Fetch follow counts
-          const { count: followersCount } = await supabase
-            .from('follows')
-            .select('*', { count: 'exact', head: true })
-            .eq('following_id', userId);
-          
-          const { count: followingCount } = await supabase
-            .from('follows')
-            .select('*', { count: 'exact', head: true })
-            .eq('follower_id', userId);
-
-          setUser((prev: any) => ({
-            ...prev,
-            followers: Array(followersCount || 0).fill(0), // Dummy array for length compatibility
-            following: Array(followingCount || 0).fill(0)
-          }));
         }
       } catch (err) {
         console.error("Error fetching user:", err);
@@ -99,74 +72,12 @@ export default function UserProfileScreen() {
 
     fetchUser();
 
-    // Sync isBlocked and isFollowing from AuthProvider data
+    // Sync isBlocked
     if (myUserData) {
       setIsBlocked(myUserData.blockedUsers?.includes(userId) || false);
-      setIsFollowing(followingIds?.includes(userId || '') || false);
     }
 
-    // Fetch user content
-    const fetchContent = async () => {
-      if (!userId || !supabase) return;
-      try {
-        if (activeFilter === 'posts') {
-          const { data } = await supabase.from('posts').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-          setPosts((data || []).map(p => ({
-            ...p,
-            imageUrl: p.media_urls?.[0] || p.imageUrl 
-          })));
-        } else if (activeFilter === 'reels') {
-          const { data } = await supabase.from('reels').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-          setPosts((data || []).map(d => ({ ...d, imageUrl: d.cover_url || d.thumbnail_url || d.cover })));
-        } else if (activeFilter === 'tube') {
-          const { data } = await supabase.from('tube_videos').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-          setPosts((data || []).map(d => ({ ...d, imageUrl: d.thumbnail_url || d.thumbnail })));
-        } else if (activeFilter === 'saved') {
-          if (myUserData?.saved_posts && myUserData.saved_posts.length > 0) {
-            const { data } = await supabase.from('posts').select('*').in('id', myUserData.saved_posts).order('created_at', { ascending: false });
-            setPosts((data || []).map(p => ({
-              ...p,
-              imageUrl: p.media_urls?.[0] || p.imageUrl 
-            })));
-          } else {
-            setPosts([]);
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching content:", err);
-        setPosts([]);
-      }
-    };
-    fetchContent();
-
-  }, [userId, activeFilter, myUserData]);
-
-  const handleToggleFollow = async () => {
-    if (!authUser || !userId || followLoading) return;
-    setFollowLoading(true);
-    
-    try {
-      if (isFollowing) {
-        await profileService.unfollowUser(authUser.id, userId);
-      } else {
-        await profileService.followUser(authUser.id, userId);
-        
-        // Add Notification (optional, if table exists)
-        await supabase.from('notifications').insert({
-          user_id: userId,
-          from_user_id: authUser.id,
-          type: 'follow',
-          text: 'started following you'
-        } as any);
-      }
-      
-      setIsFollowing(!isFollowing);
-    } catch (error) {
-      console.error("Error toggling follow:", error);
-    } finally {
-      setFollowLoading(false);
-    }
-  };
+  }, [userId, myUserData]);
 
   const handleToggleBlock = async () => {
     if (!authUser || !userId) return;
@@ -204,8 +115,6 @@ export default function UserProfileScreen() {
     );
   }
 
-  const isPrivate = user.profileType === 'private' && !isFollowing && authUser?.uid !== userId;
-
   return (
     <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden font-sans">
       {/* Header */}
@@ -233,14 +142,17 @@ export default function UserProfileScreen() {
 
       <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
         <div className="px-4 pt-6">
-          {/* Profile Picture & Stats Row */}
-          <div className="flex items-center gap-4 mb-6">
-            <div className="relative shrink-0">
-              <div className="w-20 h-20 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600">
+          {/* Beautiful and Compact Profile Card */}
+          <div className="flex flex-col items-center text-center bg-[var(--bg-card)] p-6 rounded-2xl border border-[var(--border-color)]/60 shadow-sm mb-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-[30px] pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-28 h-28 bg-rose-500/5 rounded-full blur-[25px] pointer-events-none" />
+
+            <div className="relative mb-4 shrink-0">
+              <div className="w-22 h-22 rounded-full p-[3px] bg-gradient-to-tr from-indigo-500 via-sky-400 to-rose-400 shadow-md">
                 <div className="w-full h-full rounded-full border-2 border-[var(--bg-card)] overflow-hidden bg-[var(--bg-main)]">
                   <img 
                     src={user.hidePhoto ? DEFAULT_LOGO : (user.photoURL || DEFAULT_LOGO)} 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover rounded-full"
                     referrerPolicy="no-referrer"
                     alt="Profile"
                   />
@@ -248,117 +160,34 @@ export default function UserProfileScreen() {
               </div>
             </div>
 
-            {/* Stats Box (Single) */}
-            <div className="flex-1 bg-[var(--box-bg)] rounded-xl p-2 flex justify-between items-center min-h-[60px]">
+            <h2 className="text-lg font-black tracking-tight text-[var(--text-primary)] leading-tight">
+              {user.fullName || 'GrixChat User'}
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)] font-mono mt-1">
+              @{user.username || 'username'}
+            </p>
+
+            <p className="text-xs text-[var(--text-secondary)] mt-3 max-w-xs font-semibold leading-relaxed">
+              {user.bio || 'Available'}
+            </p>
+
+            {/* Symmetrical Action Button for Message */}
+            <div className="mt-5 w-full max-w-[180px]">
               <button 
-                onClick={() => !isPrivate && navigate(`/user/${userId}/followers`)}
-                className={`flex flex-col items-center flex-1 active:scale-95 transition-all ${isPrivate ? 'opacity-50 cursor-default' : ''}`}
+                onClick={() => navigate(`/chat/${userId}`)}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 px-4 bg-indigo-600 hover:bg-indigo-550 active:scale-[0.97] transition-all rounded-lg text-[10px] font-bold uppercase tracking-wider text-white shadow-md cursor-pointer"
               >
-                <span className="text-sm font-bold text-[var(--box-text)]">{user.followers?.length || 0}</span>
-                <span className="text-[10px] text-[var(--box-text)] opacity-80 uppercase font-bold tracking-wider">Followers</span>
-              </button>
-              <button 
-                onClick={() => !isPrivate && navigate(`/user/${userId}/following`)}
-                className={`flex flex-col items-center flex-1 active:scale-95 transition-all ${isPrivate ? 'opacity-50 cursor-default' : ''}`}
-              >
-                <span className="text-sm font-bold text-[var(--box-text)]">{user.following?.length || 0}</span>
-                <span className="text-[10px] text-[var(--box-text)] opacity-80 uppercase font-bold tracking-wider">Following</span>
+                <MessageSquare size={12} />
+                <span>Message</span>
               </button>
             </div>
-          </div>
-
-          {/* 4 Boxes Layout */}
-          <div className="grid grid-cols-2 gap-2 mb-6">
-            {/* Name & Username Box */}
-            <div className="bg-[var(--box-bg)] p-3 rounded-xl text-[var(--box-text)] flex flex-col justify-center min-h-[60px]">
-              <h2 className="text-[13px] font-bold leading-tight truncate">
-                {user.fullName || 'GrixChat User'}
-              </h2>
-              <p className="text-[11px] opacity-80 truncate">
-                @{user.username || 'username'}
-              </p>
-            </div>
-
-            {/* Bio Box */}
-            <div className="bg-[var(--box-bg)] p-3 rounded-xl text-[var(--box-text)] flex flex-col justify-center min-h-[60px]">
-              <p className="text-[11px] leading-tight line-clamp-3">
-                {user.bio || 'Available'}
-              </p>
-            </div>
-
-            {/* Follow Button Box */}
-            <button 
-              onClick={handleToggleFollow}
-              disabled={followLoading}
-              className={`bg-[var(--box-bg)] text-[var(--box-text)] px-4 py-3 rounded-xl text-[13px] font-bold active:scale-[0.98] transition-all text-left flex items-center justify-between ${isFollowing ? 'opacity-90' : ''}`}
-            >
-              <span>{isFollowing ? 'Following' : 'Follow'}</span>
-              {followLoading && <Loader2 size={14} className="animate-spin" />}
-            </button>
-
-            {/* Message Box */}
-            <button 
-              onClick={() => navigate(`/chat/${userId}`)}
-              className="bg-[var(--box-bg)] text-[var(--box-text)] px-4 py-3 rounded-xl text-[13px] font-bold active:scale-[0.98] transition-all text-left"
-            >
-              Message
-            </button>
           </div>
         </div>
 
-        {/* Profile Content (Tabs & Grid) */}
-        {isPrivate ? (
-          <div className="bg-[var(--bg-card)] p-10 flex flex-col items-center text-center mt-4 border-y border-[var(--border-color)]">
-            <div className="w-16 h-16 bg-[var(--bg-main)] rounded-full flex items-center justify-center text-[var(--text-secondary)] mb-4">
-              <LockKeyhole size={32} />
-            </div>
-            <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-tight mb-2">This Account is Private</h3>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-              Follow this account to see their photos, videos and profile details.
-            </p>
-          </div>
-        ) : (
-          <div className="px-4">
-            {/* Tabs Strip */}
-            <div className="flex bg-[var(--box-bg)] rounded-xl mb-4 overflow-hidden h-[46px] items-stretch">
-              <button 
-                onClick={() => setActiveFilter('posts')}
-                className={`flex-1 flex justify-center items-center transition-colors ${activeFilter === 'posts' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
-                title="Posts"
-              >
-                <Grid size={20} />
-              </button>
-              <button 
-                onClick={() => setActiveFilter('reels')}
-                className={`flex-1 flex justify-center items-center transition-colors ${activeFilter === 'reels' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
-                title="Reels"
-              >
-                <Clapperboard size={20} />
-              </button>
-              <button 
-                onClick={() => setActiveFilter('tube')}
-                className={`flex-1 flex justify-center items-center transition-colors ${activeFilter === 'tube' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
-                title="Tube"
-              >
-                <Play size={20} className="fill-current" />
-              </button>
-              <button 
-                onClick={() => setActiveFilter('saved')}
-                className={`flex-1 flex justify-center items-center transition-colors ${activeFilter === 'saved' ? 'bg-white/10 text-[var(--box-text)]' : 'text-[var(--box-text)] opacity-50'}`}
-                title="Saved"
-              >
-                <Bookmark size={20} />
-              </button>
-            </div>
-            <ProfileContent posts={posts} activeTab={activeFilter} userId={userId} />
-          </div>
-        )}
-
-        {/* Branding Footer */}
-        <div className="py-12 flex flex-col items-center gap-1 opacity-40">
-          <span className="text-[var(--text-secondary)] text-sm font-medium">from</span>
-          <span className="text-[var(--text-primary)] text-[10px] font-black tracking-[0.3em] uppercase">Gothwad technologies</span>
-          <span className="text-[var(--text-secondary)] text-[8px] uppercase tracking-tighter mt-1">made in india</span>
+        {/* Unified Branding Footer */}
+        <div className="py-8 flex flex-col items-center gap-1 opacity-35 text-center">
+          <span className="text-[var(--text-primary)] font-black tracking-[0.15em] uppercase text-[10px]">GrixChat</span>
+          <span className="text-[var(--text-secondary)] text-[9px] uppercase tracking-wider font-semibold">Made In India</span>
         </div>
       </div>
 

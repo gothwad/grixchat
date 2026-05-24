@@ -153,8 +153,9 @@ export const useConversations = (activeFilter: string) => {
     fetchConversations();
 
     // Subscribe to conversation updates and new participants
+    const channelId = `conversations-realtime-${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
-      .channel('conversations-realtime')
+      .channel(channelId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
         fetchConversations();
       })

@@ -97,26 +97,14 @@ export default function EditProfileScreen() {
   };
 
   const renderField = (field: string, label: string, value: string, setter: (v: string) => void, isTextArea: boolean = false, type: string = 'text') => {
-    const isBio = field === 'bio';
     return (
       <div className="space-y-2">
-        <div className="flex items-center justify-between mx-1">
-          <label className="text-xs font-bold text-[var(--text-primary)]">{label}</label>
-          {isBio && (
-            <span className={`text-[10px] font-mono ${value.length >= 50 ? 'text-red-500 font-bold' : 'text-[var(--text-secondary)]'}`}>
-              {value.length}/50
-            </span>
-          )}
-        </div>
+        <label className="text-xs font-bold text-[var(--text-primary)] ml-1">{label}</label>
         {isTextArea ? (
           <textarea
             value={value}
-            onChange={(e) => {
-              if (isBio && e.target.value.length > 50) return;
-              setter(e.target.value);
-            }}
-            maxLength={isBio ? 50 : undefined}
-            rows={2}
+            onChange={(e) => setter(e.target.value)}
+            rows={3}
             className="w-full px-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all placeholder:text-[var(--text-secondary)]/50 resize-none"
             placeholder={`Enter your ${label.toLowerCase()}`}
           />

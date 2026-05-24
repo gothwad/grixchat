@@ -193,8 +193,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           presenceChannelRef.current = null;
         }
 
-        // 1. Initial Fetch
-        await fetchProfileData(currentUserId, isSubscribed);
+        // 1. Initial Fetch with strict 3-second timeout protection
+        const fetchPromise = fetchProfileData(currentUserId, isSubscribed);
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('timeout'), 3000));
+        
+        const fetchResult = await Promise.race([fetchPromise, timeoutPromise]);
+        if (fetchResult === 'timeout') {
+          console.warn('Profile fetch timed out (3s), proceeding in background to prevent splash screen lock.');
+        }
 
         // 2. Profile Subscription (Listen to ALL events for this user)
         const profileChannel = supabase

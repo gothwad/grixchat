@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MessageCircle, LayoutGrid, UserCircle, Home, Waves } from 'lucide-react';
+import { MessageCircle, Users, UserCircle, Home, Search, Phone, Settings } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
@@ -8,22 +8,59 @@ import { motion } from 'motion/react';
 export default function TabBottom() {
   const { user: authUser } = useAuth();
   const location = useLocation();
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadChatsCount, setUnreadChatsCount] = useState(0);
+  const [unreadGroupsCount, setUnreadGroupsCount] = useState(0);
 
   useEffect(() => {
     if (!authUser || !supabase) return;
 
     const fetchUnread = async () => {
       try {
-        const { data, error } = await supabase
+        // Fetch participant conversations with their type
+        const { data: participants, error: pError } = await supabase
+          .from('conversation_participants')
+          .select(`
+            conversation_id,
+            conversation:conversations (
+              type
+            )
+          `)
+          .eq('user_id', authUser.id);
+
+        if (pError || !participants) return;
+
+        // Build a mapping of conversation_id -> type
+        const convTypeMap: Record<string, string> = {};
+        participants.forEach((p: any) => {
+          if (p.conversation_id && p.conversation) {
+            convTypeMap[p.conversation_id] = p.conversation.type || 'direct';
+          }
+        });
+
+        // Fetch unread messages
+        const { data: messages, error: mError } = await supabase
           .from('messages')
           .select('conversation_id')
           .eq('is_read', false)
           .neq('sender_id', authUser.id);
         
-        if (!error && data) {
-          const distinctConversations = new Set(data.map(m => m.conversation_id));
-          setUnreadCount(distinctConversations.size);
+        if (!mError && messages) {
+          const distinctConversations = Array.from(new Set(messages.map(m => m.conversation_id as string)));
+          
+          let chatsUnread = 0;
+          let groupsUnread = 0;
+
+          distinctConversations.forEach((cid: string) => {
+            const type = convTypeMap[cid];
+            if (type === 'group') {
+              groupsUnread++;
+            } else {
+              chatsUnread++;
+            }
+          });
+
+          setUnreadChatsCount(chatsUnread);
+          setUnreadGroupsCount(groupsUnread);
         }
       } catch (err) {
         console.error("Error fetching unread count:", err);
@@ -49,10 +86,10 @@ export default function TabBottom() {
   }, [authUser?.id]);
   
   const navItems = [
-    { icon: Home, path: '/', label: 'Home', activeColor: 'text-[var(--header-text)]' },
-    { icon: Waves, path: '/tube', label: 'Vibe', activeColor: 'text-[var(--header-text)]' },
-    { icon: MessageCircle, path: '/chats', label: 'Chats', badge: unreadCount, activeColor: 'text-[var(--header-text)]' },
-    { icon: LayoutGrid, path: '/hub', label: 'Hub', activeColor: 'text-[var(--header-text)]' },
+    { icon: MessageCircle, path: '/', label: 'Chats', badge: unreadChatsCount, activeColor: 'text-[var(--header-text)]' },
+    { icon: Users, path: '/groups', label: 'Groups', badge: unreadGroupsCount, activeColor: 'text-[var(--header-text)]' },
+    { icon: Search, path: '/search', label: 'Search', activeColor: 'text-[var(--header-text)]' },
+    { icon: Phone, path: '/calls', label: 'Calls', activeColor: 'text-[var(--header-text)]' },
     { icon: UserCircle, path: '/profile', label: 'Profile', activeColor: 'text-[var(--header-text)]' },
   ];
 
