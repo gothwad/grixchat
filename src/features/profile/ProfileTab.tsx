@@ -61,7 +61,7 @@ export default function ProfileTab() {
       title: 'Grix Settings & Sounds',
       items: [
         { icon: Bell, label: 'Notifications & Sounds', sub: 'Ringtones, Vibrations & Alerts', color: 'bg-amber-500/10 text-amber-500', onClick: () => navigate('/notifications-settings') },
-        { icon: Smartphone, label: 'Chat Preferences', sub: 'OLED Black, chat wall & cache clean', color: 'bg-purple-500/10 text-purple-500', onClick: () => navigate('/app-preferences') },
+        { icon: Smartphone, label: 'Chat Settings', sub: 'Archived, Hidden chats, Wallpaper & Theme', color: 'bg-purple-500/10 text-purple-500', onClick: () => navigate('/chat-settings') },
         { icon: Clock, label: 'Usage Stats & Time', sub: 'Daily usage log tracker', color: 'bg-teal-500/10 text-teal-500', onClick: () => navigate('/time-spent') },
       ]
     },

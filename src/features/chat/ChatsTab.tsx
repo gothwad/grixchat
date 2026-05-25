@@ -1,17 +1,28 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearch } from '../../contexts/SearchContext.tsx';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, Phone, Video, ArrowUpRight, ArrowDownLeft, PhoneMissed, Info, Lock, Users, Search, X } from 'lucide-react';
+import { MessageCircle, Phone, Video, ArrowUpRight, ArrowDownLeft, PhoneMissed, Info, Lock, Users, Search, X, Plus } from 'lucide-react';
 import { useLayout } from '../../contexts/LayoutContext.tsx';
 import { motion } from 'motion/react';
 import { useConversations } from './hooks/useConversations.ts';
 import { useCalls } from './hooks/useCalls.ts';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { ChatUserList } from './components/ChatUserList.tsx';
+import { supabase } from '../../lib/supabase';
+import { getAcceptedChats, initializeAcceptedConversations } from '../../utils/acceptedChats';
+import { storage } from '../../services/StorageService';
+
+interface StoryGroup {
+  userId: string;
+  username: string;
+  fullName: string;
+  photoURL: string;
+  hasUnseen: boolean;
+}
 
 export default function ChatsTab() {
   const navigate = useNavigate();
-  const { userData } = useAuth();
+  const { user: authUser, userData } = useAuth();
   const { searchTerm, setSearchTerm } = useSearch();
   const { activeFilters } = useLayout();
   const activeFilter = activeFilters['chats'] || 'Chats';
@@ -19,6 +30,40 @@ export default function ChatsTab() {
   const { conversations, otherUsers, loading: conversationsLoading } = useConversations(activeFilter);
   const { calls, loading: callsLoading } = useCalls(activeFilter);
   const loading = activeFilter === 'Calls' ? callsLoading : conversationsLoading;
+
+  const [stories, setStories] = useState<StoryGroup[]>([]);
+
+  useEffect(() => {
+    const fetchStories = async () => {
+      if (!supabase) return;
+      try {
+        const { data: storiesData } = await supabase
+          .from('stories')
+          .select('*, users:user_id(id, username, full_name, photo_url)')
+          .order('created_at', { ascending: false });
+
+        if (storiesData) {
+          const grouped: Record<string, StoryGroup> = {};
+          storiesData.forEach((s: any) => {
+            if (s.users && s.user_id !== authUser?.id) {
+              grouped[s.user_id] = {
+                userId: s.user_id,
+                username: s.users.username || 'User',
+                fullName: s.users.full_name || 'Grix User',
+                photoURL: s.users.photo_url || '',
+                hasUnseen: true
+              };
+            }
+          });
+          setStories(Object.values(grouped));
+        }
+      } catch (e) {
+        console.error('Error fetching active stories on ChatsTab:', e);
+      }
+    };
+
+    fetchStories();
+  }, [authUser?.id]);
 
   const isSecretCodeEntered = searchTerm && userData?.hiddenChatSettings?.secretCode && searchTerm === userData.hiddenChatSettings.secretCode;
 
@@ -30,6 +75,13 @@ export default function ChatsTab() {
     // Only show hidden chats if the secret code is entered
     if (isHidden && !isSecretCodeEntered) return false;
     if (isArchived) return false;
+
+    // Filter out Message Requests (not yet accepted)
+    if (conversations.length > 0 && !storage.getItem('grix_accepted_chats_initialized')) {
+      initializeAcceptedConversations(conversations.map(x => x.id));
+    }
+    const isRequest = c.type === 'direct' && !getAcceptedChats().includes(c.id);
+    if (isRequest) return false;
 
     const matchesSearch = (c.user || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (c.username || "").toLowerCase().includes(searchTerm.toLowerCase());
@@ -47,6 +99,58 @@ export default function ChatsTab() {
   return (
     <div className="h-full flex flex-col bg-[var(--bg-card)] overflow-hidden">
       <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
+        {/* INSTAGRAM STYLE STORIES - HORIZONTAL SCROLL ROW */}
+        {activeFilter === 'Chats' && (
+          <div className="shrink-0 border-b border-[var(--border-color)]/30 bg-[var(--bg-card)] py-3 px-4 flex gap-4 overflow-x-auto no-scrollbar scroll-smooth">
+            {/* Current User Story Circle */}
+            <div className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer min-w-[64px]">
+              <div 
+                onClick={() => navigate('/stories/create')} 
+                className="relative w-[54px] h-[54px] rounded-full overflow-visible flex items-center justify-center p-[2px] transition-transform active:scale-95"
+              >
+                <div className="w-full h-full rounded-full overflow-hidden border border-[var(--border-color)]/50">
+                  <img 
+                    src={userData?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
+                    alt="My profile"
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                {/* Plus Icon Overlay */}
+                <div className="absolute bottom-[-1px] right-[-1px] w-4.5 h-4.5 bg-blue-500 rounded-full flex items-center justify-center text-white border-2 border-[var(--bg-card)] shadow-sm">
+                  <Plus size={10} strokeWidth={3} />
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-[var(--text-secondary)] text-center w-full truncate">
+                Your Story
+              </span>
+            </div>
+
+            {/* Stories from database */}
+            {stories.map((story) => (
+              <div 
+                key={story.userId}
+                onClick={() => navigate(`/stories/view/${story.userId}`)}
+                className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer min-w-[64px]"
+              >
+                <div className="relative w-[54px] h-[54px] rounded-full flex items-center justify-center p-[2px] border-2 border-indigo-500 transition-transform active:scale-95">
+                  <div className="w-full h-full rounded-full overflow-hidden bg-[var(--bg-main)] border border-[var(--bg-card)]">
+                    <img 
+                      src={story.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
+                      alt={story.username}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-[var(--text-primary)] text-center w-full truncate">
+                  {story.username}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* WhatsApp-style Scrollable Search Bar */}
         <div className="px-4 pt-3 pb-2.5">
           <div className="flex items-center bg-[var(--bg-main)] rounded-xl px-3.5 h-10 border border-[var(--border-color)]/25 transition-all">
@@ -146,6 +250,7 @@ export default function ChatsTab() {
               otherUsers={searchTerm ? [] : filteredOtherUsers} // Only show "Others" if not searching or if search returns nothing? 
                                                                // Actually the user said "others user" should be below.
               showGrixAI={!searchTerm} 
+              archivedCount={userData?.archivedChats?.length || 0}
               showSecretHeader={isSecretCodeEntered}
               onSecretHeaderClick={() => navigate('/chats/hidden')}
               secretCount={userData?.hiddenChats?.length || 0}

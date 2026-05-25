@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, Lock } from 'lucide-react';
+import { MessageCircle, Lock, Archive } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface ChatItem {
@@ -30,6 +30,7 @@ interface ChatUserListProps {
   conversations: ChatItem[];
   otherUsers?: OtherUser[];
   showGrixAI?: boolean;
+  archivedCount?: number;
   showSecretHeader?: boolean;
   onSecretHeaderClick?: () => void;
   secretCount?: number;
@@ -42,6 +43,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
   conversations,
   otherUsers = [],
   showGrixAI = false,
+  archivedCount = 0,
   showSecretHeader = false,
   onSecretHeaderClick,
   secretCount = 0,
@@ -193,6 +195,35 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
             <div className="flex justify-between items-center">
               <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
                 Ask me anything! I'm here to help.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archived Chats Pinned Shortcut */}
+      {showGrixAI && (
+        <div 
+          onClick={() => navigate('/chats/archived')}
+          className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer"
+        >
+          <div className="relative shrink-0 z-10">
+            <div className="w-[52px] h-[52px] rounded-full bg-indigo-500/10 dark:bg-zinc-800 flex items-center justify-center text-[var(--primary)] group-hover:scale-105 transition-transform border border-[var(--border-color)]/30">
+              <Archive size={21} className="text-[var(--primary)]" />
+            </div>
+          </div>
+          <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 relative">
+            <div className="flex justify-between items-baseline mb-0.5">
+              <h3 className="text-[15px] truncate font-black text-[var(--text-primary)]">
+                Archived Chats
+              </h3>
+              <span className="text-[11px] whitespace-nowrap text-indigo-500 dark:text-indigo-400 font-bold tracking-tight">
+                View
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
+                Some of your conversion can be in archived
               </p>
             </div>
           </div>

@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { Search, X, Loader2, MessageSquare, Plus, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useConversations } from '../chat/hooks/useConversations';
+import { getAcceptedChats } from '../../utils/acceptedChats';
 
 interface UserProfile {
   uid: string;
@@ -13,14 +15,6 @@ interface UserProfile {
   isOnline?: boolean;
 }
 
-interface StoryGroup {
-  userId: string;
-  username: string;
-  fullName: string;
-  photoURL: string;
-  hasUnseen: boolean;
-}
-
 export default function SearchTab() {
   const navigate = useNavigate();
   const { user: authUser, userData } = useAuth();
@@ -28,7 +22,10 @@ export default function SearchTab() {
   const [loading, setLoading] = useState(true);
   const [userResults, setUserResults] = useState<UserProfile[]>([]);
   const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
-  const [stories, setStories] = useState<StoryGroup[]>([]);
+
+  // Real-time conversation tracking to fetch genuine incoming requests count
+  const { conversations } = useConversations('Chats');
+  const requestCount = conversations.filter(c => c.type === 'direct' && !getAcceptedChats().includes(c.id)).length;
 
   useEffect(() => {
     fetchInitialData();
@@ -58,29 +55,6 @@ export default function SearchTab() {
           });
         });
         setSuggestedUsers(mappedSuggested);
-      }
-
-      // Fetch active stories
-      const { data: storiesData } = await supabase
-        .from('stories')
-        .select('*, users:user_id(id, username, full_name, photo_url)')
-        .order('created_at', { ascending: false });
-
-      if (storiesData) {
-        // Group stories by user to show unique circles
-        const grouped: Record<string, StoryGroup> = {};
-        storiesData.forEach((s: any) => {
-          if (s.users && s.user_id !== authUser?.id) {
-            grouped[s.user_id] = {
-              userId: s.user_id,
-              username: s.users.username || 'User',
-              fullName: s.users.full_name || 'Grix User',
-              photoURL: s.users.photo_url || '',
-              hasUnseen: true // Simple read state mockup
-            };
-          }
-        });
-        setStories(Object.values(grouped));
       }
 
     } catch (error) {
@@ -129,108 +103,80 @@ export default function SearchTab() {
     }
   };
 
+  // Trending & Discovery Explore categories
+  const trendingTags = [
+    { name: 'Grix AI', query: 'grix-ai', icon: '🤖' },
+    { name: 'Reels Maker', query: 'reel', icon: '🍿' },
+    { name: 'Trending Users', query: 'a', icon: '✨' },
+    { name: 'Active Now', query: 'grix', icon: '📱' },
+    { name: 'Support', query: 'support', icon: '💬' },
+  ];
+
   return (
     <div className="h-full flex flex-col bg-[var(--bg-card)] overflow-hidden font-sans">
       
-      {/* 1. INSTAGRAM STYLE STORIES - HORIZONTAL SCROLL ROW */}
-      <div className="shrink-0 border-b border-[var(--border-color)]/30 bg-[var(--bg-card)] py-4 px-4 flex gap-4 overflow-x-auto no-scrollbar scroll-smooth">
-        {/* Current User Story Circle */}
-        <div className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer min-w-[68px]">
-          <div 
-            onClick={() => navigate('/stories/create')} 
-            className="relative w-[60px] h-[60px] rounded-full overflow-visible flex items-center justify-center p-[2px] transition-transform active:scale-95"
-          >
-            <div className="w-full h-full rounded-full overflow-hidden border border-[var(--border-color)]/50">
-              <img 
-                src={userData?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-                alt="My profile"
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-            {/* Plus Icon Overlay */}
-            <div className="absolute bottom-[-1px] right-[-1px] w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white border-2 border-[var(--bg-card)] shadow-md">
-              <Plus size={12} strokeWidth={3} />
-            </div>
-          </div>
-          <span className="text-[10px] font-bold text-[var(--text-secondary)] text-center w-full truncate">
-            Your Story
-          </span>
-        </div>
-
-        {/* Stories from database */}
-        {stories.length > 0 ? (
-          stories.map((story) => (
-            <div 
-              key={story.userId}
-              onClick={() => navigate(`/stories/view/${story.userId}`)}
-              className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer min-w-[68px]"
-            >
-              <div className="relative w-[60px] h-[60px] rounded-full flex items-center justify-center p-[2.5px] border-2 border-indigo-500 transition-transform active:scale-95">
-                <div className="w-full h-full rounded-full overflow-hidden bg-[var(--bg-main)] border border-[var(--bg-card)]">
-                  <img 
-                    src={story.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-                    alt={story.username}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-              </div>
-              <span className="text-[10px] font-bold text-[var(--text-primary)] text-center w-full truncate">
-                {story.username}
-              </span>
-            </div>
-          ))
-        ) : (
-          /* fallback suggestion bubbles if no stories to keep alignment professional and gorgeous */
-          suggestedUsers.slice(0, 6).map((suggested) => (
-            <div 
-              key={suggested.uid}
-              onClick={() => navigate(`/user/${suggested.uid}`)}
-              className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer min-w-[68px] opacity-80"
-            >
-              <div className="relative w-[60px] h-[60px] rounded-full flex items-center justify-center p-[2px] border border-dashed border-[var(--border-color)] transition-transform active:scale-95">
-                <div className="w-full h-full rounded-full overflow-hidden">
-                  <img 
-                    src={suggested.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-                    alt={suggested.username}
-                    className="w-full h-full object-cover grayscale"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-              </div>
-              <span className="text-[10px] font-medium text-[var(--text-secondary)] text-center w-full truncate">
-                {suggested.username}
-              </span>
-            </div>
-          ))
-        )}
-      </div>
-
       {/* 2. BEAUTIFIED SEARCH BAR */}
-      <div className="px-5 py-4 shrink-0 bg-[var(--bg-card)] z-40">
-        <div className="flex items-center bg-[var(--bg-main)] hover:bg-[var(--bg-main)]/80 focus-within:bg-[var(--bg-main)] rounded-2xl px-4 h-12 border border-[var(--border-color)]/30 shadow-sm transition-all">
-          <Search size={18} className="text-[var(--text-secondary)] mr-3 opacity-60" />
+      <div className="px-5 py-3.5 shrink-0 bg-[var(--bg-card)] z-40 border-b border-[var(--border-color)]/20">
+        <div className="flex items-center bg-[var(--bg-main)] hover:bg-[var(--bg-main)]/90 focus-within:bg-[var(--bg-main)] rounded-2xl px-4 h-11 border border-[var(--border-color)]/30 focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/10 shadow-sm transition-all duration-250">
+          <Search size={16} className="text-[var(--text-secondary)] mr-2.5 opacity-60" />
           <input 
             type="text" 
             placeholder="Search username or name..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 bg-transparent border-none outline-none text-[14px] font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50"
+            className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50"
           />
           {searchTerm && (
             <button 
               onClick={() => setSearchTerm('')}
-              className="p-1 hover:bg-black/5 rounded-full transition-colors"
+              className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors"
             >
-              <X size={16} className="text-[var(--text-secondary)]" />
+              <X size={14} className="text-[var(--text-secondary)]" />
             </button>
           )}
         </div>
       </div>
 
+      {/* 2.5 MESSAGE REQUESTS SHORTCUT (Archived style layout with custom icon) */}
+      {!searchTerm && (
+        <div 
+          onClick={() => navigate('/chats/requests')}
+          className="flex items-center gap-[15px] px-5 py-4 hover:bg-[var(--bg-main)] transition-all active:scale-[0.99] group cursor-pointer border-b border-[var(--border-color)]/25 bg-[var(--bg-card)] shrink-0 select-none"
+        >
+          <div className="relative shrink-0 z-10">
+            {/* Custom request style avatar icon */}
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 dark:bg-indigo-950/30 flex items-center justify-center text-indigo-500 group-hover:scale-105 transition-transform border border-indigo-500/20 shadow-sm">
+              <MessageSquare size={21} strokeWidth={2.5} />
+            </div>
+            {requestCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-600 text-[10px] font-black font-mono text-white rounded-full flex items-center justify-center animate-bounce border border-white dark:border-[var(--bg-card)]">
+                {requestCount}
+              </span>
+            )}
+          </div>
+          <div className="flex-1 min-w-0 relative">
+            <div className="flex justify-between items-baseline mb-0.5">
+              <h3 className="text-sm font-black text-[var(--text-primary)] tracking-tight">
+                Message Requests
+              </h3>
+              <span className="text-[11px] whitespace-nowrap text-indigo-500 dark:text-indigo-400 font-bold tracking-tight">
+                View
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <p className="text-[11px] truncate text-[var(--text-secondary)] leading-tight">
+                {requestCount > 0 
+                  ? `You have ${requestCount} pending chat request${requestCount > 1 ? 's' : ''}` 
+                  : "No new requests from people you don't know"
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 3. SEARCH RESULTS OR SUGGESTIONS */}
-      <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
+      <div className="flex-1 overflow-y-auto no-scrollbar pb-32 bg-[var(--bg-card)]">
         {loading && searchTerm ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <Loader2 className="animate-spin text-indigo-600" size={28} />
@@ -238,24 +184,25 @@ export default function SearchTab() {
           </div>
         ) : (
           <div className="flex flex-col">
-            <div className="px-6 py-2">
-              <h3 className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-[0.15em]">
+            <div className="px-5 pt-5 pb-2">
+              <h3 className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em] opacity-80 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                 {searchTerm ? 'Search Results' : 'Suggested People'}
               </h3>
             </div>
 
-            <div className="divide-y divide-[var(--border-color)]/20 mt-1">
+            <div className="mt-1">
               {(searchTerm ? userResults : suggestedUsers).map((profile) => (
                 <div 
                   key={profile.uid}
                   onClick={() => navigate(`/user/${profile.uid}`)}
-                  className="flex items-center gap-3.5 px-6 py-4 hover:bg-[var(--bg-main)]/50 transition-colors cursor-pointer group active:bg-[var(--bg-main)]"
+                  className="flex items-center gap-3.5 px-5 py-3 hover:bg-[var(--bg-main)] transition-all duration-200 cursor-pointer group active:bg-[var(--bg-main)] border-b border-[var(--border-color)]/10"
                 >
                   <div className="relative">
                     <img 
                       src={profile.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
                       alt={profile.username}
-                      className="w-12 h-12 rounded-full object-cover border border-[var(--border-color)] group-hover:scale-105 transition-transform"
+                      className="w-12 h-12 rounded-full object-cover border border-[var(--border-color)] group-hover:scale-102 transition-transform shadow-sm"
                       referrerPolicy="no-referrer"
                     />
                     {profile.isOnline && (
@@ -264,10 +211,10 @@ export default function SearchTab() {
                   </div>
                   
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-[14px] font-bold text-[var(--text-primary)] truncate">
+                    <h4 className="text-[13.5px] font-extrabold text-[var(--text-primary)] truncate group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors">
                       {profile.fullName || profile.username}
                     </h4>
-                    <p className="text-xs text-[var(--text-secondary)] truncate">@{profile.username}</p>
+                    <p className="text-[11px] text-[var(--text-secondary)]/80 font-bold truncate">@{profile.username}</p>
                   </div>
                   
                   <button 
@@ -275,9 +222,9 @@ export default function SearchTab() {
                       e.stopPropagation();
                       navigate(`/chat/${profile.uid}`);
                     }}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-sm shrink-0"
+                    className="px-3.5 py-1.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1 shadow-md shrink-0 cursor-pointer"
                   >
-                    <MessageSquare size={13} strokeWidth={2.5} />
+                    <MessageSquare size={12} strokeWidth={3} />
                     <span>Message</span>
                   </button>
                 </div>
@@ -296,6 +243,9 @@ export default function SearchTab() {
           </div>
         )}
       </div>
+
+
+
     </div>
   );
 }

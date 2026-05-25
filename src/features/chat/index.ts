@@ -5,3 +5,4 @@ export { default as ChatLayout } from './ChatLayout';
 export { default as HideChatScreen } from './HideChatScreen';
 export { default as ArchivedChatScreen } from './ArchivedChatScreen';
 export { default as HideChatSettings } from './HideChatSettings';
+export { default as MessageRequestsScreen } from './MessageRequestsScreen';

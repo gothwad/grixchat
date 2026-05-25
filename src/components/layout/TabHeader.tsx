@@ -111,32 +111,10 @@ export default function TabHeader() {
         </Link>
       </div>
       <div className="flex items-center gap-1">
-        {/* Archived Chats Shortcut - Show on Chats and Groups */}
-        {(isChatsPage || isGroupsPage) && (
-          <button 
-            onClick={() => navigate('/chats/archived')}
-            className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group"
-            title="Archived Chats"
-          >
-            <Archive size={21} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
-          </button>
-        )}
-
-        {/* Hidden Chats Shortcut - Show on Chats and Groups if allowed */}
-        {(isChatsPage || isGroupsPage) && (userData?.hiddenChatSettings?.showMenuEntry !== false) && (
-          <button 
-            onClick={() => navigate('/chats/hidden')}
-            className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group"
-            title="Hidden Chats"
-          >
-            <EyeOff size={21} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
-          </button>
-        )}
-
         {/* Heart Icon - Show on Reels */}
         {isReelsPage && (
           <Link to="/notifications/likes" className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group relative">
-            <Heart size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" fill="currentColor" fillOpacity={0.1} />
+            <Heart size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" fill={location.pathname === '/notifications/likes' ? "currentColor" : "none"} />
             {hasUnreadLikes && (
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[var(--header-bg)]" />
             )}
@@ -153,15 +131,7 @@ export default function TabHeader() {
           </Link>
         )}
 
-        {/* Analytics Icon - Show on Profile (Left of Settings) */}
-        {isProfilePage && (
-          <button 
-            onClick={() => navigate('/analytics')}
-            className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group"
-          >
-            <BarChart2 size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
-          </button>
-        )}
+
 
 
 

@@ -32,6 +32,8 @@ export default function CallsTab() {
   const [searchQuery, setSearchQuery] = useState('');
   const [contactsLoading, setContactsLoading] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [mediaFilter, setMediaFilter] = useState<'voice' | 'video'>('voice');
+  const [statusFilter, setStatusFilter] = useState<'incoming' | 'outgoing' | 'missed'>('incoming');
 
   const fetchCalls = async () => {
     if (!authUser || !supabase) return;
@@ -150,12 +152,62 @@ export default function CallsTab() {
     (c.username || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const filteredCalls = calls.filter(call => {
+    // 1. Media Filter (Audio / Video)
+    if (mediaFilter === 'voice' && call.type !== 'voice') return false;
+    if (mediaFilter === 'video' && call.type !== 'video') return false;
+
+    // 2. Status Filter (Incoming / Outgoing / Missed)
+    if (statusFilter === 'incoming') {
+      if (!call.isIncoming || call.isMissed) return false;
+    }
+    if (statusFilter === 'outgoing') {
+      if (call.isIncoming) return false;
+    }
+    if (statusFilter === 'missed') {
+      if (!call.isMissed) return false;
+    }
+
+    return true;
+  });
+
   return (
     <div className="flex flex-col h-full bg-[var(--bg-main)] font-sans relative">
       {/* Scrollable Container */}
       <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
+        
+        {/* Dual Switch Filter ABOVE Create Link */}
+        <div className="px-4 pt-4 pb-1 shrink-0">
+          <div className="flex bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-color)]/25">
+            <button
+              onClick={() => {
+                setMediaFilter('voice');
+              }}
+              className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+                mediaFilter === 'voice'
+                  ? 'bg-[var(--bg-main)] text-[var(--primary)] shadow-sm'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              AUDIO
+            </button>
+            <button
+              onClick={() => {
+                setMediaFilter('video');
+              }}
+              className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+                mediaFilter === 'video'
+                  ? 'bg-[var(--bg-main)] text-[var(--primary)] shadow-sm'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              VIDEO
+            </button>
+          </div>
+        </div>
+
         {/* Create Call Link Header - WhatsApp Style */}
-        <div className="px-4 pt-4 pb-2">
+        <div className="px-4 pt-2 pb-2">
           <div 
             onClick={handleCopyCallLink}
             className="flex items-center gap-4 bg-[var(--bg-card)] border border-[var(--border-color)]/50 p-4 rounded-2xl hover:bg-[var(--bg-card)]/90 transition-all cursor-pointer shadow-sm group active:scale-[0.99]"
@@ -176,14 +228,50 @@ export default function CallsTab() {
           </div>
         </div>
 
+        {/* Consistent 3-Way Switch Filter BELOW Create Link */}
+        <div className="px-4 py-2 shrink-0">
+          <div className="flex bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-color)]/25">
+            <button
+              onClick={() => setStatusFilter('incoming')}
+              className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+                statusFilter === 'incoming'
+                  ? 'bg-[var(--bg-main)] text-[var(--primary)] shadow-sm'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              INCOMING
+            </button>
+            <button
+              onClick={() => setStatusFilter('outgoing')}
+              className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+                statusFilter === 'outgoing'
+                  ? 'bg-[var(--bg-main)] text-[var(--primary)] shadow-sm'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              OUTGOING
+            </button>
+            <button
+              onClick={() => setStatusFilter('missed')}
+              className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+                statusFilter === 'missed'
+                  ? 'bg-[var(--bg-main)] text-[var(--primary)] shadow-sm'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              MISSED
+            </button>
+          </div>
+        </div>
+
         {/* Section title for recent logs */}
         <div className="px-5 pt-3 pb-2 flex items-center justify-between select-none">
           <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em]">
-            Recent Calls
+            History Logs
           </span>
           {calls.length > 0 && (
             <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase opacity-60">
-              Logs
+              {filteredCalls.length} logs
             </span>
           )}
         </div>
@@ -214,15 +302,38 @@ export default function CallsTab() {
               </button>
             </div>
           </div>
+        ) : filteredCalls.length === 0 ? (
+          <div className="px-4 py-6">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-4 shadow-sm">
+              <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center animate-pulse">
+                <PhoneCall size={30} />
+              </div>
+              <div className="max-w-[240px]">
+                <h3 className="text-sm font-bold text-[var(--text-primary)] mb-1">No matching calls</h3>
+                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                  No call logs found matching your active filter configuration.
+                </p>
+              </div>
+              <button 
+                onClick={() => {
+                  setMediaFilter('voice');
+                  setStatusFilter('incoming');
+                }}
+                className="mt-2 text-xs font-black uppercase tracking-wider bg-indigo-650 hover:bg-indigo-600 text-white px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
         ) : (
           <div className="px-4 space-y-2">
-            {calls.map((call) => (
+            {filteredCalls.map((call) => (
               <div 
                 key={call.id}
                 className="flex items-center gap-3.5 bg-[var(--bg-card)] border border-[var(--border-color)]/30 px-4 py-3.5 rounded-2xl shadow-sm hover:bg-[var(--bg-card)]/80 transition-all select-none group"
               >
                 <img 
-                  src={call.avatar} 
+                  src={call.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
                   alt={call.user} 
                   className="w-11 h-11 rounded-full object-cover border border-[var(--border-color)]/50 shrink-0"
                   referrerPolicy="no-referrer"
@@ -269,15 +380,7 @@ export default function CallsTab() {
         )}
       </div>
 
-      {/* Floating Action Button - Contacts / Dialer Style */}
-      <div className="absolute bottom-6 right-6 z-40">
-        <button 
-          onClick={handleOpenContacts}
-          className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-550 text-white flex items-center justify-center shadow-xl shadow-indigo-600/25 active:scale-95 transition-transform duration-100 cursor-pointer"
-        >
-          <Plus size={24} strokeWidth={2.5} />
-        </button>
-      </div>
+
 
       {/* Active Contacts Sheet for launching voice/video calls */}
       <AnimatePresence>

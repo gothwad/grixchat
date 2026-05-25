@@ -41,6 +41,7 @@ const MessagesListScreen = React.lazy(() => import('./features/chat/MessagesList
 const HideChatScreen = React.lazy(() => import('./features/chat/HideChatScreen'));
 const ArchivedChatScreen = React.lazy(() => import('./features/chat/ArchivedChatScreen'));
 const HideChatSettings = React.lazy(() => import('./features/chat/HideChatSettings'));
+const MessageRequestsScreen = React.lazy(() => import('./features/chat/MessageRequestsScreen'));
 const SearchUserScreen = React.lazy(() => import('./features/chat/SearchUserScreen'));
 const GrixAIScreen = React.lazy(() => import('./features/chat/GrixAIScreen'));
 const ChatSettingsScreen = React.lazy(() => import('./features/chat/ChatSettingsScreen'));
@@ -64,6 +65,7 @@ const CameraTab = React.lazy(() => import('./features/camera/CameraTab'));
 
 const PrivacySettingsScreen = React.lazy(() => import('./features/settings/PrivacySettingsScreen'));
 const AppPreferencesScreen = React.lazy(() => import('./features/settings/AppPreferencesScreen'));
+const ChatSettingsMainScreen = React.lazy(() => import('./features/settings/ChatSettingsMainScreen'));
 // SettingsScreen directly imported above
 const AccountSettingsScreen = React.lazy(() => import('./features/settings/AccountSettingsScreen'));
 const NotificationsSettingsScreen = React.lazy(() => import('./features/settings/NotificationsSettingsScreen'));
@@ -270,6 +272,7 @@ export default function App() {
                       } />
                       <Route path="/chats" element={<Navigate to="/" replace />} />
                       <Route path="/chats/archived" element={user ? <ArchivedChatScreen /> : <Navigate to="/login" />} />
+                      <Route path="/chats/requests" element={user ? <MessageRequestsScreen /> : <Navigate to="/login" />} />
                       <Route path="/chats/hidden" element={user ? <HideChatScreen /> : <Navigate to="/login" />} />
                       <Route path="/chats/hidden/settings" element={user ? <HideChatSettings /> : <Navigate to="/login" />} />
                       <Route path="/groups" element={user ? <GroupsTab /> : <Navigate to="/login" />} />
@@ -299,6 +302,7 @@ export default function App() {
                     <Route path="/settings" element={<Navigate to="/profile" replace />} />
                     <Route path="/edit-profile" element={user ? <EditProfileScreen /> : <Navigate to="/login" />} />
                     <Route path="/privacy-settings" element={user ? <PrivacySettingsScreen /> : <Navigate to="/login" />} />
+                    <Route path="/chat-settings" element={user ? <ChatSettingsMainScreen /> : <Navigate to="/login" />} />
                     <Route path="/app-preferences" element={user ? <AppPreferencesScreen /> : <Navigate to="/login" />} />
                     <Route path="/account-settings" element={user ? <AccountSettingsScreen /> : <Navigate to="/login" />} />
                     <Route path="/app-lock" element={user ? <AppLockScreen /> : <Navigate to="/login" />} />

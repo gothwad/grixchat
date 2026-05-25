@@ -17,6 +17,7 @@ import ChatBottom from '../../components/layout/ChatBottom.tsx';
 import WatchTogether from './components/WatchTogether.tsx';
 import { MessageList } from './components/MessageList';
 import { ChatOptionsSheet } from './components/ChatOptionsSheet';
+import { getAcceptedChats, acceptChat, declineChat } from '../../utils/acceptedChats';
 
 export default function ChatScreen() {
   const { id: receiverId } = useParams();
@@ -25,6 +26,16 @@ export default function ChatScreen() {
   const { user, userData: currentUserData } = useAuth();
   
   const { chatId, convType } = useChatId(receiverId);
+
+  // Tracks if the direct conversation is accepted or if it is a pending Message Request
+  const [isAccepted, setIsAccepted] = useState(true);
+
+  useEffect(() => {
+    if (chatId) {
+      const accepted = convType !== 'direct' || getAcceptedChats().includes(chatId);
+      setIsAccepted(accepted);
+    }
+  }, [chatId, convType]);
 
   const [showOptions, setShowOptions] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
@@ -355,41 +366,69 @@ export default function ChatScreen() {
         isOtherTyping={isOtherTyping}
       />
 
-      <ChatBottom 
-        activeMessageMenu={activeMessageMenu}
-        setActiveMessageMenu={setActiveMessageMenu}
-        setReplyingTo={setReplyingTo}
-        startEdit={startEdit}
-        deleteMessage={performDeleteMessage}
-        currentUserUid={user?.id}
-        setShowReactionPicker={setShowReactionPicker}
-        editingMessage={editingMessage}
-        setEditingMessage={setEditingMessage}
-        newMessage={newMessage}
-        setNewMessage={setNewMessage}
-        replyingTo={replyingTo}
-        receiver={receiver}
-        handleSendMessage={handleSendMessage}
-        fileInputRef={fileInputRef}
-        imageInputRef={imageInputRef}
-        handleFileChange={handleFileChange}
-        showPlusMenu={showPlusMenu}
-        setShowPlusMenu={setShowPlusMenu}
-        plusMenuRef={plusMenuRef}
-        chatId={chatId}
-        filePreviewUrls={filePreviewUrls}
-        isUploading={isUploading}
-        uploadProgress={uploadProgress}
-        setSelectedFiles={setSelectedFiles}
-        setFilePreviewUrls={setFilePreviewUrls}
-        textareaRef={textareaRef}
-        handleTyping={handleTyping}
-        showEmojiPicker={showEmojiPicker}
-        setShowEmojiPicker={setShowEmojiPicker}
-        emojiPickerRef={emojiPickerRef}
-        isSending={isSending}
-        selectedFiles={selectedFiles}
-      />
+      {!isAccepted ? (
+        <div className="p-5 bg-[var(--bg-card)] border-t border-[var(--border-color)]/25 flex flex-col items-center text-center gap-3.5 shrink-0 z-40 select-none">
+          <p className="text-xs text-[var(--text-secondary)] font-semibold leading-relaxed max-w-[280px]">
+            The sender is not in your chat list. Do you want to accept this message request and start chatting?
+          </p>
+          <div className="flex gap-3.5 w-full max-w-[280px]">
+            <button
+              onClick={() => {
+                declineChat(chatId);
+                navigate(-1);
+              }}
+              className="flex-1 py-3 border border-red-500/20 text-red-500 font-black text-[11px] uppercase tracking-wider rounded-2xl hover:bg-red-500/[0.04] transition-all cursor-pointer active:scale-95"
+            >
+              Block & Delete
+            </button>
+            <button
+              onClick={() => {
+                acceptChat(chatId);
+                setIsAccepted(true);
+              }}
+              className="flex-1 py-3 bg-indigo-650 text-white font-black text-[11px] uppercase tracking-wider rounded-2xl hover:bg-indigo-550 transition-all cursor-pointer active:scale-95 shadow-md"
+            >
+              Accept Chat
+            </button>
+          </div>
+        </div>
+      ) : (
+        <ChatBottom 
+          activeMessageMenu={activeMessageMenu}
+          setActiveMessageMenu={setActiveMessageMenu}
+          setReplyingTo={setReplyingTo}
+          startEdit={startEdit}
+          deleteMessage={performDeleteMessage}
+          currentUserUid={user?.id}
+          setShowReactionPicker={setShowReactionPicker}
+          editingMessage={editingMessage}
+          setEditingMessage={setEditingMessage}
+          newMessage={newMessage}
+          setNewMessage={setNewMessage}
+          replyingTo={replyingTo}
+          receiver={receiver}
+          handleSendMessage={handleSendMessage}
+          fileInputRef={fileInputRef}
+          imageInputRef={imageInputRef}
+          handleFileChange={handleFileChange}
+          showPlusMenu={showPlusMenu}
+          setShowPlusMenu={setShowPlusMenu}
+          plusMenuRef={plusMenuRef}
+          chatId={chatId}
+          filePreviewUrls={filePreviewUrls}
+          isUploading={isUploading}
+          uploadProgress={uploadProgress}
+          setSelectedFiles={setSelectedFiles}
+          setFilePreviewUrls={setFilePreviewUrls}
+          textareaRef={textareaRef}
+          handleTyping={handleTyping}
+          showEmojiPicker={showEmojiPicker}
+          setShowEmojiPicker={setShowEmojiPicker}
+          emojiPickerRef={emojiPickerRef}
+          isSending={isSending}
+          selectedFiles={selectedFiles}
+        />
+      )}
 
       <ChatOptionsSheet 
         isOpen={showOptions}
