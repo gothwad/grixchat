@@ -47,6 +47,7 @@ const GrixAIScreen = React.lazy(() => import('./features/chat/GrixAIScreen'));
 const ChatSettingsScreen = React.lazy(() => import('./features/chat/ChatSettingsScreen'));
 
 const SearchTab = React.lazy(() => import('./features/search/SearchTab'));
+const FriendsScreen = React.lazy(() => import('./features/search/FriendsScreen'));
 
 const StoryMakerScreen = React.lazy(() => import('./features/stories/StoryMakerScreen'));
 const StoryWatcherScreen = React.lazy(() => import('./features/stories/StoryWatcherScreen'));
@@ -265,18 +266,24 @@ export default function App() {
                     {/* Main Layout Routes */}
                     <Route element={<MainLayout />}>
                       <Route path="/" element={
-                        !user ? <Navigate to="/login" /> : 
-                        needsVerification ? <Navigate to="/verify-email" /> :
-                        needsProfileCompletion ? <Navigate to="/complete-profile" /> :
+                        !user ? <Navigate to="/login" replace /> : 
+                        needsVerification ? <Navigate to="/verify-email" replace /> :
+                        needsProfileCompletion ? <Navigate to="/complete-profile" replace /> :
+                        <Navigate to="/chats" replace />
+                      } />
+                      <Route path="/chats" element={
+                        !user ? <Navigate to="/login" replace /> : 
+                        needsVerification ? <Navigate to="/verify-email" replace /> :
+                        needsProfileCompletion ? <Navigate to="/complete-profile" replace /> :
                         <ChatsTab />
                       } />
-                      <Route path="/chats" element={<Navigate to="/" replace />} />
                       <Route path="/chats/archived" element={user ? <ArchivedChatScreen /> : <Navigate to="/login" />} />
                       <Route path="/chats/requests" element={user ? <MessageRequestsScreen /> : <Navigate to="/login" />} />
                       <Route path="/chats/hidden" element={user ? <HideChatScreen /> : <Navigate to="/login" />} />
                       <Route path="/chats/hidden/settings" element={user ? <HideChatSettings /> : <Navigate to="/login" />} />
                       <Route path="/groups" element={user ? <GroupsTab /> : <Navigate to="/login" />} />
                       <Route path="/search" element={user ? <SearchTab /> : <Navigate to="/login" />} />
+                      <Route path="/search/friends" element={user ? <FriendsScreen /> : <Navigate to="/login" />} />
                       <Route element={<ChatLayout />}>
                         <Route path="/chat/grix-ai" element={user ? <GrixAIScreen /> : <Navigate to="/login" />} />
                         <Route path="/chat/:id" element={user ? <ChatScreen /> : <Navigate to="/login" />} />
@@ -288,10 +295,10 @@ export default function App() {
     
                     {/* Other Routes */}
                     <Route path="/verify-email" element={
-                      user && !user.email_confirmed_at ? <VerifyEmailScreen /> : <Navigate to="/" />
+                      user && !user.email_confirmed_at ? <VerifyEmailScreen /> : <Navigate to="/chats" replace />
                     } />
                     <Route path="/complete-profile" element={
-                      user && (!userData || !userData.username) ? <CompleteProfileScreen /> : <Navigate to="/" />
+                      user && (!userData || !userData.username) ? <CompleteProfileScreen /> : <Navigate to="/chats" replace />
                     } />
                     <Route path="/camera" element={user ? <CameraTab /> : <Navigate to="/login" />} />
                     <Route path="/call/:id" element={user ? <CallScreen /> : <Navigate to="/login" />} />
@@ -319,9 +326,9 @@ export default function App() {
                     <Route path="/muted-accounts" element={user ? <MutedAccountsScreen /> : <Navigate to="/login" />} />
                     <Route path="/new-group" element={user ? <NewGroupScreen /> : <Navigate to="/login" />} />
                     <Route path="/group-settings/:id" element={user ? <GroupSettingsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/login" element={!user ? <LoginScreen /> : <Navigate to="/" />} />
-                    <Route path="/signup" element={!user ? <SignupScreen /> : <Navigate to="/" />} />
-                    <Route path="/forgot-password" element={!user ? <ForgotPasswordScreen /> : <Navigate to="/" />} />
+                    <Route path="/login" element={!user ? <LoginScreen /> : <Navigate to="/chats" replace />} />
+                    <Route path="/signup" element={!user ? <SignupScreen /> : <Navigate to="/chats" replace />} />
+                    <Route path="/forgot-password" element={!user ? <ForgotPasswordScreen /> : <Navigate to="/chats" replace />} />
                     <Route path="/privacy-policy" element={<PrivacyPolicyScreen />} />
                     <Route path="/terms" element={<TermsAndConditionsScreen />} />
                     <Route path="/messages" element={user ? <MessagesListScreen /> : <Navigate to="/login" />} />
@@ -329,7 +336,7 @@ export default function App() {
                     <Route path="/user/:id" element={user ? <UserProfileScreen /> : <Navigate to="/login" />} />
                     <Route path="/chat/preview" element={user ? <ImagePreviewScreen /> : <Navigate to="/login" />} />
                     <Route path="/profile/grix-ai" element={user ? <GrixAIProfile /> : <Navigate to="/login" />} />
-                    <Route path="*" element={<Navigate to="/" />} />
+                    <Route path="*" element={<Navigate to="/chats" replace />} />
                   </Routes>
                 </React.Suspense>
               </div>

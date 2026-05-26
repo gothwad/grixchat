@@ -9,7 +9,7 @@ export default function DesktopSidebar() {
   const isChatActive = !!id;
 
   const navItems = [
-    { icon: MessageCircle, path: '/', label: 'Chats' },
+    { icon: MessageCircle, path: '/chats', label: 'Chats' },
     { icon: Users, path: '/groups', label: 'Groups' },
     { icon: Search, path: '/search', label: 'Search' },
     { icon: Phone, path: '/calls', label: 'Calls' },

@@ -265,7 +265,7 @@ export default function ChatScreen() {
   const deleteChat = async () => {
     if (!window.confirm("Delete this chat?")) return;
     await performClearChat();
-    navigate('/');
+    navigate('/chats');
   };
 
   const hideChat = async () => {

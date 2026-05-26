@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
-import { Search, X, Loader2, MessageSquare, Plus, Check } from 'lucide-react';
+import { Search, X, Loader2, MessageSquare, Plus, Check, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useConversations } from '../chat/hooks/useConversations';
 import { getAcceptedChats } from '../../utils/acceptedChats';
@@ -115,7 +115,7 @@ export default function SearchTab() {
   return (
     <div className="h-full flex flex-col bg-[var(--bg-card)] overflow-hidden font-sans">
       
-      {/* 2. BEAUTIFIED SEARCH BAR */}
+      {/* 2. BEAUTIFIED SEARCH BAR (Fixed at Top) */}
       <div className="px-5 py-3.5 shrink-0 bg-[var(--bg-card)] z-40 border-b border-[var(--border-color)]/20">
         <div className="flex items-center bg-[var(--bg-main)] hover:bg-[var(--bg-main)]/90 focus-within:bg-[var(--bg-main)] rounded-2xl px-4 h-11 border border-[var(--border-color)]/30 focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/10 shadow-sm transition-all duration-250">
           <Search size={16} className="text-[var(--text-secondary)] mr-2.5 opacity-60" />
@@ -137,46 +137,75 @@ export default function SearchTab() {
         </div>
       </div>
 
-      {/* 2.5 MESSAGE REQUESTS SHORTCUT (Archived style layout with custom icon) */}
-      {!searchTerm && (
-        <div 
-          onClick={() => navigate('/chats/requests')}
-          className="flex items-center gap-[15px] px-5 py-4 hover:bg-[var(--bg-main)] transition-all active:scale-[0.99] group cursor-pointer border-b border-[var(--border-color)]/25 bg-[var(--bg-card)] shrink-0 select-none"
-        >
-          <div className="relative shrink-0 z-10">
-            {/* Custom request style avatar icon */}
-            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 dark:bg-indigo-950/30 flex items-center justify-center text-indigo-500 group-hover:scale-105 transition-transform border border-indigo-500/20 shadow-sm">
-              <MessageSquare size={21} strokeWidth={2.5} />
-            </div>
-            {requestCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-600 text-[10px] font-black font-mono text-white rounded-full flex items-center justify-center animate-bounce border border-white dark:border-[var(--bg-card)]">
-                {requestCount}
-              </span>
-            )}
-          </div>
-          <div className="flex-1 min-w-0 relative">
-            <div className="flex justify-between items-baseline mb-0.5">
-              <h3 className="text-sm font-black text-[var(--text-primary)] tracking-tight">
-                Message Requests
-              </h3>
-              <span className="text-[11px] whitespace-nowrap text-indigo-500 dark:text-indigo-400 font-bold tracking-tight">
-                View
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <p className="text-[11px] truncate text-[var(--text-secondary)] leading-tight">
-                {requestCount > 0 
-                  ? `You have ${requestCount} pending chat request${requestCount > 1 ? 's' : ''}` 
-                  : "No new requests from people you don't know"
-                }
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. SEARCH RESULTS OR SUGGESTIONS */}
+      {/* 3. SCROLLABLE CONTAINER FOR ALL ELEMENTS */}
       <div className="flex-1 overflow-y-auto no-scrollbar pb-32 bg-[var(--bg-card)]">
+        
+        {/* 2.5 MESSAGE REQUESTS SHORTCUT (Now Inside Scrollable Container) */}
+        {!searchTerm && (
+          <div 
+            onClick={() => navigate('/chats/requests')}
+            className="flex items-center gap-[15px] px-5 py-4 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer border-b border-[var(--border-color)]/20 bg-[var(--bg-card)] select-none"
+          >
+            <div className="relative shrink-0 z-10">
+              {/* Custom rounded profile icon style matching Chat List items / Archived Chats */}
+              <div className="w-[52px] h-[52px] rounded-full bg-indigo-500/10 dark:bg-zinc-800 flex items-center justify-center text-indigo-500 group-hover:scale-105 transition-transform border border-[var(--border-color)]/30">
+                <MessageSquare size={21} strokeWidth={2.5} />
+              </div>
+              {requestCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-600 text-[10px] font-black font-mono text-white rounded-full flex items-center justify-center animate-bounce border border-white dark:border-[var(--bg-card)]">
+                  {requestCount}
+                </span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0 pb-1 relative">
+              <div className="flex justify-between items-baseline mb-0.5">
+                <h3 className="text-[15px] truncate font-black text-[var(--text-primary)]">
+                  Message Requests
+                </h3>
+                <span className="text-[11px] whitespace-nowrap text-indigo-500 dark:text-indigo-400 font-bold tracking-tight">
+                  View
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
+                  {requestCount > 0 
+                    ? `You have ${requestCount} pending chat request${requestCount > 1 ? 's' : ''}` 
+                    : "No new requests from people you don't know"
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2.6 FRIENDS SUB-MENU (Direct, native-inspired entries) */}
+        {!searchTerm && (
+          <div className="bg-[var(--bg-card)] border-b border-[var(--border-color)]/20 select-none">
+            {/* Friends Option */}
+            <div 
+              onClick={() => navigate('/search/friends')}
+              className="flex items-center gap-[15px] px-5 py-4 hover:bg-[var(--bg-main)] dark:hover:bg-zinc-800/30 transition-all active:scale-[0.98] group cursor-pointer"
+            >
+              <div className="w-[52px] h-[52px] rounded-full bg-emerald-500/10 dark:bg-zinc-800 flex items-center justify-center text-emerald-500 group-hover:scale-105 transition-transform border border-[var(--border-color)]/35">
+                <Users size={21} strokeWidth={2.5} />
+              </div>
+              <div className="flex-1 min-w-0 pb-1">
+                <div className="flex justify-between items-baseline mb-0.5">
+                  <h3 className="text-[15px] truncate font-black text-[var(--text-primary)]">
+                    Friends
+                  </h3>
+                  <span className="text-[11px] whitespace-nowrap text-emerald-500 font-bold tracking-tight">
+                    Open
+                  </span>
+                </div>
+                <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
+                  Connect with people you chat with on Grix
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {loading && searchTerm ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <Loader2 className="animate-spin text-indigo-600" size={28} />
@@ -184,12 +213,14 @@ export default function SearchTab() {
           </div>
         ) : (
           <div className="flex flex-col">
-            <div className="px-5 pt-5 pb-2">
-              <h3 className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em] opacity-80 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                {searchTerm ? 'Search Results' : 'Suggested People'}
-              </h3>
-            </div>
+            {searchTerm && (
+              <div className="px-5 pt-5 pb-2">
+                <h3 className="text-[11px] font-black text-[var(--text-secondary)] tracking-wide opacity-80 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                  Search Results
+                </h3>
+              </div>
+            )}
 
             <div className="mt-1">
               {(searchTerm ? userResults : suggestedUsers).map((profile) => (
@@ -222,7 +253,7 @@ export default function SearchTab() {
                       e.stopPropagation();
                       navigate(`/chat/${profile.uid}`);
                     }}
-                    className="px-3.5 py-1.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1 shadow-md shrink-0 cursor-pointer"
+                    className="px-3.5 py-1.5 bg-[#0c1319] hover:bg-[#0c1319]/90 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1 shadow-md shrink-0 cursor-pointer border border-[#0c1319]/10"
                   >
                     <MessageSquare size={12} strokeWidth={3} />
                     <span>Message</span>
@@ -243,8 +274,6 @@ export default function SearchTab() {
           </div>
         )}
       </div>
-
-
 
     </div>
   );

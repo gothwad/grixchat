@@ -34,7 +34,7 @@ export default function StoryWatcherScreen() {
       setLoading(false);
       
       if (!data || data.length === 0) {
-        navigate('/');
+        navigate('/chats');
       }
     };
 
@@ -60,7 +60,7 @@ export default function StoryWatcherScreen() {
     if (currentIndex < stories.length - 1) {
       setCurrentIndex(prev => prev + 1);
     } else {
-      navigate('/');
+      navigate('/chats');
     }
   };
 
@@ -104,7 +104,7 @@ export default function StoryWatcherScreen() {
           />
           <span className="text-white font-bold text-sm">{currentStory?.username}</span>
         </div>
-        <button onClick={() => navigate('/')} className="text-white">
+        <button onClick={() => navigate('/chats')} className="text-white">
           <X size={28} />
         </button>
       </div>

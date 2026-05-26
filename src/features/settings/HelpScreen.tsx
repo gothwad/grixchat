@@ -91,7 +91,7 @@ export default function HelpScreen() {
           <div className="bg-zinc-50/10 border border-[var(--border-color)] rounded-xl p-3 flex gap-3">
             <Info size={16} className="text-primary shrink-0" />
             <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed">
-              GrixChat is a secure, fast, and reliable messaging platform developed by Gothwad Technologies.
+              GrixChat is a secure, fast, and reliable messaging platform build for scales.
             </p>
           </div>
         </div>
@@ -99,7 +99,6 @@ export default function HelpScreen() {
         {/* Footer */}
         <div className="py-12 flex flex-col items-center gap-1 opacity-40">
           <span className="text-[var(--text-primary)] font-black tracking-[0.2em] uppercase text-[10px]">GrixChat Help</span>
-          <span className="text-[var(--text-secondary)] text-[8px] uppercase tracking-tighter">Secured by Gothwad Technologies</span>
         </div>
       </div>
     </div>

@@ -103,25 +103,27 @@ export default function ChatsTab() {
         {activeFilter === 'Chats' && (
           <div className="shrink-0 border-b border-[var(--border-color)]/30 bg-[var(--bg-card)] py-3 px-4 flex gap-4 overflow-x-auto no-scrollbar scroll-smooth">
             {/* Current User Story Circle */}
-            <div className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer min-w-[64px]">
+            <div className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer min-w-[72px]">
               <div 
                 onClick={() => navigate('/stories/create')} 
-                className="relative w-[54px] h-[54px] rounded-full overflow-visible flex items-center justify-center p-[2px] transition-transform active:scale-95"
+                className="relative group shrink-0 active:scale-95 transition-transform"
               >
-                <div className="w-full h-full rounded-full overflow-hidden border border-[var(--border-color)]/50">
-                  <img 
-                    src={userData?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-                    alt="My profile"
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
+                <div className="w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-tr from-indigo-500 via-sky-400 to-rose-400 shadow-md flex items-center justify-center shrink-0 aspect-square">
+                  <div className="w-full h-full rounded-full border-2 border-[var(--bg-card)] overflow-hidden bg-[var(--bg-main)] flex items-center justify-center shrink-0">
+                    <img 
+                      src={userData?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
+                      alt="My profile"
+                      className="w-full h-full rounded-full object-cover shrink-0"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
                 </div>
                 {/* Plus Icon Overlay */}
-                <div className="absolute bottom-[-1px] right-[-1px] w-4.5 h-4.5 bg-blue-500 rounded-full flex items-center justify-center text-white border-2 border-[var(--bg-card)] shadow-sm">
-                  <Plus size={10} strokeWidth={3} />
-                </div>
+                <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-md border-2 border-[var(--bg-card)]">
+                  <Plus size={12} strokeWidth={2.5} />
+                </span>
               </div>
-              <span className="text-[10px] font-bold text-[var(--text-secondary)] text-center w-full truncate">
+              <span className="text-[10px] font-bold text-[var(--text-secondary)] text-center w-full truncate mt-0.5">
                 Your Story
               </span>
             </div>
@@ -131,19 +133,21 @@ export default function ChatsTab() {
               <div 
                 key={story.userId}
                 onClick={() => navigate(`/stories/view/${story.userId}`)}
-                className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer min-w-[64px]"
+                className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer min-w-[72px]"
               >
-                <div className="relative w-[54px] h-[54px] rounded-full flex items-center justify-center p-[2px] border-2 border-indigo-500 transition-transform active:scale-95">
-                  <div className="w-full h-full rounded-full overflow-hidden bg-[var(--bg-main)] border border-[var(--bg-card)]">
-                    <img 
-                      src={story.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-                      alt={story.username}
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
+                <div className="relative active:scale-95 transition-transform">
+                  <div className="w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-tr from-indigo-500 via-sky-400 to-rose-400 shadow-md flex items-center justify-center shrink-0 aspect-square">
+                    <div className="w-full h-full rounded-full border-2 border-[var(--bg-card)] overflow-hidden bg-[var(--bg-main)] flex items-center justify-center shrink-0">
+                      <img 
+                        src={story.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
+                        alt={story.username}
+                        className="w-full h-full rounded-full object-cover shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-[var(--text-primary)] text-center w-full truncate">
+                <span className="text-[10px] font-bold text-[var(--text-primary)] text-center w-full truncate mt-0.5">
                   {story.username}
                 </span>
               </div>

@@ -110,27 +110,39 @@ export default function NewGroupScreen() {
         }
       }
 
+      // Helper to generate UUID client-side securely
+      const generateUUID = () => {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+          return crypto.randomUUID();
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      };
+
+      const newConvId = generateUUID();
       const participants = [authUser.id, ...selectedUsers.map(u => u.id)];
       
       // 1. Create the conversation
-      const { data: conv, error: convError } = await (supabase as any)
+      const { error: convError } = await (supabase as any)
         .from('conversations')
         .insert({
+          id: newConvId,
           name: groupName,
           photo_url: iconUrl,
           type: 'group',
           created_by: authUser.id,
           last_message: `Group "${groupName}" created`,
           last_message_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+        });
 
       if (convError) throw convError;
 
       // 2. Add participants
       const participantInserts = participants.map(uid => ({
-        conversation_id: conv.id,
+        conversation_id: newConvId,
         user_id: uid
       }));
 
@@ -143,7 +155,7 @@ export default function NewGroupScreen() {
       // 3. Add system message
       try {
         await (supabase as any).from('messages').insert({
-          conversation_id: conv.id,
+          conversation_id: newConvId,
           sender_id: authUser.id, // System messages can be sent by creator or a special sys id?
           content: `${currentUserData?.fullName || 'You'} created the group "${groupName}"`,
           created_at: new Date().toISOString(),
@@ -153,7 +165,7 @@ export default function NewGroupScreen() {
         console.error('Failed to add system message:', msgErr);
       }
 
-      navigate(`/chat/${conv.id}`);
+      navigate(`/chat/${newConvId}`);
     } catch (error) {
       console.error('Error creating group:', error);
       const message = error instanceof Error ? error.message : 'Unknown error';

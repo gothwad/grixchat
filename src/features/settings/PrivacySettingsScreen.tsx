@@ -156,7 +156,6 @@ export default function PrivacySettingsScreen() {
             <ShieldCheck size={14} className="text-[var(--text-primary)]" />
             <span className="text-[var(--text-primary)] text-[9px] font-black tracking-[0.2em] uppercase">GrixChat Privacy</span>
           </div>
-          <span className="text-[var(--text-secondary)] text-[8px] uppercase tracking-tighter">Secured by Gothwad Technologies</span>
         </div>
       </div>
     </div>

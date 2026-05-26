@@ -9,8 +9,10 @@ export function useChatId(receiverId: string | undefined) {
   const { user } = useAuth();
 
   useEffect(() => {
+    // Clear old chatId instantly when receiverId changes to avoid leaking messages to the previous chat!
+    setChatId('');
+
     if (!receiverId || !user || !supabase) {
-      setChatId('');
       return;
     }
     

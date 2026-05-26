@@ -95,7 +95,7 @@ export default function TabHeader() {
     { label: 'Settings', icon: Settings, path: '/settings' },
   ];
 
-  const isChatsPage = location.pathname === '/';
+  const isChatsPage = location.pathname === '/' || location.pathname === '/chats';
   const isGroupsPage = location.pathname === '/groups';
   const isReelsPage = location.pathname === '/reels';
   const isSearchPage = location.pathname === '/search';
@@ -104,7 +104,7 @@ export default function TabHeader() {
   return (
     <div className="w-full px-4 min-h-[56px] flex justify-between items-center z-50 shrink-0 relative">
       <div className="flex items-center">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to="/chats" className="flex items-center gap-2">
           <h1 className="text-2xl font-black text-[var(--header-text)] tracking-tighter">
             GrixChat
           </h1>

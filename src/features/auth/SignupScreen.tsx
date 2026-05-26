@@ -14,6 +14,7 @@ export default function SignupScreen() {
   const [username, setUsername] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -229,11 +230,33 @@ export default function SignupScreen() {
               {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
+
+          <div 
+            onClick={() => setAgreeTerms(!agreeTerms)}
+            className="flex items-start gap-2.5 px-1 py-1 cursor-pointer group select-none"
+          >
+            <div 
+              className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 mt-0.5 ${
+                agreeTerms 
+                  ? 'bg-[var(--primary)] border-[var(--primary)]' 
+                  : 'bg-[var(--bg-card)] border-[var(--border-color)] group-hover:border-[var(--text-secondary)]/50'
+              }`}
+            >
+              {agreeTerms && (
+                <svg className="w-2.5 h-2.5 text-white stroke-[3.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              )}
+            </div>
+            <span className="text-[11px] font-medium text-[var(--text-secondary)] leading-tight group-hover:text-[var(--text-primary)] transition-colors">
+              I agree to the <span className="font-bold text-[var(--primary)] hover:underline">Terms of Service</span> and <span className="font-bold text-[var(--primary)] hover:underline">Privacy Policy</span>
+            </span>
+          </div>
           
           <button 
             type="submit"
-            disabled={loading || googleLoading || githubLoading || !fullName || !email || !username || password.length < 6 || password !== confirmPassword}
-            className="w-full bg-[var(--primary)] text-white text-sm font-bold py-3.5 rounded-xl transition-all disabled:opacity-70 active:scale-[0.98] shadow-sm shadow-[var(--primary)]/20 mt-2 flex items-center justify-center gap-2"
+            disabled={loading || googleLoading || githubLoading || !fullName || !email || !username || password.length < 6 || password !== confirmPassword || !agreeTerms}
+            className="w-full bg-[var(--primary)] text-white text-sm font-bold py-3.5 rounded-xl transition-all disabled:opacity-75 disabled:cursor-not-allowed active:scale-[0.98] shadow-sm shadow-[var(--primary)]/20 mt-2 flex items-center justify-center gap-2"
           >
             <span>{loading ? 'Creating account...' : 'Sign Up'}</span>
           </button>

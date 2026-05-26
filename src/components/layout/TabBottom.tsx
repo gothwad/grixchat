@@ -86,7 +86,7 @@ export default function TabBottom() {
   }, [authUser?.id]);
   
   const navItems = [
-    { icon: MessageCircle, path: '/', label: 'Chats', badge: unreadChatsCount, activeColor: 'text-[var(--header-text)]' },
+    { icon: MessageCircle, path: '/chats', label: 'Chats', badge: unreadChatsCount, activeColor: 'text-[var(--header-text)]' },
     { icon: Users, path: '/groups', label: 'Groups', badge: unreadGroupsCount, activeColor: 'text-[var(--header-text)]' },
     { icon: Search, path: '/search', label: 'Search', activeColor: 'text-[var(--header-text)]' },
     { icon: Phone, path: '/calls', label: 'Calls', activeColor: 'text-[var(--header-text)]' },
@@ -97,7 +97,7 @@ export default function TabBottom() {
     <div className="w-full bg-[var(--header-bg)] px-2 min-h-[64px] pb-safe flex justify-around items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] shrink-0 border-t border-[var(--border-color)] rounded-t-2xl">
       {navItems.map((item) => {
         const Icon = item.icon;
-        const isActive = location.pathname === item.path;
+        const isActive = location.pathname === item.path || (item.path === '/chats' && (location.pathname === '/' || location.pathname.startsWith('/chat/')));
         
         return (
           <Link 

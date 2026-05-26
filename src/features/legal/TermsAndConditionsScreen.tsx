@@ -25,7 +25,7 @@ export default function TermsAndConditionsScreen() {
             <h2 className="text-zinc-900 font-bold text-base">1. Agreement to Terms</h2>
             <p>
               These Terms and Conditions constitute a legally binding agreement made between you, whether personally or on behalf of an entity, 
-              and Gothwad Technologies, concerning your access to and use of the GrixChat application.
+              and the GrixChat Team, concerning your access to and use of the GrixChat application.
             </p>
           </section>
 

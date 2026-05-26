@@ -181,10 +181,6 @@ export default function AppPreferencesScreen() {
         {/* Footer Info */}
         <div className="py-12 flex flex-col items-center gap-1 opacity-40">
           <span className="text-[var(--text-primary)] font-black tracking-[0.2em] uppercase text-[10px]">GrixChat V 1.0.0</span>
-          <div className="flex flex-col items-center mt-2">
-            <span className="text-[var(--text-secondary)] text-[10px] font-medium">from</span>
-            <span className="text-[var(--text-primary)] font-bold tracking-widest uppercase text-[9px]">Gothwad technologies</span>
-          </div>
         </div>
       </div>
     </div>

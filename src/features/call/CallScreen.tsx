@@ -200,17 +200,32 @@ export default function CallScreen() {
     const { data: convId } = await supabase.rpc('get_direct_conversation_id', { u1, u2 });
     if (convId) return convId;
 
+    // Helper to generate UUID client-side securely
+    const generateUUID = () => {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+
+    const newConvId = generateUUID();
+
     // Create if not exists
-    const { data: newConv, error } = await supabase.from('conversations').insert({
+    const { error } = await supabase.from('conversations').insert({
+      id: newConvId,
       type: 'direct'
-    } as any).select().single();
+    } as any);
     
-    if (newConv) {
+    if (!error) {
       await supabase.from('conversation_participants').insert([
-        { conversation_id: newConv.id, user_id: u1 },
-        { conversation_id: newConv.id, user_id: u2 }
+        { conversation_id: newConvId, user_id: u1 },
+        { conversation_id: newConvId, user_id: u2 }
       ]);
-      return newConv.id;
+      return newConvId;
     }
     return null;
   };

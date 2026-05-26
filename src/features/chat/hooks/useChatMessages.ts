@@ -81,6 +81,24 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
     setLoadingMore(false);
   }, [conversationId, messageLimit]);
 
+  // Synchronously sync messages & loading state when conversationId changes
+  useEffect(() => {
+    if (conversationId) {
+      const cached = LocalDataCache.getMessages(conversationId);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        setMessages(cached);
+        setLoading(false);
+      } else {
+        setMessages([]);
+        setLoading(true);
+      }
+    } else {
+      setMessages([]);
+      setLoading(true);
+    }
+    setMessageLimit(initialLimit);
+  }, [conversationId, initialLimit]);
+
   useEffect(() => {
     fetchMessages();
 

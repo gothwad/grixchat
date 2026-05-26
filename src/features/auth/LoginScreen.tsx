@@ -10,6 +10,7 @@ export default function LoginScreen() {
   const [identifier, setIdentifier] = useState(''); // Can be email or username
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -30,22 +31,33 @@ export default function LoginScreen() {
       if (identifier.includes('@')) {
         loginEmail = identifier;
       } else {
-        const { data, error: fetchError } = await supabase
-          .from('users')
-          .select('email')
-          .eq('username', identifier.toLowerCase().trim())
-          .maybeSingle();
+        const cleanId = identifier.trim();
+        let matchedUser = null;
         
-        if (fetchError) throw fetchError;
-        if (!data) {
+        // Try matching by username first (always exists and safe)
+        try {
+          const { data, error: uError } = await supabase
+            .from('users')
+            .select('email')
+            .eq('username', cleanId.toLowerCase())
+            .maybeSingle();
+            
+          if (!uError && data) {
+            matchedUser = data;
+          }
+        } catch (uErr) {
+          console.error("Username query fallback error", uErr);
+        }
+        
+        if (!matchedUser) {
           throw new Error("Username not found");
         }
         
-        loginEmail = data.email;
+        loginEmail = matchedUser.email;
       }
 
       await authService.login(loginEmail, password);
-      navigate('/');
+      navigate('/chats');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -108,7 +120,7 @@ export default function LoginScreen() {
             <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
             <input 
               type="text" 
-              placeholder="Enter your email or username"
+              placeholder="Enter email or username"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               className="w-full pl-12 pr-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
@@ -136,13 +148,26 @@ export default function LoginScreen() {
           </div>
 
           <div className="flex justify-between items-center px-1">
-            <div className="flex items-center gap-2">
-              <input 
-                type="checkbox" 
-                id="remember" 
-                className="w-4 h-4 rounded border-[var(--border-color)] text-[var(--primary)] focus:ring-[var(--primary)] accent-[var(--primary)] bg-[var(--bg-card)]" 
-              />
-              <label htmlFor="remember" className="text-[11px] font-medium text-[var(--text-secondary)] cursor-pointer">Remember me</label>
+            <div 
+              onClick={() => setRememberMe(!rememberMe)}
+              className="flex items-center gap-2 cursor-pointer group select-none"
+            >
+              <div 
+                className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+                  rememberMe 
+                    ? 'bg-[var(--primary)] border-[var(--primary)]' 
+                    : 'bg-[var(--bg-card)] border-[var(--border-color)] group-hover:border-[var(--text-secondary)]/50'
+                }`}
+              >
+                {rememberMe && (
+                  <svg className="w-2.5 h-2.5 text-white stroke-[3.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                )}
+              </div>
+              <span className="text-[11px] font-medium text-[var(--text-secondary)] cursor-pointer group-hover:text-[var(--text-primary)] transition-colors">
+                Remember me
+              </span>
             </div>
             <Link to="/forgot-password" title="Forgot password?" className="text-[11px] font-bold text-[var(--primary)] hover:underline">Forgot Password</Link>
           </div>

@@ -14,6 +14,11 @@ export function useChatSync(receiverId: string | undefined, chatId: string, conv
   const { user, userData: authUser } = useAuth();
 
   useEffect(() => {
+    // Clear old states immediately on receiverId change to prevent visual bleed from the previous conversation
+    setReceiver(null);
+    setReceiverStatus('offline');
+    setReceiverLastSeen(null);
+
     if (!receiverId || !supabase) return;
 
     const fetchReceiver = async () => {
@@ -80,6 +85,10 @@ export function useChatSync(receiverId: string | undefined, chatId: string, conv
   }, [receiverId, convType]);
 
   useEffect(() => {
+    // Clear old watch data states instantly when chatId changes
+    setWatchData(null);
+    setIsWatchMode(false);
+
     if (!user || !chatId || !supabase) return;
 
     // Fetch conversation data (including watch together state)

@@ -100,18 +100,74 @@ export const chatService = {
   async getOrCreateDirectConversation(user1Id: string, user2Id: string) {
     if (!supabase) return null;
 
-    // Check if DM already exists
-    const { data: existing, error: checkError } = await supabase
-      .rpc('get_direct_conversation_id', { u1: user1Id, u2: user2Id });
+    let existingId: string | null = null;
 
-    if (existing) return existing;
+    // 1. Try RPC check first (most efficient)
+    try {
+      const { data: existing, error: checkError } = await supabase
+        .rpc('get_direct_conversation_id', { u1: user1Id, u2: user2Id });
 
-    // Create new DM conversation
-    const { data: conv, error: convError } = await supabase
+      if (!checkError && existing) {
+        existingId = existing;
+      }
+    } catch (rpcErr) {
+      console.warn("RPC get_direct_conversation_id failed / missing. Falling back to query:", rpcErr);
+    }
+
+    // 2. Strong client-side query fallback if RPC is unavailable or returns null
+    if (!existingId) {
+      try {
+        // Find conversation_participants for user1Id
+        const { data: u1Convs, error: u1Error } = await supabase
+          .from('conversation_participants')
+          .select('conversation_id, conversation:conversations(id, type)')
+          .eq('user_id', user1Id);
+
+        if (!u1Error && u1Convs) {
+          // Filter direct conversations that user1Id belongs to
+          const directConvIds = u1Convs
+            .filter(item => item.conversation && (item.conversation as any).type === 'direct')
+            .map(item => item.conversation_id);
+
+          if (directConvIds.length > 0) {
+            // Find which of these also contains user2Id as participant
+            const { data: matchedParticipant, error: u2Error } = await supabase
+              .from('conversation_participants')
+              .select('conversation_id')
+              .in('conversation_id', directConvIds)
+              .eq('user_id', user2Id)
+              .limit(1);
+
+            if (!u2Error && matchedParticipant && matchedParticipant.length > 0) {
+              existingId = matchedParticipant[0].conversation_id;
+            }
+          }
+        }
+      } catch (fallbackErr) {
+        console.error("Client fallback direct conversation match failed:", fallbackErr);
+      }
+    }
+
+    if (existingId) return existingId;
+
+    // Helper to generate UUID client-side securely
+    const generateUUID = () => {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+
+    const newConvId = generateUUID();
+
+    // Create new DM conversation first
+    const { error: convError } = await supabase
       .from('conversations')
-      .insert({ type: 'direct' } as any)
-      .select()
-      .single();
+      .insert({ id: newConvId, type: 'direct' } as any);
 
     if (convError) throw convError;
 
@@ -119,12 +175,12 @@ export const chatService = {
     const { error: partError } = await supabase
       .from('conversation_participants')
       .insert([
-        { conversation_id: conv.id, user_id: user1Id },
-        { conversation_id: conv.id, user_id: user2Id }
+        { conversation_id: newConvId, user_id: user1Id },
+        { conversation_id: newConvId, user_id: user2Id }
       ] as any);
 
     if (partError) throw partError;
 
-    return (conv as any).id;
+    return newConvId;
   }
 };

@@ -49,18 +49,6 @@ export default function AppInfoScreen() {
             </p>
           </div>
 
-          <div className="px-6 py-5 border-b border-[var(--border-color)]">
-            <div className="flex items-center gap-4 mb-2">
-              <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                <Globe size={20} />
-              </div>
-              <h4 className="text-sm font-bold text-[var(--text-primary)]">Made in India</h4>
-            </div>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed ml-12">
-              Proudly developed and maintained by {APP_CONFIG.DEVELOPER} in India.
-            </p>
-          </div>
-
           <div className="px-6 py-5">
             <div className="flex items-center gap-4 mb-2">
               <div className="p-2 rounded-lg bg-zinc-500/10 text-zinc-500">
@@ -75,7 +63,7 @@ export default function AppInfoScreen() {
         </div>
 
         <div className="mt-12 flex flex-col items-center gap-1">
-          <span className="text-[var(--text-secondary)] text-[10px] font-medium uppercase tracking-widest">© 2026 Gothwad Technologies</span>
+          <span className="text-[var(--text-secondary)] text-[10px] font-medium uppercase tracking-widest">© 2026 GrixChat</span>
           <span className="text-[var(--text-primary)] font-black tracking-[0.3em] uppercase text-[9px] mt-1">All Rights Reserved</span>
         </div>
       </div>

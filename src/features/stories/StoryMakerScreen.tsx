@@ -37,7 +37,7 @@ export default function StoryMakerScreen() {
 
       if (error) throw error;
 
-      navigate('/');
+      navigate('/chats');
     } catch (error) {
       console.error("Error creating story:", error);
       alert("Failed to share story.");

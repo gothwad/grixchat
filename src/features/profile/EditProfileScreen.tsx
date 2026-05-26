@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { ImageService } from '../../services/ImageService';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
+import { truncateToChars, countChars } from '../../utils/bioHelper';
 
 export default function EditProfileScreen() {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ export default function EditProfileScreen() {
   // Form States
   const [fullName, setFullName] = useState(currentAuthUserData?.fullName || '');
   const [username, setUsername] = useState(currentAuthUserData?.username || '');
-  const [bio, setBio] = useState(currentAuthUserData?.bio || 'Available');
+  const [bio, setBio] = useState(truncateToChars(currentAuthUserData?.bio || 'Available', 100));
   const [photoURL, setPhotoURL] = useState(currentAuthUserData?.photoURL || '');
 
   const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
@@ -30,7 +31,7 @@ export default function EditProfileScreen() {
     if (currentAuthUserData) {
       setFullName(currentAuthUserData.fullName || '');
       setUsername(currentAuthUserData.username || '');
-      setBio(currentAuthUserData.bio || 'Available');
+      setBio(truncateToChars(currentAuthUserData.bio || 'Available', 100));
       setPhotoURL(currentAuthUserData.photoURL || DEFAULT_LOGO);
     }
   }, [currentAuthUserData]);
@@ -79,7 +80,7 @@ export default function EditProfileScreen() {
         .update({
           full_name: fullName.trim(),
           username: trimmedUsername,
-          bio: bio.trim() || 'Available',
+          bio: truncateToChars(bio.trim(), 100) || 'Available',
           photo_url: photoURL
         } as any)
         .eq('id', authUser.id);
@@ -97,17 +98,38 @@ export default function EditProfileScreen() {
   };
 
   const renderField = (field: string, label: string, value: string, setter: (v: string) => void, isTextArea: boolean = false, type: string = 'text') => {
+    const isBio = field === 'bio';
+    const numChars = isBio ? countChars(value) : 0;
+    const isOverLimit = isBio && numChars > 100;
+
     return (
       <div className="space-y-2">
-        <label className="text-xs font-bold text-[var(--text-primary)] ml-1">{label}</label>
+        <div className="flex justify-between items-center px-1">
+          <label className="text-xs font-bold text-[var(--text-primary)]">{label}</label>
+          {isBio && (
+            <span className={`text-[10px] font-black tracking-wide ${isOverLimit ? 'text-red-500 font-bold' : 'text-[var(--text-secondary)] font-mono'}`}>
+              {numChars} / 100 letters
+            </span>
+          )}
+        </div>
         {isTextArea ? (
-          <textarea
-            value={value}
-            onChange={(e) => setter(e.target.value)}
-            rows={3}
-            className="w-full px-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all placeholder:text-[var(--text-secondary)]/50 resize-none"
-            placeholder={`Enter your ${label.toLowerCase()}`}
-          />
+          <div>
+            <textarea
+              value={value}
+              onChange={(e) => setter(e.target.value)}
+              maxLength={100}
+              rows={3}
+              className={`w-full px-5 py-4 bg-[var(--bg-card)] border rounded-2xl text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all placeholder:text-[var(--text-secondary)]/50 resize-none ${
+                isOverLimit ? 'border-red-500/80 focus:ring-red-500/25' : 'border-[var(--border-color)]'
+              }`}
+              placeholder={`Enter your ${label.toLowerCase()}`}
+            />
+            {isOverLimit && (
+              <p className="text-[10px] text-red-500 font-bold mt-1 ml-1">
+                Bio exceeds 100 letters and will be truncated automatically to fit our 100-letter policy.
+              </p>
+            )}
+          </div>
         ) : (
           <input 
             type={type}

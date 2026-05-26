@@ -173,7 +173,8 @@ export default function CallsTab() {
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-main)] font-sans relative">
-      {/* Scrollable Container */}
+      
+      {/* Scrollable Container with All Call Components */}
       <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
         
         {/* Dual Switch Filter ABOVE Create Link */}
@@ -266,11 +267,11 @@ export default function CallsTab() {
 
         {/* Section title for recent logs */}
         <div className="px-5 pt-3 pb-2 flex items-center justify-between select-none">
-          <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em]">
+          <span className="text-xs font-black text-[var(--text-secondary)] tracking-tight">
             History Logs
           </span>
           {calls.length > 0 && (
-            <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase opacity-60">
+            <span className="text-[10px] font-black text-[var(--text-secondary)] opacity-60">
               {filteredCalls.length} logs
             </span>
           )}

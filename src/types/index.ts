@@ -6,7 +6,6 @@ export interface UserProfile {
   username: string;
   photoURL?: string;
   bio?: string;
-  phoneNumber?: string;
   gender?: string;
   isVerified?: boolean;
   isAdmin?: boolean;

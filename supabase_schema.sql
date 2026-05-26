@@ -1,358 +1,423 @@
+-- ===================================================
+-- GRIXCHAT SUPABASE CLEAN DATABASE SCHEMA (BULLETPROOF)
+-- ===================================================
+-- This script contains all tables, constraints, RPC functions,
+-- public profiles syncing triggers, and indices required for GrixChat.
+-- 
+-- ORDER OF EXECUTION IS RESOLVED: All tables are created first,
+-- followed by policies, triggers, functions, and indices to prevent dependency errors.
 
--- 1. Extend Users table (if not already done)
-ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT FALSE;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-ALTER TABLE users ADD COLUMN IF NOT EXISTS following UUID[] DEFAULT '{}';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS followers UUID[] DEFAULT '{}';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS saved_posts UUID[] DEFAULT '{}';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS saved_videos UUID[] DEFAULT '{}';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS blocked_users UUID[] DEFAULT '{}';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS hidden_chats UUID[] DEFAULT '{}';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS archived_chats UUID[] DEFAULT '{}';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS favorites UUID[] DEFAULT '{}';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS muted_users UUID[] DEFAULT '{}';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS lock JSONB DEFAULT '{}'::jsonb;
+-- 1. CLEANUP EXISTING ARTIFACTS (Fresh Setup)
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_auth_user();
+DROP FUNCTION IF EXISTS public.get_direct_conversation_id(UUID, UUID);
 
--- 2. Create Follows Join Table (Better for scalability)
-CREATE TABLE IF NOT EXISTS follows (
-    follower_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    following_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    PRIMARY KEY (follower_id, following_id)
+DROP TABLE IF EXISTS public.chat_settings CASCADE;
+DROP TABLE IF EXISTS public.notifications CASCADE;
+DROP TABLE IF EXISTS public.call_candidates CASCADE;
+DROP TABLE IF EXISTS public.calls CASCADE;
+DROP TABLE IF EXISTS public.stories CASCADE;
+DROP TABLE IF EXISTS public.messages CASCADE;
+DROP TABLE IF EXISTS public.conversation_participants CASCADE;
+DROP TABLE IF EXISTS public.conversations CASCADE;
+DROP TABLE IF EXISTS public.follows CASCADE;
+DROP TABLE IF EXISTS public.users CASCADE;
+
+
+-- ===================================================
+-- 2. CREATE ALL TABLES (Pre-declared to prevent constraint/policy errors)
+-- ===================================================
+
+-- Users Table
+CREATE TABLE public.users (
+    id UUID PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
+    email TEXT,
+    full_name TEXT,
+    username TEXT UNIQUE NOT NULL,
+    photo_url TEXT DEFAULT 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+    bio TEXT DEFAULT 'Available',
+    is_verified BOOLEAN DEFAULT FALSE,
+    profile_type TEXT DEFAULT 'personal',
+    is_online BOOLEAN DEFAULT FALSE,
+    last_seen TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    settings JSONB DEFAULT '{}'::jsonb,
+    blocked_users TEXT[] DEFAULT '{}'::text[],
+    muted_users TEXT[] DEFAULT '{}'::text[],
+    favorites TEXT[] DEFAULT '{}'::text[],
+    hidden_chats TEXT[] DEFAULT '{}'::text[],
+    archived_chats TEXT[] DEFAULT '{}'::text[]
 );
 
--- 3. Extend Conversations table
-ALTER TABLE conversations ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'direct'; -- values: 'direct', 'group'
-ALTER TABLE conversations ADD COLUMN IF NOT EXISTS name TEXT;
-ALTER TABLE conversations ADD COLUMN IF NOT EXISTS photo_url TEXT;
-ALTER TABLE conversations ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id);
+-- Follows Table (Connections/Friends)
+CREATE TABLE public.follows (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    follower_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    following_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT follows_unique_pair UNIQUE (follower_id, following_id)
+);
 
--- 4. RPC for efficient DM checking
-CREATE OR REPLACE FUNCTION get_direct_conversation_id(u1 UUID, u2 UUID)
+-- Conversations Table
+CREATE TABLE public.conversations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type TEXT NOT NULL CHECK (type IN ('direct', 'group')),
+    name TEXT,
+    photo_url TEXT,
+    admins UUID[] DEFAULT '{}'::uuid[],
+    watch_video_url TEXT,
+    watch_state JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Conversation Participants Table
+CREATE TABLE public.conversation_participants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID REFERENCES public.conversations(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    joined_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT conversation_participants_unique_pair UNIQUE (conversation_id, user_id)
+);
+
+-- Messages Table
+CREATE TABLE public.messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID REFERENCES public.conversations(id) ON DELETE CASCADE NOT NULL,
+    sender_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    text TEXT,
+    media_url TEXT,
+    media_type TEXT,
+    reply_to UUID REFERENCES public.messages(id) ON DELETE SET NULL,
+    reactions JSONB DEFAULT '{}'::jsonb,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Stories Table
+CREATE TABLE public.stories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    media_url TEXT NOT NULL,
+    type TEXT DEFAULT 'image',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Calls Table
+CREATE TABLE public.calls (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    caller_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    receiver_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    type TEXT CHECK (type IN ('audio', 'video')) NOT NULL,
+    status TEXT DEFAULT 'ringing' CHECK (status IN ('ringing', 'accepted', 'rejected', 'ended', 'error')),
+    offer JSONB,
+    answer JSONB,
+    is_missed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Call ICE Candidates Table
+CREATE TABLE public.call_candidates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    call_id UUID REFERENCES public.calls(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    candidate JSONB NOT NULL,
+    type TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Chat Settings Table
+CREATE TABLE public.chat_settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    receiver_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    nickname TEXT,
+    custom_photo_url TEXT,
+    is_muted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT chat_settings_unique_pair UNIQUE (user_id, receiver_id)
+);
+
+-- Notifications Table
+CREATE TABLE public.notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    from_user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    title TEXT,
+    content TEXT,
+    is_read BOOLEAN DEFAULT FALSE,
+    post_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+
+-- ===================================================
+-- 3. ENABLE ROW LEVEL SECURITY (RLS) ON ALL TABLES
+-- ===================================================
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversation_participants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.calls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.call_candidates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chat_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+
+-- ===================================================
+-- 4. CREATE ROW LEVEL SECURITY (RLS) POLICIES
+-- ===================================================
+
+-- Policies for public.users
+CREATE POLICY "Allow public read access on profiles" 
+    ON public.users FOR SELECT USING (true);
+
+CREATE POLICY "Allow users to update own profile" 
+    ON public.users FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Allow users to insert own profile" 
+    ON public.users FOR INSERT WITH CHECK (auth.uid() = id);
+
+
+-- Policies for public.follows
+CREATE POLICY "Allow public select on active connections" 
+    ON public.follows FOR SELECT USING (true);
+
+CREATE POLICY "Allow users to follow others" 
+    ON public.follows FOR INSERT WITH CHECK (auth.uid() = follower_id);
+
+CREATE POLICY "Allow users to unfollow others" 
+    ON public.follows FOR DELETE USING (auth.uid() = follower_id);
+
+
+-- Policies for public.conversations
+CREATE POLICY "Allow authenticated users to create conversations" 
+    ON public.conversations FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Allow users to see conversations they are part of" 
+    ON public.conversations FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.conversation_participants 
+            WHERE conversation_participants.conversation_id = conversations.id 
+              AND conversation_participants.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Allow participants to update conversation details" 
+    ON public.conversations FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM public.conversation_participants 
+            WHERE conversation_participants.conversation_id = conversations.id 
+              AND conversation_participants.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Allow group admins or members to delete a conversation" 
+    ON public.conversations FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM public.conversation_participants 
+            WHERE conversation_participants.conversation_id = conversations.id 
+              AND conversation_participants.user_id = auth.uid()
+        )
+    );
+
+
+-- Policies for public.conversation_participants
+CREATE POLICY "Allow authenticated users to view participant rosters" 
+    ON public.conversation_participants FOR SELECT USING (true);
+
+CREATE POLICY "Allow users to join or be added to conversations" 
+    ON public.conversation_participants FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Allow users to leave or remove members from conversations" 
+    ON public.conversation_participants FOR DELETE USING (auth.role() = 'authenticated');
+
+
+-- Policies for public.messages
+CREATE POLICY "Allow members of conversation to view messages" 
+    ON public.messages FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.conversation_participants 
+            WHERE conversation_participants.conversation_id = messages.conversation_id 
+              AND conversation_participants.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Allow database users to send messages to their chats" 
+    ON public.messages FOR INSERT WITH CHECK (
+        auth.uid() = sender_id 
+        AND EXISTS (
+            SELECT 1 FROM public.conversation_participants 
+            WHERE conversation_participants.conversation_id = messages.conversation_id 
+              AND conversation_participants.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Allow senders to edit/delete their own messages" 
+    ON public.messages FOR UPDATE USING (auth.uid() = sender_id);
+
+
+-- Policies for public.stories
+CREATE POLICY "Allow authenticated users to view active stories" 
+    ON public.stories FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Allow users to post stories" 
+    ON public.stories FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Allow users to remove their stories" 
+    ON public.stories FOR DELETE USING (auth.uid() = user_id);
+
+
+-- Policies for public.calls
+CREATE POLICY "Allow users to see call records they are part of" 
+    ON public.calls FOR SELECT USING (auth.uid() = caller_id OR auth.uid() = receiver_id);
+
+CREATE POLICY "Allow users to spawn new call actions" 
+    ON public.calls FOR INSERT WITH CHECK (auth.uid() = caller_id);
+
+CREATE POLICY "Allow callers or receivers to update call descriptors" 
+    ON public.calls FOR UPDATE USING (auth.uid() = caller_id OR auth.uid() = receiver_id);
+
+
+-- Policies for public.call_candidates
+CREATE POLICY "Allow access to call candidates for call participants" 
+    ON public.call_candidates FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.calls 
+            WHERE calls.id = call_candidates.call_id 
+              AND (calls.caller_id = auth.uid() OR calls.receiver_id = auth.uid())
+        )
+    );
+
+CREATE POLICY "Allow participants to add call candidate elements" 
+    ON public.call_candidates FOR INSERT WITH CHECK (
+        auth.uid() = user_id 
+        AND EXISTS (
+            SELECT 1 FROM public.calls 
+            WHERE calls.id = call_candidates.call_id 
+              AND (calls.caller_id = auth.uid() OR calls.receiver_id = auth.uid())
+        )
+    );
+
+
+-- Policies for public.chat_settings
+CREATE POLICY "Allow users to see their own custom chat settings" 
+    ON public.chat_settings FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Allow users to save or update chat settings" 
+    ON public.chat_settings FOR ALL USING (auth.uid() = user_id);
+
+
+-- Policies for public.notifications
+CREATE POLICY "Allow users to fetch their own notifications" 
+    ON public.notifications FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Allow users or system to insert notifications" 
+    ON public.notifications FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Allow users to update/acknowledge their notifications" 
+    ON public.notifications FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Allow users to delete their notifications" 
+    ON public.notifications FOR DELETE USING (auth.uid() = user_id);
+
+
+-- ===================================================
+-- 5. CREATE DATABASE RPC FUNCTIONS
+-- ===================================================
+
+-- Direct Conversation Quick Match RPC
+CREATE OR REPLACE FUNCTION public.get_direct_conversation_id(u1 UUID, u2 UUID)
 RETURNS UUID AS $$
-    SELECT cp1.conversation_id
-    FROM conversation_participants cp1
-    JOIN conversation_participants cp2 ON cp1.conversation_id = cp2.conversation_id
-    JOIN conversations c ON c.id = cp1.conversation_id
+DECLARE
+    conv_id UUID;
+BEGIN
+    SELECT cp1.conversation_id INTO conv_id
+    FROM public.conversation_participants cp1
+    JOIN public.conversation_participants cp2 
+      ON cp1.conversation_id = cp2.conversation_id
+    JOIN public.conversations c 
+      ON cp1.conversation_id = c.id
     WHERE cp1.user_id = u1 
       AND cp2.user_id = u2 
       AND c.type = 'direct'
     LIMIT 1;
-$$ LANGUAGE sql STABLE;
 
--- 5. Tube Videos and Stories tables (Ensuring they exist)
-CREATE TABLE IF NOT EXISTS stories (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    media_url TEXT NOT NULL,
-    type TEXT DEFAULT 'image',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS tube_videos (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    title TEXT NOT NULL,
-    description TEXT,
-    youtube_url TEXT NOT NULL,
-    thumbnail TEXT,
-    category TEXT DEFAULT 'All',
-    duration TEXT DEFAULT '0:00',
-    views_count INTEGER DEFAULT 0,
-    likes_count INTEGER DEFAULT 0,
-    comments_count INTEGER DEFAULT 0,
-    liked_by UUID[] DEFAULT '{}',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 6. Notifications table
-CREATE TABLE IF NOT EXISTS notifications (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    from_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    type TEXT NOT NULL, -- 'like', 'follow', 'comment', etc.
-    post_id UUID,
-    text TEXT,
-    is_read BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 7. Add columns to Posts if missing
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS caption TEXT;
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS location TEXT;
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS user_name TEXT;
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS user_avatar TEXT;
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS likes_count INTEGER DEFAULT 0;
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS comments_count INTEGER DEFAULT 0;
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS liked_by UUID[] DEFAULT '{}';
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_urls TEXT[] DEFAULT '{}';
-
-ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can see posts" ON posts FOR SELECT USING (true);
-CREATE POLICY "Users can create posts" ON posts FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update their own posts" ON posts FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete their own posts" ON posts FOR DELETE USING (auth.uid() = user_id);
-
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Public profiles are viewable by everyone" ON users FOR SELECT USING (true);
-CREATE POLICY "Users can update own profile" ON users FOR UPDATE USING (auth.uid() = id);
-
--- 8. RLS Policies (Basic ones, adjust according to needs)
-ALTER TABLE follows ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can see follows" ON follows FOR SELECT USING (true);
-CREATE POLICY "Users can follow/unfollow" ON follows FOR ALL USING (auth.uid() = follower_id);
-
-ALTER TABLE stories ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can see stories" ON stories FOR SELECT USING (true);
-CREATE POLICY "Users can manage their stories" ON stories FOR ALL USING (auth.uid() = user_id);
-
-ALTER TABLE tube_videos ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can see videos" ON tube_videos FOR SELECT USING (true);
-CREATE POLICY "Users can manage their videos" ON tube_videos FOR ALL USING (auth.uid() = user_id);
-
--- 9. Comments table
-CREATE TABLE IF NOT EXISTS comments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    post_id UUID NOT NULL, -- can refer to posts.id or tube_videos.id
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    user_name TEXT,
-    user_avatar TEXT,
-    text TEXT NOT NULL,
-    likes_count INTEGER DEFAULT 0,
-    parent_id UUID REFERENCES comments(id) ON DELETE CASCADE, -- for replies
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 10. Likes table (Generic for all content types)
-CREATE TABLE IF NOT EXISTS likes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    target_id UUID NOT NULL,
-    target_type TEXT NOT NULL, -- 'post', 'reel', 'video', 'comment'
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, target_id, target_type)
-);
-
--- 11. Reels table
-CREATE TABLE IF NOT EXISTS reels (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    video_url TEXT,
-    youtube_id TEXT,
-    thumbnail_url TEXT,
-    caption TEXT,
-    description TEXT,
-    location TEXT,
-    mentions TEXT[],
-    allow_comments BOOLEAN DEFAULT TRUE,
-    hide_likes BOOLEAN DEFAULT FALSE,
-    audio_title TEXT DEFAULT 'Original Audio',
-    likes_count INTEGER DEFAULT 0,
-    comments_count INTEGER DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 12. Calls table
-CREATE TABLE IF NOT EXISTS calls (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    caller_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    receiver_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    type TEXT DEFAULT 'voice',
-    status TEXT DEFAULT 'ringing',
-    offer JSONB,
-    answer JSONB,
-    is_missed BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-ALTER TABLE calls ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can see their own calls" ON calls FOR SELECT USING (auth.uid() = caller_id OR auth.uid() = receiver_id);
-CREATE POLICY "Users can manage their own calls" ON calls FOR ALL USING (auth.uid() = caller_id OR auth.uid() = receiver_id);
-
--- 13. Call candidates for WebRTC
-CREATE TABLE IF NOT EXISTS call_candidates (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    call_id UUID REFERENCES calls(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    candidate JSONB NOT NULL,
-    type TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-ALTER TABLE call_candidates ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can see call candidates" ON call_candidates FOR SELECT USING (
-    EXISTS (SELECT 1 FROM calls WHERE id = call_id AND (caller_id = auth.uid() OR receiver_id = auth.uid()))
-);
-CREATE POLICY "Users can add call candidates" ON call_candidates FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM calls WHERE id = call_id AND (caller_id = auth.uid() OR receiver_id = auth.uid()))
-);
-
--- triggered function for new user creation
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
-BEGIN
-  INSERT INTO public.users (id, email, full_name, username, photo_url)
-  VALUES (
-    new.id,
-    new.email,
-    new.raw_user_meta_data->>'full_name',
-    LOWER(COALESCE(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1))),
-    COALESCE(new.raw_user_meta_data->>'avatar_url', 'https://cdn-icons-png.flaticon.com/512/149/149071.png')
-  )
-  ON CONFLICT (id) DO NOTHING;
-  RETURN new;
+    RETURN conv_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger to call the function on insert
--- Note: This requires high privileges, user may need to run this manually as admin
--- CREATE TRIGGER on_auth_user_created
---   AFTER INSERT ON auth.users
---   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Function to increment video views
-CREATE OR REPLACE FUNCTION increment_video_views(video_id UUID)
-RETURNS void AS $$
+-- ===================================================
+-- 6. SYSTEM TRIGGER: Auth to Public User profile sync
+-- ===================================================
+CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
+RETURNS TRIGGER AS $$
+DECLARE
+    username_val TEXT;
+    full_name_val TEXT;
 BEGIN
-  UPDATE tube_videos
-  SET views_count = COALESCE(views_count, 0) + 1
-  WHERE id = video_id;
+    -- Extract values safely from raw_user_meta_data
+    username_val := COALESCE(
+        new.raw_user_meta_data->>'username', 
+        split_part(new.email, '@', 1)
+    );
+    full_name_val := COALESCE(
+        new.raw_user_meta_data->>'full_name', 
+        split_part(new.email, '@', 1)
+    );
+
+    -- Ensure uniqueness of username
+    IF EXISTS (SELECT 1 FROM public.users WHERE username = username_val) THEN
+        username_val := username_val || '_' || substring(new.id::text, 1, 5);
+    END IF;
+
+    INSERT INTO public.users (
+        id, 
+        email, 
+        full_name, 
+        username, 
+        photo_url, 
+        bio
+    )
+    VALUES (
+        new.id,
+        new.email,
+        full_name_val,
+        LOWER(username_val),
+        COALESCE(new.raw_user_meta_data->>'avatar_url', 'https://cdn-icons-png.flaticon.com/512/149/149071.png'),
+        'Available'
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        email = EXCLUDED.email,
+        full_name = COALESCE(public.users.full_name, EXCLUDED.full_name),
+        username = COALESCE(public.users.username, EXCLUDED.username);
+
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Generic increment function for likes
-CREATE OR REPLACE FUNCTION increment_likes(target_id UUID, target_table TEXT, amount INTEGER)
-RETURNS void AS $$
-BEGIN
-  EXECUTE format('UPDATE %I SET likes_count = COALESCE(likes_count, 0) + %L WHERE id = %L', target_table, amount, target_id);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- Create the trigger on auth.users
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user();
 
--- Generic increment function for comments
-CREATE OR REPLACE FUNCTION increment_comments(target_id UUID, target_table TEXT, amount INTEGER)
-RETURNS void AS $$
-BEGIN
-  EXECUTE format('UPDATE %I SET comments_count = COALESCE(comments_count, 0) + %L WHERE id = %L', target_table, amount, target_id);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 15. Storage Buckets Setup
--- Run these as a one-time setup in Supabase SQL editor or via application initial logic
--- We'll try to include them here for completeness
-
--- Note: These often need 'service_role' or manual UI setup in Supabase, 
--- but here are the SQL commands for standard storage setup.
-
-INSERT INTO storage.buckets (id, name, public) VALUES ('chat-media', 'chat-media', true) ON CONFLICT (id) DO NOTHING;
-INSERT INTO storage.buckets (id, name, public) VALUES ('posts', 'posts', true) ON CONFLICT (id) DO NOTHING;
-INSERT INTO storage.buckets (id, name, public) VALUES ('reels', 'reels', true) ON CONFLICT (id) DO NOTHING;
-INSERT INTO storage.buckets (id, name, public) VALUES ('stories', 'stories', true) ON CONFLICT (id) DO NOTHING;
-INSERT INTO storage.buckets (id, name, public) VALUES ('profiles', 'profiles', true) ON CONFLICT (id) DO NOTHING;
-
--- Storage Policies for chat-media
-CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id = 'chat-media' );
-CREATE POLICY "Authenticated Users Upload" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'chat-media' AND auth.role() = 'authenticated' );
-
--- Storage Policies for posts
-CREATE POLICY "Public Access Posts" ON storage.objects FOR SELECT USING ( bucket_id = 'posts' );
-CREATE POLICY "Authenticated Users Upload Posts" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'posts' AND auth.role() = 'authenticated' );
-
--- Storage Policies for reels
-CREATE POLICY "Public Access Reels" ON storage.objects FOR SELECT USING ( bucket_id = 'reels' );
-CREATE POLICY "Authenticated Users Upload Reels" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'reels' AND auth.role() = 'authenticated' );
-
--- Storage Policies for stories
-CREATE POLICY "Public Access Stories" ON storage.objects FOR SELECT USING ( bucket_id = 'stories' );
-CREATE POLICY "Authenticated Users Upload Stories" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'stories' AND auth.role() = 'authenticated' );
-
--- Storage Policies for profiles
-CREATE POLICY "Public Access Profiles" ON storage.objects FOR SELECT USING ( bucket_id = 'profiles' );
-CREATE POLICY "Authenticated Users Upload Profiles" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'profiles' AND auth.role() = 'authenticated' );
-
--- Function to keep only the last 20 messages per conversation
-CREATE OR REPLACE FUNCTION public.cleanup_old_messages()
-RETURNS trigger AS $$
-BEGIN
-  -- Delete messages older than the top 20 for this conversation
-  DELETE FROM public.messages
-  WHERE id IN (
-    SELECT id
-    FROM public.messages
-    WHERE conversation_id = NEW.conversation_id
-    ORDER BY created_at DESC
-    OFFSET 20
-  );
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Trigger to run cleanup after every message insert
--- Note: Uncomment this in your Supabase SQL Editor to enable autodelete
--- CREATE TRIGGER on_message_inserted
---   AFTER INSERT ON public.messages
---   FOR EACH ROW EXECUTE FUNCTION public.cleanup_old_messages();
-
--- 14. Messages table
-CREATE TABLE IF NOT EXISTS messages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
-    sender_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    content TEXT,
-    media_url TEXT,
-    type TEXT DEFAULT 'text', -- 'text', 'image', 'video', 'voice'
-    is_read BOOLEAN DEFAULT FALSE,
-    reply_to JSONB DEFAULT NULL,
-    is_edited BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Ensure is_read exists if table was already there
-ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;
-
--- Ensure replication is on for Realtime updates
-ALTER TABLE messages REPLICA IDENTITY FULL;
-DO $$ 
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
-    CREATE PUBLICATION supabase_realtime;
-  END IF;
-  ALTER PUBLICATION supabase_realtime ADD TABLE messages;
-EXCEPTION WHEN OTHERS THEN
-  -- Handle case where it's already added or publication doesn't exist yet
-END $$;
-
-ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can see messages in their conversations" ON messages FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM conversation_participants 
-    WHERE conversation_id = messages.conversation_id AND user_id = auth.uid()
-  )
-);
-CREATE POLICY "Users can insert messages to their conversations" ON messages FOR INSERT WITH CHECK (
-  auth.uid() = sender_id AND EXISTS (
-    SELECT 1 FROM conversation_participants 
-    WHERE conversation_id = messages.conversation_id AND user_id = auth.uid()
-  )
-);
-CREATE POLICY "Users can update is_read in their conversations" ON messages FOR UPDATE USING (
-  EXISTS (
-    SELECT 1 FROM conversation_participants 
-    WHERE conversation_id = messages.conversation_id AND user_id = auth.uid()
-  )
-);
-
--- 14. Tube Live Chat
-CREATE TABLE IF NOT EXISTS tube_live_chat (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    video_id UUID NOT NULL REFERENCES tube_videos(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    text TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-ALTER TABLE tube_live_chat ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can see live chat" ON tube_live_chat FOR SELECT USING (true);
-CREATE POLICY "Users can chat" ON tube_live_chat FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- ===================================================
+-- 7. PERFORMANCE AND SCALABILITY INDICES
+-- ===================================================
+CREATE INDEX IF NOT EXISTS idx_messages_conversation ON public.messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON public.messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_participants_user ON public.conversation_participants(user_id);
+CREATE INDEX IF NOT EXISTS idx_participants_conversation ON public.conversation_participants(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_users_username_lowered ON public.users(LOWER(username));
+CREATE INDEX IF NOT EXISTS idx_follows_follower ON public.follows(follower_id);
+CREATE INDEX IF NOT EXISTS idx_follows_following ON public.follows(following_id);
+CREATE INDEX IF NOT EXISTS idx_stories_user ON public.stories(user_id);
+CREATE INDEX IF NOT EXISTS idx_calls_participants ON public.calls(caller_id, receiver_id);
+CREATE INDEX IF NOT EXISTS idx_chat_settings_user ON public.chat_settings(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON public.notifications(user_id);

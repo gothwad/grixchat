@@ -26,6 +26,7 @@ import { supabase } from '../../lib/supabase';
 import { profileService } from './services/profileService';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { motion, AnimatePresence } from 'motion/react';
+import { truncateToChars } from '../../utils/bioHelper';
 
 export default function UserProfileScreen() {
   const { id: userId } = useParams();
@@ -168,7 +169,7 @@ export default function UserProfileScreen() {
             </p>
 
             <p className="text-xs text-[var(--text-secondary)] mt-3 max-w-xs font-semibold leading-relaxed">
-              {user.bio || 'Available'}
+              {user.bio ? truncateToChars(user.bio) : 'Available'}
             </p>
 
             {/* Symmetrical Action Button for Message */}
@@ -187,7 +188,6 @@ export default function UserProfileScreen() {
         {/* Unified Branding Footer */}
         <div className="py-8 flex flex-col items-center gap-1 opacity-35 text-center">
           <span className="text-[var(--text-primary)] font-black tracking-[0.15em] uppercase text-[10px]">GrixChat</span>
-          <span className="text-[var(--text-secondary)] text-[9px] uppercase tracking-wider font-semibold">Made In India</span>
         </div>
       </div>
 
