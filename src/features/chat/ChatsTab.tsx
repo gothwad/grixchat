@@ -80,8 +80,6 @@ export default function ChatsTab() {
     if (conversations.length > 0 && !storage.getItem('grix_accepted_chats_initialized')) {
       initializeAcceptedConversations(conversations.map(x => x.id));
     }
-    const isRequest = c.type === 'direct' && !getAcceptedChats().includes(c.id);
-    if (isRequest) return false;
 
     const matchesSearch = (c.user || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (c.username || "").toLowerCase().includes(searchTerm.toLowerCase());
@@ -108,18 +106,18 @@ export default function ChatsTab() {
                 onClick={() => navigate('/stories/create')} 
                 className="relative group shrink-0 active:scale-95 transition-transform"
               >
-                <div className="w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-tr from-indigo-500 via-sky-400 to-rose-400 shadow-md flex items-center justify-center shrink-0 aspect-square">
-                  <div className="w-full h-full rounded-full border-2 border-[var(--bg-card)] overflow-hidden bg-[var(--bg-main)] flex items-center justify-center shrink-0">
+                <div className="w-16 h-16 rounded-full p-[2px] border-2 border-[#0494f4] bg-[var(--bg-main)] flex items-center justify-center shrink-0 aspect-square">
+                  <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
                     <img 
                       src={userData?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
                       alt="My profile"
-                      className="w-full h-full rounded-full object-cover shrink-0"
+                      className="w-full h-full object-cover shrink-0"
                       referrerPolicy="no-referrer"
                     />
                   </div>
                 </div>
                 {/* Plus Icon Overlay */}
-                <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-md border-2 border-[var(--bg-card)]">
+                <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#0494f4] text-white rounded-full flex items-center justify-center shadow-md border-2 border-[var(--bg-card)]">
                   <Plus size={12} strokeWidth={2.5} />
                 </span>
               </div>
@@ -136,12 +134,12 @@ export default function ChatsTab() {
                 className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer min-w-[72px]"
               >
                 <div className="relative active:scale-95 transition-transform">
-                  <div className="w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-tr from-indigo-500 via-sky-400 to-rose-400 shadow-md flex items-center justify-center shrink-0 aspect-square">
-                    <div className="w-full h-full rounded-full border-2 border-[var(--bg-card)] overflow-hidden bg-[var(--bg-main)] flex items-center justify-center shrink-0">
+                  <div className="w-16 h-16 rounded-full p-[2px] border-2 border-[#0494f4] flex items-center justify-center shrink-0 aspect-square">
+                    <div className="w-full h-full rounded-full overflow-hidden bg-[var(--bg-main)] flex items-center justify-center shrink-0">
                       <img 
                         src={story.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
                         alt={story.username}
-                        className="w-full h-full rounded-full object-cover shrink-0"
+                        className="w-full h-full object-cover shrink-0"
                         referrerPolicy="no-referrer"
                       />
                     </div>

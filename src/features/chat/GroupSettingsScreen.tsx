@@ -24,6 +24,8 @@ export default function GroupSettingsScreen() {
   const { id: chatId } = useParams();
   const navigate = useNavigate();
   const { user: authUser, userData: currentUserData } = useAuth();
+  const authUserId = authUser?.id || authUser?.uid || '';
+
   const [group, setGroup] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +35,7 @@ export default function GroupSettingsScreen() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    if (!chatId || !authUser?.uid || !supabase) return;
+    if (!chatId || !authUserId || !supabase) return;
 
     const fetchGroupData = async () => {
       setLoading(true);
@@ -48,7 +50,7 @@ export default function GroupSettingsScreen() {
 
         setGroup(conv);
         setNewName(conv.name);
-        setIsAdmin(conv.admins?.includes(authUser.uid) || conv.created_by === authUser.uid);
+        setIsAdmin(conv.admins?.includes(authUserId) || conv.created_by === authUserId);
 
         // Fetch member details
         const { data: participants, error: partError } = await (supabase as any)
@@ -85,7 +87,7 @@ export default function GroupSettingsScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [chatId, authUser?.uid]);
+  }, [chatId, authUserId]);
 
   const handleUpdateIcon = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -97,8 +99,8 @@ export default function GroupSettingsScreen() {
         
         await supabase.from('messages').insert({
           conversation_id: chatId,
-          sender_id: authUser?.uid,
-          content: `${currentUserData?.fullName || 'Admin'} changed group icon`,
+          sender_id: authUserId,
+          text: `${currentUserData?.fullName || 'Admin'} changed group icon`,
           created_at: new Date().toISOString(),
           media_type: 'system'
         });
@@ -117,8 +119,8 @@ export default function GroupSettingsScreen() {
       await supabase.from('conversations').update({ name: newName } as any).eq('id', chatId);
       await (supabase as any).from('messages').insert({
         conversation_id: chatId,
-        sender_id: authUser?.uid,
-        content: `${currentUserData?.fullName || 'Admin'} changed group name to "${newName}"`,
+        sender_id: authUserId,
+        text: `${currentUserData?.fullName || 'Admin'} changed group name to "${newName}"`,
         created_at: new Date().toISOString(),
         media_type: 'system'
       });
@@ -131,7 +133,7 @@ export default function GroupSettingsScreen() {
   };
 
   const removeMember = async (uid: string) => {
-    if (!chatId || !isAdmin || uid === authUser?.uid || !supabase) return;
+    if (!chatId || !isAdmin || uid === authUserId || !supabase) return;
     if (!window.confirm("Remove this member from the group?")) return;
     
     try {
@@ -140,8 +142,8 @@ export default function GroupSettingsScreen() {
       const removedUser = (members as any[]).find(m => m.uid === uid);
       await (supabase as any).from('messages').insert({
         conversation_id: chatId,
-        sender_id: authUser?.uid,
-        content: `${currentUserData?.fullName || 'Admin'} removed ${removedUser?.fullName || 'a user'}`,
+        sender_id: authUserId,
+        text: `${currentUserData?.fullName || 'Admin'} removed ${removedUser?.fullName || 'a user'}`,
         created_at: new Date().toISOString(),
         media_type: 'system'
       });
@@ -158,8 +160,8 @@ export default function GroupSettingsScreen() {
       const user = (members as any[]).find(m => m.uid === uid);
       await (supabase as any).from('messages').insert({
         conversation_id: chatId,
-        sender_id: authUser?.uid,
-        content: `${user?.fullName || 'User'} is now an admin`,
+        sender_id: authUserId,
+        text: `${user?.fullName || 'User'} is now an admin`,
         created_at: new Date().toISOString(),
         media_type: 'system'
       });
@@ -167,16 +169,16 @@ export default function GroupSettingsScreen() {
   };
 
   const leaveGroup = async () => {
-    if (!chatId || !authUser?.uid || !supabase) return;
+    if (!chatId || !authUserId || !supabase) return;
     if (!window.confirm("Are you sure you want to leave this group?")) return;
     
     try {
-      await supabase.from('conversation_participants').delete().eq('conversation_id', chatId).eq('user_id', authUser.uid);
+      await supabase.from('conversation_participants').delete().eq('conversation_id', chatId).eq('user_id', authUserId);
       
       await (supabase as any).from('messages').insert({
         conversation_id: chatId,
-        sender_id: authUser.uid,
-        content: `${currentUserData?.fullName || 'User'} left the group`,
+        sender_id: authUserId,
+        text: `${currentUserData?.fullName || 'User'} left the group`,
         created_at: new Date().toISOString(),
         media_type: 'system'
       });
@@ -283,7 +285,7 @@ export default function GroupSettingsScreen() {
             <div className="bg-[var(--bg-card)] rounded-3xl border border-[var(--border-color)] divide-y divide-[var(--border-color)] overflow-hidden">
               {members.map(member => {
                 const memberIsAdmin = (group.admins || []).includes(member.uid);
-                const isMe = member.uid === authUser?.uid;
+                const isMe = member.uid === authUserId;
                 return (
                   <div key={member.uid} className="flex items-center gap-3 p-4">
                     <img src={member.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} className="w-11 h-11 rounded-full object-cover border border-[var(--border-color)]" alt="" />

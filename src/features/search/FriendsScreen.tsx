@@ -31,21 +31,33 @@ export default function FriendsScreen() {
       setLoading(true);
       setError(null);
 
-      // Get following IDs from follows table representing friend links
-      const { data: followData, error: followError } = await supabase
+      // Get following IDs and follower IDs from follows table representing mutual friend links
+      const { data: followRows, error: followError } = await supabase
         .from('follows')
-        .select('following_id')
-        .eq('follower_id', authUser.id);
+        .select('follower_id, following_id')
+        .or(`follower_id.eq.${authUser.id},following_id.eq.${authUser.id}`);
       
       if (followError) throw followError;
+
+      const IFollow = new Set<string>();
+      const FollowsMe = new Set<string>();
+
+      followRows?.forEach((row: any) => {
+        if (row.follower_id === authUser.id) {
+          IFollow.add(row.following_id);
+        }
+        if (row.following_id === authUser.id) {
+          FollowsMe.add(row.follower_id);
+        }
+      });
+
+      const mutualIds = Array.from(IFollow).filter(id => FollowsMe.has(id));
       
-      const followingIds = followData?.map(f => f.following_id) || [];
-      
-      if (followingIds.length > 0) {
+      if (mutualIds.length > 0) {
         const { data: friendsData, error: friendsError } = await supabase
           .from('users')
           .select('id, username, full_name, photo_url, is_online')
-          .in('id', followingIds)
+          .in('id', mutualIds)
           .limit(100);
         
         if (friendsError) throw friendsError;
@@ -91,7 +103,7 @@ export default function FriendsScreen() {
           <ArrowLeft size={18} />
         </button>
         <div className="flex-1 min-w-0">
-          <h2 className="text-[17px] font-bold text-[var(--text-primary)] tracking-tight">Friends</h2>
+          <h2 className="text-[17px] font-bold text-[var(--text-primary)] tracking-tight">GrixChat Friends</h2>
           <p className="text-[11px] text-[var(--text-secondary)] font-medium leading-none mt-1">
             {friends.length} {friends.length === 1 ? 'connection' : 'connections'} on Grix
           </p>
@@ -182,7 +194,7 @@ export default function FriendsScreen() {
                     e.stopPropagation();
                     navigate(`/chat/${friend.id}`);
                   }}
-                  className="px-3.5 py-1.5 bg-[#0c1319] hover:bg-[#0c1319]/90 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1 shadow-md shrink-0 cursor-pointer border border-[#0c1319]/10"
+                  className="px-3.5 py-1.5 bg-[#0494f4] hover:bg-[#0494f4]/95 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1 shadow-md shrink-0 cursor-pointer border border-[#0494f4]/10"
                 >
                   <MessageSquare size={12} strokeWidth={3} />
                   <span>Message</span>

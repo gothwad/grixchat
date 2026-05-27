@@ -89,29 +89,25 @@ export default function ProfileTab() {
       <div className="px-4 pt-4 mb-4">
         <div 
           onClick={() => navigate('/edit-profile')}
-          className="relative bg-[var(--bg-card)] text-[var(--text-primary)] py-4 px-5 border border-[var(--border-color)]/50 rounded-2xl shadow-sm overflow-hidden shrink-0 cursor-pointer hover:bg-[var(--bg-card)]/90 transition-colors"
+          className="relative bg-[var(--bg-card)] text-[var(--text-primary)] py-4 px-5 border border-[var(--border-color)]/50 rounded-2xl shadow-sm shrink-0 cursor-pointer hover:bg-[var(--bg-card)]/90 transition-colors"
         >
-          {/* Soft elegant ambient flares that work on both light and dark OLED themes */}
-          <div className="absolute top-0 right-0 w-44 h-44 bg-indigo-500/5 rounded-full blur-[40px] pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-36 h-36 bg-rose-500/5 rounded-full blur-[30px] pointer-events-none" />
-
           <div className="relative flex flex-col gap-3">
             {/* Top Row: Avatar on Left, Name and Username on Right */}
             <div className="flex items-center gap-4">
-              {/* Solid Avatar Wrapper with Edit Pencil icon overlay */}
+              {/* Solid Avatar Wrapper with Edit Pencil icon overlay and custom #0494f4 ring */}
               <div className="relative group shrink-0">
-                <div className="w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-tr from-indigo-500 via-sky-400 to-rose-400 shadow-md transition-transform duration-200 group-hover:scale-[1.03] flex items-center justify-center shrink-0 aspect-square">
-                  <div className="w-full h-full rounded-full border-2 border-[var(--bg-card)] overflow-hidden bg-[var(--bg-main)] flex items-center justify-center shrink-0">
+                <div className="w-16 h-16 rounded-full p-[2.5px] border-[2.5px] border-[#0494f4] bg-[var(--bg-main)] flex items-center justify-center shrink-0">
+                  <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
                     <img 
                       src={profilePic || DEFAULT_LOGO} 
-                      className="w-full h-full rounded-full object-cover shrink-0"
+                      className="w-full h-full object-cover shrink-0"
                       referrerPolicy="no-referrer"
                       alt="Profile Avatar"
                     />
                   </div>
                 </div>
                 {/* Pencil Edit Icon replacing online dot */}
-                <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-md border-2 border-[var(--bg-card)]">
+                <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#0494f4] text-white rounded-full flex items-center justify-center shadow-md border-2 border-[var(--bg-card)]">
                   <Pencil size={11} strokeWidth={2.5} />
                 </span>
               </div>
@@ -214,10 +210,6 @@ export default function ProfileTab() {
           </div>
         </div>
 
-        {/* Unified Branding Footer */}
-        <div className="py-8 flex flex-col items-center gap-1 opacity-35 text-center">
-          <span className="text-[var(--text-primary)] font-black tracking-[0.15em] uppercase text-[10px]">GrixChat</span>
-        </div>
       </div>
     </div>
   );

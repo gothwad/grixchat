@@ -16,33 +16,79 @@ export default function TabBottom() {
 
     const fetchUnread = async () => {
       try {
-        // Fetch participant conversations with their type
+        // Fetch participant conversations with their participants
         const { data: participants, error: pError } = await supabase
           .from('conversation_participants')
           .select(`
             conversation_id,
             conversation:conversations (
-              type
+              type,
+              participants:conversation_participants (
+                user_id
+              )
             )
           `)
           .eq('user_id', authUser.id);
 
         if (pError || !participants) return;
 
+        // Fetch mutual follows to filter out non-friends from direct chats
+        const { data: followRows } = await supabase
+          .from('follows')
+          .select('follower_id, following_id')
+          .or(`follower_id.eq.${authUser.id},following_id.eq.${authUser.id}`);
+
+        const IFollow = new Set<string>();
+        const FollowsMe = new Set<string>();
+
+        followRows?.forEach((row: any) => {
+          if (row.follower_id === authUser.id) {
+            IFollow.add(row.following_id);
+          }
+          if (row.following_id === authUser.id) {
+            FollowsMe.add(row.follower_id);
+          }
+        });
+
+        const mutualFriendsSet = new Set<string>();
+        IFollow.forEach(id => {
+          if (FollowsMe.has(id)) {
+            mutualFriendsSet.add(id);
+          }
+        });
+
         // Build a mapping of conversation_id -> type
         const convTypeMap: Record<string, string> = {};
         participants.forEach((p: any) => {
           if (p.conversation_id && p.conversation) {
-            convTypeMap[p.conversation_id] = p.conversation.type || 'direct';
+            const conv = p.conversation;
+            const isGroup = conv.type === 'group';
+            if (isGroup) {
+              convTypeMap[p.conversation_id] = 'group';
+            } else {
+              // Find other participant user id
+              const otherId = conv.participants?.find((part: any) => part.user_id !== authUser.id)?.user_id;
+              if (otherId && mutualFriendsSet.has(otherId)) {
+                convTypeMap[p.conversation_id] = 'direct';
+              }
+            }
           }
         });
 
         // Fetch unread messages
+        const myConvIds = Object.keys(convTypeMap);
+        if (myConvIds.length === 0) {
+          setUnreadChatsCount(0);
+          setUnreadGroupsCount(0);
+          return;
+        }
+
         const { data: messages, error: mError } = await supabase
           .from('messages')
           .select('conversation_id')
           .eq('is_read', false)
-          .neq('sender_id', authUser.id);
+          .neq('sender_id', authUser.id)
+          .in('conversation_id', myConvIds);
         
         if (!mError && messages) {
           const distinctConversations = Array.from(new Set(messages.map(m => m.conversation_id as string)));
@@ -54,13 +100,16 @@ export default function TabBottom() {
             const type = convTypeMap[cid];
             if (type === 'group') {
               groupsUnread++;
-            } else {
+            } else if (type === 'direct') {
               chatsUnread++;
             }
           });
 
           setUnreadChatsCount(chatsUnread);
           setUnreadGroupsCount(groupsUnread);
+        } else {
+          setUnreadChatsCount(0);
+          setUnreadGroupsCount(0);
         }
       } catch (err) {
         console.error("Error fetching unread count:", err);
@@ -75,6 +124,13 @@ export default function TabBottom() {
         event: '*',
         schema: 'public',
         table: 'messages',
+      }, () => {
+        fetchUnread();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'follows',
       }, () => {
         fetchUnread();
       })
@@ -125,7 +181,7 @@ export default function TabBottom() {
                 <motion.div 
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-[var(--header-bg)] shadow-sm z-10"
+                  className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 bg-[#0494f4] text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-[var(--header-bg)] shadow-sm z-10"
                 >
                   {item.badge > 9 ? '9+' : item.badge}
                 </motion.div>

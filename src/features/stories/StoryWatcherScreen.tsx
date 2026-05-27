@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Music, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function StoryWatcherScreen() {
@@ -12,6 +12,8 @@ export default function StoryWatcherScreen() {
   const [stories, setStories] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!userId || !supabase) return;
@@ -41,9 +43,40 @@ export default function StoryWatcherScreen() {
     fetchStories();
   }, [userId]);
 
+  // Handle active story music track playback
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    const currentStory = stories[currentIndex];
+    const trackUrl = currentStory?.music_url;
+    
+    if (trackUrl) {
+      const audio = new Audio(trackUrl);
+      audio.volume = 0.5;
+      audio.loop = true;
+      audioRef.current = audio;
+      
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(err => {
+          console.log("Audio autoplay was prevented/interrupted: ", err);
+        });
+      }
+    }
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [currentIndex, stories]);
+
   useEffect(() => {
     // Logic for tracking viewers could be added here if needed in Supabase
-    // But for now keeping it simple as we don't have a viewers table yet
   }, [currentIndex, stories]);
 
   // Auto-advance
@@ -81,7 +114,7 @@ export default function StoryWatcherScreen() {
   const currentStory = stories[currentIndex];
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
+    <div className="fixed inset-0 bg-black z-50 flex flex-col font-sans select-none">
       {/* Progress Bars */}
       <div className="absolute top-4 left-0 right-0 px-2 flex gap-1 z-20">
         {stories.map((_, idx) => (
@@ -99,28 +132,57 @@ export default function StoryWatcherScreen() {
         <div className="flex items-center gap-3">
           <img 
             src={currentStory?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-            className="w-10 h-10 rounded-full border border-white/20"
+            className="w-10 h-10 rounded-full border border-white/20 object-cover"
             referrerPolicy="no-referrer"
           />
-          <span className="text-white font-bold text-sm">{currentStory?.username}</span>
+          <span className="text-white font-extrabold text-xs tracking-wider">@{currentStory?.username}</span>
         </div>
-        <button onClick={() => navigate('/chats')} className="text-white">
-          <X size={28} />
+        <button onClick={() => navigate('/chats')} className="text-white p-1 hover:bg-white/10 rounded-full transition-all cursor-pointer">
+          <X size={24} />
         </button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 relative flex items-center justify-center">
+      <div className="flex-1 relative flex items-center justify-center overflow-hidden">
         <AnimatePresence mode="wait">
-          <motion.img 
-            key={currentStory?.id}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.1 }}
-            src={currentStory?.imageUrl} 
-            className="w-full h-full object-contain"
-          />
+          {currentStory?.type === 'text' ? (
+            <motion.div
+              key={currentStory.id}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.1 }}
+              style={{ background: currentStory.bg_color || '#111' }}
+              className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center"
+            >
+              <p className={`text-white text-[24px] font-black leading-snug max-w-md ${currentStory.filter_applied || 'font-sans'}`} style={{ textShadow: '0 2px 10px rgba(0,0,0,0.4)' }}>
+                {currentStory.text_content}
+              </p>
+            </motion.div>
+          ) : (
+            <motion.img 
+              key={currentStory?.id}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.1 }}
+              src={currentStory?.imageUrl} 
+              className={`w-full h-full object-contain`}
+              style={{ filter: currentStory?.filter_applied || 'none' }}
+            />
+          )}
         </AnimatePresence>
+
+        {/* Music Indicator Layer */}
+        {currentStory?.music_title && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-md rounded-full py-1.5 px-4 flex items-center gap-2 border border-white/10 z-30 max-w-[280px]">
+            <Music size={12} className="text-[#0494f4] animate-spin" />
+            <span className="text-[10px] font-extrabold text-white truncate max-w-[150px]">
+              {currentStory.music_title}
+            </span>
+            <span className="text-[9px] text-zinc-400 truncate">
+              • {currentStory.music_artist}
+            </span>
+          </div>
+        )}
 
         {/* Navigation Overlays */}
         <div className="absolute inset-0 flex">

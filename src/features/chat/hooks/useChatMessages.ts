@@ -28,12 +28,32 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
   const [messageLimit, setMessageLimit] = useState(initialLimit);
   const lastMessageCount = useRef(0);
   const { user, userData } = useAuth();
+  
+  const confirmOptimisticMessage = useCallback((tempId: string, dbMessage: any) => {
+    if (!dbMessage) return;
+    dbMessage.content = dbMessage.text || dbMessage.content || '';
+    
+    setMessages(prev => {
+      const filtered = prev.filter(m => m.id !== tempId);
+      if (filtered.some(m => m.id === dbMessage.id)) {
+        return filtered;
+      }
+      const newList = [...filtered, dbMessage];
+      const sorted = newList.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      
+      if (conversationId) {
+        LocalDataCache.saveMessages(conversationId, sorted);
+      }
+      return sorted;
+    });
+  }, [conversationId]);
 
   const addOptimisticMessage = useCallback((msg: any) => {
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     setMessages(prev => {
       const newList = [...prev, {
         ...msg,
-        id: `temp-${Date.now()}`,
+        id: tempId,
         created_at: new Date().toISOString(),
         sender_id: user?.id,
         is_read: false,
@@ -47,6 +67,7 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
       }];
       return newList.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     });
+    return tempId;
   }, [user, userData]);
 
   const fetchMessages = useCallback(async (isMore = false) => {
@@ -63,6 +84,11 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
           username,
           full_name,
           photo_url
+        ),
+        reply_to:messages!reply_to (
+          id,
+          text,
+          sender_id
         )
       `)
       .eq('conversation_id', conversationId)
@@ -73,6 +99,9 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
       console.error('Error fetching messages:', error);
     } else {
       const reversed = (data as any[] || []).reverse();
+      reversed.forEach((m: any) => {
+        m.content = m.text || m.content || '';
+      });
       LocalDataCache.saveMessages(conversationId, reversed);
       setMessages(reversed);
     }
@@ -107,6 +136,10 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
     // Mark as read
     const markAsRead = async () => {
       if (!conversationId || !user) return;
+      
+      // Instantly clear cached count for zero local UI latency!
+      LocalDataCache.clearUnreadCount(user.id, conversationId);
+
       try {
         const { error } = await supabase
           .from('messages')
@@ -150,12 +183,18 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
                 username,
                 full_name,
                 photo_url
+              ),
+              reply_to:messages!reply_to (
+                id,
+                text,
+                sender_id
               )
             `)
             .eq('id', payload.new.id)
             .single();
 
           if (!error && data) {
+            data.content = data.text || data.content || '';
             setMessages(prev => {
               // 1. Remove matching optimistic message if it exists
               // We match by sender_id and content/media for simple cases
@@ -197,12 +236,18 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
               username,
               full_name,
               photo_url
+            ),
+            reply_to:messages!reply_to (
+              id,
+              text,
+              sender_id
             )
           `)
           .eq('id', payload.new.id)
           .single();
 
         if (!error && data) {
+          data.content = data.text || data.content || '';
           setMessages(prev => prev.map(m => m.id === data.id ? data : m));
         }
       })
@@ -265,6 +310,7 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
     loadingMore,
     loadMore,
     addOptimisticMessage,
+    confirmOptimisticMessage,
     messageLimit,
     lastMessageCount
   };

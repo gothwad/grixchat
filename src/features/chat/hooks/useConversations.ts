@@ -60,17 +60,66 @@ export const useConversations = (activeFilter: string) => {
         return;
       }
 
+      // Fetch mutual follows to filter out non-friends from direct chats
+      const { data: followRows } = await supabase
+        .from('follows')
+        .select('follower_id, following_id')
+        .or(`follower_id.eq.${myId},following_id.eq.${myId}`);
+
+      const IFollow = new Set<string>();
+      const FollowsMe = new Set<string>();
+
+      followRows?.forEach((row: any) => {
+        if (row.follower_id === myId) {
+          IFollow.add(row.following_id);
+        }
+        if (row.following_id === myId) {
+          FollowsMe.add(row.follower_id);
+        }
+      });
+
+      const mutualFriendsSet = new Set<string>();
+      IFollow.forEach(id => {
+        if (FollowsMe.has(id)) {
+          mutualFriendsSet.add(id);
+        }
+      });
+
+      const conversationIds = data?.map((item: any) => item.conversation?.id).filter(Boolean) || [];
+
       // Fetch unread messages count for all my conversations at once
-      const { data: unreadData } = await supabase
-        .from('messages')
-        .select('conversation_id')
-        .eq('is_read', false)
-        .neq('sender_id', myId);
+      let unreadData: any[] = [];
+      if (conversationIds.length > 0) {
+        const { data: res } = await supabase
+          .from('messages')
+          .select('conversation_id')
+          .eq('is_read', false)
+          .neq('sender_id', myId)
+          .in('conversation_id', conversationIds);
+        unreadData = res || [];
+      }
 
       const unreadMap: Record<string, number> = {};
-      unreadData?.forEach(m => {
+      unreadData.forEach(m => {
         unreadMap[m.conversation_id] = (unreadMap[m.conversation_id] || 0) + 1;
       });
+
+      // Fetch the actual newest message from messages table for each conversation to prevent race conditions
+      const latestMessagesMap: Record<string, any> = {};
+
+      if (conversationIds.length > 0) {
+        const { data: latestMsgs } = await supabase
+          .from('messages')
+          .select('conversation_id, text, media_type, created_at')
+          .in('conversation_id', conversationIds)
+          .order('created_at', { ascending: false });
+
+        latestMsgs?.forEach((m: any) => {
+          if (!latestMessagesMap[m.conversation_id]) {
+            latestMessagesMap[m.conversation_id] = m;
+          }
+        });
+      }
 
       const rawList = data
         .map((item: any) => {
@@ -82,7 +131,21 @@ export const useConversations = (activeFilter: string) => {
 
           if (!isGroup && !firstOther) return null;
 
+          // CRITICAL: direct messaging is only allowed and shown for mutual GrixChat Friends
+          if (!isGroup && firstOther && !mutualFriendsSet.has(firstOther.id)) {
+            return null;
+          }
+
           const unreadCount = unreadMap[conv.id] || 0;
+          const latestDbMsg = latestMessagesMap[conv.id];
+
+          let lastMsgVal = conv.last_message || 'New Conversation';
+          let lastMsgAtVal = conv.last_message_at || conv.created_at;
+
+          if (latestDbMsg) {
+            lastMsgVal = latestDbMsg.text || (latestDbMsg.media_type ? `Sent a ${latestDbMsg.media_type}` : 'Sent a file');
+            lastMsgAtVal = latestDbMsg.created_at;
+          }
 
           return {
             id: conv.id,
@@ -91,9 +154,9 @@ export const useConversations = (activeFilter: string) => {
             user: isGroup ? (conv.name || 'Group') : (firstOther.full_name || firstOther.username || 'Unknown'),
             username: isGroup ? 'group' : firstOther?.username,
             fullName: isGroup ? conv.name : firstOther?.full_name,
-            lastMsg: conv.last_message || 'New conversation',
-            lastMsgAt: conv.last_message_at || conv.created_at,
-            time: formatTime(new Date(conv.last_message_at || conv.created_at)),
+            lastMsg: lastMsgVal,
+            lastMsgAt: lastMsgAtVal,
+            time: formatTime(new Date(lastMsgAtVal)),
             avatar: isGroup 
               ? (conv.photo_url || `https://cdn-icons-png.flaticon.com/512/166/166258.png`)
               : (firstOther?.photo_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`),
@@ -112,9 +175,9 @@ export const useConversations = (activeFilter: string) => {
         if (!existing) {
           seenDict[conv.otherUserId] = conv;
         } else {
-          // If one has real messages and the other is empty ('New conversation'), keep the real one
-          const currentHasMsg = conv.lastMsg && conv.lastMsg !== 'New conversation';
-          const existingHasMsg = existing.lastMsg && existing.lastMsg !== 'New conversation';
+          // If one has real messages and the other is empty ('New Conversation'), keep the real one
+          const currentHasMsg = conv.lastMsg && conv.lastMsg !== 'New Conversation';
+          const existingHasMsg = existing.lastMsg && existing.lastMsg !== 'New Conversation';
 
           if (currentHasMsg && !existingHasMsg) {
             seenDict[conv.otherUserId] = conv;
@@ -166,6 +229,9 @@ export const useConversations = (activeFilter: string) => {
         fetchConversations();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+        fetchConversations();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'follows' }, () => {
         fetchConversations();
       })
       .subscribe();

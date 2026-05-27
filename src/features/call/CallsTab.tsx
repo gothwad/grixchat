@@ -186,7 +186,7 @@ export default function CallsTab() {
               }}
               className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
                 mediaFilter === 'voice'
-                  ? 'bg-[var(--bg-main)] text-[var(--primary)] shadow-sm'
+                  ? 'bg-[#0494f4] text-white shadow-sm'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
@@ -198,7 +198,7 @@ export default function CallsTab() {
               }}
               className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
                 mediaFilter === 'video'
-                  ? 'bg-[var(--bg-main)] text-[var(--primary)] shadow-sm'
+                  ? 'bg-[#0494f4] text-white shadow-sm'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
@@ -213,7 +213,7 @@ export default function CallsTab() {
             onClick={handleCopyCallLink}
             className="flex items-center gap-4 bg-[var(--bg-card)] border border-[var(--border-color)]/50 p-4 rounded-2xl hover:bg-[var(--bg-card)]/90 transition-all cursor-pointer shadow-sm group active:scale-[0.99]"
           >
-            <div className="w-11 h-11 rounded-full bg-indigo-600/10 text-indigo-500 flex items-center justify-center shrink-0">
+            <div className="w-11 h-11 rounded-full bg-[#0494f4]/10 text-[#0494f4] flex items-center justify-center shrink-0">
               <LinkIcon size={20} className="transform rotate-45" />
             </div>
             <div className="flex-1 min-w-0">
@@ -222,7 +222,7 @@ export default function CallsTab() {
                 {linkCopied ? 'Link copied successfully!' : 'Share a custom link for your Grix call'}
               </p>
             </div>
-            <div className="shrink-0 text-[10px] uppercase font-bold text-indigo-500 bg-indigo-500/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
+            <div className="shrink-0 text-[10px] uppercase font-bold text-[#0494f4] bg-[#0494f4]/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
               {linkCopied ? <Check size={11} strokeWidth={2.5} /> : <Share2 size={11} />}
               <span>{linkCopied ? 'Copied' : 'Share'}</span>
             </div>
@@ -236,7 +236,7 @@ export default function CallsTab() {
               onClick={() => setStatusFilter('incoming')}
               className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
                 statusFilter === 'incoming'
-                  ? 'bg-[var(--bg-main)] text-[var(--primary)] shadow-sm'
+                  ? 'bg-[#0494f4] text-white shadow-sm'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
@@ -246,7 +246,7 @@ export default function CallsTab() {
               onClick={() => setStatusFilter('outgoing')}
               className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
                 statusFilter === 'outgoing'
-                  ? 'bg-[var(--bg-main)] text-[var(--primary)] shadow-sm'
+                  ? 'bg-[#0494f4] text-white shadow-sm'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
@@ -256,7 +256,7 @@ export default function CallsTab() {
               onClick={() => setStatusFilter('missed')}
               className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
                 statusFilter === 'missed'
-                  ? 'bg-[var(--bg-main)] text-[var(--primary)] shadow-sm'
+                  ? 'bg-[#0494f4] text-white shadow-sm'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
@@ -280,13 +280,13 @@ export default function CallsTab() {
         {/* Call Log List or Placeholder */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="w-8 h-8 border-3 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+            <div className="w-8 h-8 border-3 border-[#0494f4]/20 border-t-[#0494f4] rounded-full animate-spin" />
             <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em]">Loading Records...</p>
           </div>
         ) : calls.length === 0 ? (
           <div className="px-4 py-6">
             <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-4 shadow-sm">
-              <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-2xl bg-[#0494f4]/10 text-[#0494f4] flex items-center justify-center">
                 <PhoneCall size={30} />
               </div>
               <div className="max-w-[240px]">
@@ -297,7 +297,7 @@ export default function CallsTab() {
               </div>
               <button 
                 onClick={handleOpenContacts}
-                className="mt-2 text-xs font-black uppercase tracking-wider bg-indigo-600 hover:bg-indigo-550 text-white px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                className="mt-2 text-xs font-black uppercase tracking-wider bg-[#0494f4] hover:bg-[#0494f4]/90 text-white px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
               >
                 Call Someone
               </button>
@@ -306,7 +306,7 @@ export default function CallsTab() {
         ) : filteredCalls.length === 0 ? (
           <div className="px-4 py-6">
             <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-4 shadow-sm">
-              <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center animate-pulse">
+              <div className="w-16 h-16 rounded-2xl bg-[#0494f4]/10 text-[#0494f4] flex items-center justify-center animate-pulse">
                 <PhoneCall size={30} />
               </div>
               <div className="max-w-[240px]">
@@ -320,7 +320,7 @@ export default function CallsTab() {
                   setMediaFilter('voice');
                   setStatusFilter('incoming');
                 }}
-                className="mt-2 text-xs font-black uppercase tracking-wider bg-indigo-650 hover:bg-indigo-600 text-white px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                className="mt-2 text-xs font-black uppercase tracking-wider bg-[#0494f4] hover:bg-[#0494f4]/90 text-white px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
               >
                 Reset Filters
               </button>
@@ -355,7 +355,7 @@ export default function CallsTab() {
                     ) : call.isIncoming ? (
                       <ArrowDownLeft size={11} className="text-emerald-500 shrink-0" />
                     ) : (
-                      <ArrowUpRight size={11} className="text-indigo-500 shrink-0" />
+                      <ArrowUpRight size={11} className="text-[#0494f4] shrink-0" />
                     )}
                     <span className="font-medium">{call.isMissed ? 'Missed' : call.isIncoming ? 'Incoming' : 'Outgoing'}</span>
                   </div>
@@ -364,13 +364,13 @@ export default function CallsTab() {
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => startCallDirectly(call.otherUserId, 'voice')}
-                    className="w-9 h-9 rounded-xl bg-indigo-600/10 text-indigo-500 hover:bg-indigo-600 hover:text-white transition-colors flex items-center justify-center cursor-pointer"
+                    className="w-9 h-9 rounded-xl bg-[#0494f4]/10 text-[#0494f4] hover:bg-[#0494f4] hover:text-white transition-colors flex items-center justify-center cursor-pointer"
                   >
                     <Phone size={15} />
                   </button>
                   <button 
                     onClick={() => startCallDirectly(call.otherUserId, 'video')}
-                    className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors flex items-center justify-center cursor-pointer"
+                    className="w-9 h-9 rounded-xl bg-[#0494f4]/10 text-[#0494f4] hover:bg-[#0494f4] hover:text-white transition-colors flex items-center justify-center cursor-pointer"
                   >
                     <Video size={15} />
                   </button>
@@ -429,7 +429,7 @@ export default function CallsTab() {
                     placeholder="Search name or username..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-indigo-500/80 transition-colors"
+                    className="w-full pl-10 pr-4 py-3 bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-[#0494f4]/30 transition-colors"
                   />
                   {searchQuery && (
                     <button 
@@ -446,7 +446,7 @@ export default function CallsTab() {
               <div className="flex-1 overflow-y-auto no-scrollbar px-4 pb-8 space-y-2 min-h-[300px]">
                 {contactsLoading ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <div className="w-7 h-7 border-3 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+                    <div className="w-7 h-7 border-3 border-[#0494f4]/20 border-t-[#0494f4] rounded-full animate-spin" />
                     <p className="text-[9px] font-mono tracking-wider text-[var(--text-secondary)] uppercase">Fetching Active Channels...</p>
                   </div>
                 ) : filteredContacts.length === 0 ? (
@@ -479,13 +479,13 @@ export default function CallsTab() {
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => startCallDirectly(contact.id, 'voice')}
-                          className="w-9 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-550 text-white transition-colors flex items-center justify-center cursor-pointer shadow-sm"
+                          className="w-9 h-9 rounded-xl bg-[#0494f4] hover:bg-[#0494f4]/90 text-white transition-colors flex items-center justify-center cursor-pointer shadow-sm"
                         >
                           <Phone size={15} />
                         </button>
                         <button 
                           onClick={() => startCallDirectly(contact.id, 'video')}
-                          className="w-9 h-9 rounded-xl bg-rose-500 hover:bg-rose-450 text-white transition-colors flex items-center justify-center cursor-pointer shadow-sm"
+                          className="w-9 h-9 rounded-xl bg-[#0494f4] hover:bg-[#0494f4]/90 text-white transition-colors flex items-center justify-center cursor-pointer shadow-sm"
                         >
                           <Video size={15} />
                         </button>

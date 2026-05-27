@@ -132,9 +132,9 @@ export const ChatOptionsSheet: React.FC<ChatOptionsSheetProps> = ({
 
                   <button 
                     onClick={() => handleAction(onWatchTogether)}
-                    className="w-full px-5 py-3.5 text-left text-sm font-bold text-blue-500 hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl"
+                    className="w-full px-5 py-3.5 text-left text-sm font-bold text-[#0494f4] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl"
                   >
-                    <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
+                    <div className="w-9 h-9 rounded-full bg-[#0494f4]/10 flex items-center justify-center text-[#0494f4]">
                       <Play size={20} fill="currentColor" />
                     </div>
                     <span>Watch Together</span>

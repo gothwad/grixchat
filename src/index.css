@@ -20,16 +20,16 @@
 @layer base {
   /* Light Theme (Default) */
   :root {
-    --primary: #0095f6;
+    --primary: #0494f4;
     --primary-foreground: #ffffff;
-    --primary-shadow: rgba(0, 149, 246, 0.1);
+    --primary-shadow: rgba(4, 148, 244, 0.1);
     --bg-main: #ffffff;
     --bg-card: #ffffff;
     --bg-chat: #ffffff;
     --text-primary: #000000;
     --text-secondary: #475569;
     --border-color: #f1f5f9;
-    --accent-color: #0095f6;
+    --accent-color: #0494f4;
     --bubble-own: #e5e5e5;
     --bubble-other: #e5e5e5;
     --bubble-text-own: #1e293b;
@@ -38,23 +38,23 @@
     --header-text: #000000;
     --nav-bg: #ffffff;
     --nav-text: #000000;
-    --brand-color: #0095f6;
+    --brand-color: #0494f4;
     --box-bg: #f8fafc;
     --box-text: #000000;
   }
 
   /* Dark Theme */
   [data-theme='dark'] {
-    --primary: #0095f6;
+    --primary: #0494f4;
     --primary-foreground: #ffffff;
-    --primary-shadow: rgba(0, 149, 246, 0.2);
+    --primary-shadow: rgba(4, 148, 244, 0.2);
     --bg-main: #202124;
     --bg-card: #202124;
     --bg-chat: #202124;
     --text-primary: #ffffff;
     --text-secondary: #a1a1aa;
     --border-color: #2c2d30;
-    --accent-color: #0095f6;
+    --accent-color: #0494f4;
     --bubble-own: #3c4043;
     --bubble-other: #303134;
     --bubble-text-own: #ffffff;
@@ -63,7 +63,7 @@
     --header-text: #ffffff;
     --nav-bg: #202124;
     --nav-text: #ffffff;
-    --brand-color: #0095f6;
+    --brand-color: #0494f4;
     --box-bg: #292a2d;
     --box-text: #ffffff;
   }

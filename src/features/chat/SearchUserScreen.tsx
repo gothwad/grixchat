@@ -46,7 +46,7 @@ const UserItem = ({
         e.stopPropagation();
         navigate(`/chat/${user.uid}`);
       }}
-      className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-550 text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1 min-w-[85px] shadow-sm shrink-0"
+      className="px-3.5 py-1.5 bg-[#0494f4] hover:bg-[#0494f4]/90 text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1 min-w-[85px] shadow-sm shrink-0"
     >
       <MessageSquare size={12} strokeWidth={2.5} />
       <span>Message</span>

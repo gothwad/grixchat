@@ -208,7 +208,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
           className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer"
         >
           <div className="relative shrink-0 z-10">
-            <div className="w-[52px] h-[52px] rounded-full bg-indigo-500/10 dark:bg-zinc-800 flex items-center justify-center text-[var(--primary)] group-hover:scale-105 transition-transform border border-[var(--border-color)]/30">
+            <div className="w-[52px] h-[52px] rounded-full bg-[#0494f4]/10 dark:bg-zinc-800 flex items-center justify-center text-[var(--primary)] group-hover:scale-105 transition-transform border border-[var(--border-color)]/30">
               <Archive size={21} className="text-[var(--primary)]" />
             </div>
           </div>
@@ -217,7 +217,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
               <h3 className="text-[15px] truncate font-black text-[var(--text-primary)]">
                 Archived Chats
               </h3>
-              <span className="text-[11px] whitespace-nowrap text-indigo-500 dark:text-indigo-400 font-bold tracking-tight">
+              <span className="text-[11px] whitespace-nowrap text-[#0494f4] font-bold tracking-tight">
                 View
               </span>
             </div>

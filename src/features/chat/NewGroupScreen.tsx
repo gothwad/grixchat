@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Users, 
   ArrowLeft, 
@@ -23,6 +23,10 @@ interface UserProfile {
 
 export default function NewGroupScreen() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const rawType = searchParams.get('type') || 'group';
+  const groupType = rawType === 'channel' ? 'channel' : 'group';
+
   const { user: authUser, userData: currentUserData } = useAuth();
   const [step, setStep] = useState(1);
   const [groupName, setGroupName] = useState('');
@@ -42,21 +46,33 @@ export default function NewGroupScreen() {
       if (!authUser?.id || !supabase) return;
       try {
         setLoading(true);
-        // Get following IDs from follows table
-        const { data: followData, error: followError } = await supabase
+        // Get following and follower IDs to compute mutual friends
+        const { data: followRows, error: followError } = await supabase
           .from('follows')
-          .select('following_id')
-          .eq('follower_id', authUser.id);
+          .select('follower_id, following_id')
+          .or(`follower_id.eq.${authUser.id},following_id.eq.${authUser.id}`);
         
         if (followError) throw followError;
+
+        const IFollow = new Set<string>();
+        const FollowsMe = new Set<string>();
+
+        followRows?.forEach((row: any) => {
+          if (row.follower_id === authUser.id) {
+            IFollow.add(row.following_id);
+          }
+          if (row.following_id === authUser.id) {
+            FollowsMe.add(row.follower_id);
+          }
+        });
+
+        const mutualIds = Array.from(IFollow).filter(id => FollowsMe.has(id));
         
-        const following = followData?.map(f => f.following_id) || [];
-        
-        if (following.length > 0) {
+        if (mutualIds.length > 0) {
           const { data: friendsData, error: friendsError } = await supabase
             .from('users')
             .select('*')
-            .in('id', following);
+            .in('id', mutualIds);
           
           if (friendsError) throw friendsError;
 
@@ -125,16 +141,20 @@ export default function NewGroupScreen() {
       const newConvId = generateUUID();
       const participants = [authUser.id, ...selectedUsers.map(u => u.id)];
       
+      const finalName = groupType === 'channel' 
+        ? (groupName.toLowerCase().includes('channel') || groupName.toLowerCase().includes('broadcast') ? groupName : `${groupName} Channel`) 
+        : groupName;
+
       // 1. Create the conversation
       const { error: convError } = await (supabase as any)
         .from('conversations')
         .insert({
           id: newConvId,
-          name: groupName,
+          name: finalName,
           photo_url: iconUrl,
           type: 'group',
           created_by: authUser.id,
-          last_message: `Group "${groupName}" created`,
+          last_message: groupType === 'channel' ? `Channel "${finalName}" created` : `Group "${groupName}" created`,
           last_message_at: new Date().toISOString()
         });
 
@@ -157,7 +177,9 @@ export default function NewGroupScreen() {
         await (supabase as any).from('messages').insert({
           conversation_id: newConvId,
           sender_id: authUser.id, // System messages can be sent by creator or a special sys id?
-          content: `${currentUserData?.fullName || 'You'} created the group "${groupName}"`,
+          text: groupType === 'channel' 
+            ? `${currentUserData?.fullName || 'You'} created the channel "${finalName}"` 
+            : `${currentUserData?.fullName || 'You'} created the group "${groupName}"`,
           created_at: new Date().toISOString(),
           media_type: 'system'
         });
@@ -189,16 +211,19 @@ export default function NewGroupScreen() {
         </button>
         <div className="flex-1">
           <h2 className="text-sm font-black uppercase tracking-widest text-[var(--text-primary)]">
-            {step === 1 ? 'New Group' : 'Group Info'}
+            {step === 1 
+              ? (groupType === 'channel' ? 'New Broadcast' : 'New Group') 
+              : (groupType === 'channel' ? 'Channel Details' : 'Group Details')
+            }
           </h2>
           <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">
-            {step === 1 ? `${selectedUsers.length} selected` : 'Finalize details'}
+            {step === 1 ? `${selectedUsers.length} elements selected` : 'Fill settings'}
           </p>
         </div>
         {step === 1 && selectedUsers.length > 0 && (
           <button 
             onClick={() => setStep(2)}
-            className="p-2 bg-blue-500 text-white rounded-full shadow-lg shadow-blue-500/20 active:scale-90 transition-transform"
+            className="p-2 bg-[#0494f4] text-white rounded-full shadow-lg shadow-[#0494f4]/20 active:scale-90 transition-transform"
           >
             <Check size={20} />
           </button>
@@ -219,10 +244,10 @@ export default function NewGroupScreen() {
               {selectedUsers.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
                   {selectedUsers.map(user => (
-                    <div key={user.id} className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full shrink-0">
+                    <div key={user.id} className="flex items-center gap-1.5 px-2 py-1 bg-[#0494f4]/10 border border-[#0494f4]/20 rounded-full shrink-0">
                       <img src={user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} className="w-5 h-5 rounded-full object-cover" alt="" />
-                      <span className="text-[9px] font-bold text-blue-600 truncate max-w-[60px]">{user.fullName}</span>
-                      <button onClick={() => toggleUserSelection(user)} className="text-blue-600 hover:text-blue-800">
+                      <span className="text-[9px] font-bold text-[#0494f4] truncate max-w-[60px]">{user.fullName}</span>
+                      <button onClick={() => toggleUserSelection(user)} className="text-[#0494f4] hover:text-[#0494f4]/80">
                         <X size={10} />
                       </button>
                     </div>
@@ -238,7 +263,7 @@ export default function NewGroupScreen() {
                   placeholder="Search followers..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold outline-none focus:border-blue-500 transition-colors"
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold outline-none focus:border-[#0494f4] transition-colors"
                 />
               </div>
 
@@ -246,7 +271,7 @@ export default function NewGroupScreen() {
               <div className="space-y-1">
                 {loading ? (
                   <div className="flex flex-col items-center py-10 gap-3">
-                    <Loader2 size={24} className="animate-spin text-blue-500" />
+                    <Loader2 size={24} className="animate-spin text-[#0494f4]" />
                     <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase">Finding your circle...</p>
                   </div>
                 ) : filteredFriends.length > 0 ? (
@@ -256,12 +281,12 @@ export default function NewGroupScreen() {
                       <div 
                         key={user.id}
                         onClick={() => toggleUserSelection(user)}
-                        className={`flex items-center gap-3 p-3 rounded-2xl transition-all cursor-pointer ${isSelected ? 'bg-blue-500/5 ring-1 ring-blue-500/20' : 'hover:bg-black/5'}`}
+                        className={`flex items-center gap-3 p-3 rounded-2xl transition-all cursor-pointer ${isSelected ? 'bg-[#0494f4]/5 ring-1 ring-[#0494f4]/20' : 'hover:bg-black/5'}`}
                       >
                         <div className="relative">
                           <img src={user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} className="w-11 h-11 rounded-full object-cover border border-[var(--border-color)]" alt="" />
                           {isSelected && (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center border-2 border-[var(--bg-main)]">
+                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-[#0494f4] rounded-full flex items-center justify-center border-2 border-[var(--bg-main)]">
                               <Check size={10} className="text-white" />
                             </div>
                           )}
@@ -299,7 +324,7 @@ export default function NewGroupScreen() {
                     </div>
                   )}
                 </div>
-                <label className="absolute bottom-1 right-1 p-2 bg-blue-500 text-white rounded-full shadow-lg cursor-pointer hover:scale-110 active:scale-95 transition-all">
+                <label className="absolute bottom-1 right-1 p-2 bg-[#0494f4] text-white rounded-full shadow-lg cursor-pointer hover:scale-110 active:scale-95 transition-all">
                   <Camera size={18} />
                   <input type="file" className="hidden" accept="image/*" onChange={handleIconChange} />
                 </label>
@@ -307,21 +332,30 @@ export default function NewGroupScreen() {
 
               <div className="w-full max-w-sm space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-1">Group Name</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-1">
+                    {groupType === 'channel' ? 'Channel Name' : 'Group Name'}
+                  </label>
                   <input 
                     type="text"
-                    placeholder="Enter group name..."
+                    placeholder={groupType === 'channel' ? "Enter channel name..." : "Enter group name..."}
                     autoFocus
                     value={groupName}
                     onChange={(e) => setGroupName(e.target.value)}
-                    className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl py-3 px-4 text-sm font-bold outline-none focus:border-blue-500 transition-colors shadow-sm"
+                    className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl py-3 px-4 text-sm font-bold outline-none focus:border-[#0494f4] transition-colors shadow-sm"
                   />
-                  <p className="text-[8px] font-bold text-[var(--text-secondary)] uppercase px-1">Provide a subject and optional group icon</p>
+                  <p className="text-[8px] font-bold text-[var(--text-secondary)] uppercase px-1">
+                    {groupType === 'channel' 
+                      ? 'Provide a broadcast channel topic and optional avatar' 
+                      : 'Provide a subject and optional group icon'
+                    }
+                  </p>
                 </div>
               </div>
 
               <div className="w-full max-w-sm">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-1 mb-3">Members: {selectedUsers.length}</h3>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-1 mb-3">
+                  {groupType === 'channel' ? 'Subscribers' : 'Members'}: {selectedUsers.length}
+                </h3>
                 <div className="grid grid-cols-2 gap-2">
                   {selectedUsers.map(user => (
                     <div key={user.id} className="flex items-center gap-2 p-2 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] overflow-hidden">
@@ -335,7 +369,7 @@ export default function NewGroupScreen() {
               <button 
                 onClick={handleCreateGroup}
                 disabled={!groupName.trim() || creating}
-                className="w-full max-w-sm mt-8 bg-blue-500 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-3"
+                className="w-full max-w-sm mt-8 bg-[#0494f4] text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-[#0494f4]/20 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-3"
               >
                 {creating ? (
                   <>
@@ -343,7 +377,7 @@ export default function NewGroupScreen() {
                     <span>Creating...</span>
                   </>
                 ) : (
-                  <span>Create Group</span>
+                  <span>Create {groupType === 'channel' ? 'Channel' : 'Group'}</span>
                 )}
               </button>
             </motion.div>

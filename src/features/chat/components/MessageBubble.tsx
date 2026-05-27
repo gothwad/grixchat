@@ -1,9 +1,6 @@
 import React from 'react';
 import { motion, useMotionValue, AnimatePresence } from 'motion/react';
 import { 
-  Check, 
-  CheckCheck, 
-  Clock, 
   FileIcon, 
   Download
 } from 'lucide-react';
@@ -32,7 +29,51 @@ interface MessageBubbleProps {
   performReactToMessage: (id: string, emoji: string) => void;
   onJumpToMessage?: (messageId: string) => void;
   isHighlighted?: boolean;
+  isLatestMessage?: boolean;
 }
+
+const getStatusString = (msg: any): string => {
+  if (msg.status === 'sending') {
+    return 'Sending...';
+  }
+
+  const isRead = msg.is_read;
+  const rawTime = isRead ? (msg.updated_at || msg.created_at) : msg.created_at;
+  if (!rawTime) return isRead ? 'Seen' : 'Sent';
+
+  let dateVal: Date;
+  try {
+    dateVal = new Date(rawTime);
+    if (isNaN(dateVal.getTime())) {
+      return isRead ? 'Seen' : 'Sent';
+    }
+  } catch (e) {
+    return isRead ? 'Seen' : 'Sent';
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - dateVal.getTime();
+  const diffSec = Math.max(0, Math.floor(diffMs / 1000));
+  const diffMin = Math.floor(diffSec / 60);
+
+  const prefix = isRead ? 'Seen' : 'Sent';
+
+  if (diffSec < 60) {
+    return `${prefix} Just now`;
+  } else if (diffMin === 1) {
+    return `${prefix} 1m ago`;
+  } else if (diffMin === 2) {
+    return `${prefix} 2m ago`;
+  } else if (diffMin === 3) {
+    return `${prefix} 3m ago`;
+  } else if (diffMin === 4) {
+    return `${prefix} 4m ago`;
+  } else if (diffMin === 5) {
+    return `${prefix} 5m ago`;
+  } else {
+    return `${prefix} long time ago`;
+  }
+};
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   msg,
@@ -50,11 +91,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   handleMessageTap,
   performReactToMessage,
   onJumpToMessage,
-  isHighlighted
+  isHighlighted,
+  isLatestMessage
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const x = useMotionValue(0);
+  const [tick, setTick] = React.useState(0);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setTick(t => t + 1);
+    }, 10000); // update every 10 seconds to auto-update relative status text
+    return () => clearInterval(timer);
+  }, []);
   
   if (msg.type === 'system') {
     return (
@@ -72,7 +122,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const mediaType = msg.media_type || msg.type;
 
   return (
-    <div id={`msg-${msg.id}`} className={`flex w-full max-w-full ${isMe ? 'justify-end' : 'justify-start'} ${!isSameSender ? 'mt-3' : 'mt-0.5'} relative`}>
+    <div id={`msg-${msg.id}`} className={`flex flex-col w-full max-w-full ${isMe ? 'items-end' : 'items-start'} ${!isSameSender ? 'mt-3' : 'mt-0.5'} relative`}>
       <AnimatePresence>
         {isHighlighted && (
           <motion.div 
@@ -223,19 +273,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {toDate(msg.created_at)?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) || ''}
                 {msg.is_edited && ' • edited'}
               </span>
-              {isMe && (
-                <div className="flex ml-0.5 items-center">
-                  {msg.status === 'sending' ? (
-                    <Clock size={12} className="text-zinc-400 animate-pulse" />
-                  ) : msg.is_read ? (
-                    <CheckCheck size={14} className="text-blue-500" />
-                  ) : receiverStatus === 'online' ? (
-                    <CheckCheck size={14} className="text-zinc-400" />
-                  ) : (
-                    <Check size={14} className="text-zinc-400" />
-                  )}
-                </div>
-              )}
             </div>
           </div>
 
@@ -251,6 +288,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           )}
         </motion.div>
       </div>
+      {isMe && isLatestMessage && (
+        <span className="text-[10px] text-zinc-400/80 mt-1 mr-2 px-1 font-medium select-none text-right">
+          {getStatusString(msg)}
+        </span>
+      )}
     </div>
   );
 };

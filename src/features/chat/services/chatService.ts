@@ -13,17 +13,13 @@ export const chatService = {
     const insertPayload: any = {
       conversation_id: conversationId,
       sender_id: senderId,
-      content: content,
+      text: content,
       media_url: mediaData?.url,
       media_type: mediaData?.type,
     };
 
-    if (replyTo) {
-      insertPayload.reply_to = {
-        id: replyTo.id,
-        content: replyTo.content || replyTo.text || '',
-        sender_id: replyTo.sender_id
-      };
+    if (replyTo && replyTo.id) {
+      insertPayload.reply_to = replyTo.id;
     }
 
     const { data, error } = await supabase
@@ -33,6 +29,13 @@ export const chatService = {
       .single();
 
     if (error) throw error;
+
+    if (data) {
+      data.content = data.text || data.content || '';
+      if (replyTo) {
+        data.reply_to = replyTo;
+      }
+    }
 
     // Update last message in conversation
     await supabase
@@ -82,6 +85,11 @@ export const chatService = {
           username,
           full_name,
           photo_url
+        ),
+        reply_to:messages!reply_to (
+          id,
+          text,
+          sender_id
         )
       `)
       .eq('conversation_id', conversationId)
@@ -93,8 +101,13 @@ export const chatService = {
       return [];
     }
 
+    const messages = data || [];
+    messages.forEach((m: any) => {
+      m.content = m.text || m.content || '';
+    });
+
     // Return in chronological order for UI
-    return data.reverse();
+    return messages.reverse();
   },
 
   async getOrCreateDirectConversation(user1Id: string, user2Id: string) {

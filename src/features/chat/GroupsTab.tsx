@@ -54,7 +54,7 @@ export default function GroupsTab() {
               }}
               className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
                 subTab === 'groups'
-                  ? 'bg-[var(--bg-card)] text-[var(--primary)] shadow-sm'
+                  ? 'bg-[#0494f4] text-white shadow-sm'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
@@ -67,7 +67,7 @@ export default function GroupsTab() {
               }}
               className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
                 subTab === 'channels'
-                  ? 'bg-[var(--bg-card)] text-[var(--primary)] shadow-sm'
+                  ? 'bg-[#0494f4] text-white shadow-sm'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
@@ -101,22 +101,14 @@ export default function GroupsTab() {
         <div className="flex flex-col h-full mt-1.5">
           {/* Top Option: Create New Group / Channel */}
           <Link 
-            to="/new-group"
+            to={subTab === 'groups' ? "/new-group?type=group" : "/new-group?type=channel"}
             className="flex items-center gap-[15px] px-4 py-3.5 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] border-b border-[var(--border-color)]/30 group cursor-pointer shrink-0"
           >
-            <div className={`w-[52px] h-[52px] rounded-full flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform ${
-              subTab === 'groups' 
-                ? 'bg-blue-500/10 text-blue-500' 
-                : 'bg-purple-500/10 text-purple-500'
-            }`}>
+            <div className={`w-[52px] h-[52px] rounded-full flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform bg-[#0494f4]/10 text-[#0494f4]`}>
               {subTab === 'groups' ? <Users size={24} /> : <Radio size={24} />}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className={`text-[15px] font-bold transition-colors ${
-                subTab === 'groups' 
-                  ? 'text-[var(--text-primary)] group-hover:text-blue-500' 
-                  : 'text-[var(--text-primary)] group-hover:text-purple-500'
-              }`}>
+              <h3 className={`text-[15px] font-bold transition-colors text-[var(--text-primary)] group-hover:text-[#0494f4]`}>
                 {subTab === 'groups' ? 'New Group' : 'New Broadcast Channel'}
               </h3>
               <p className="text-xs text-[var(--text-secondary)] truncate">
@@ -126,7 +118,7 @@ export default function GroupsTab() {
                 }
               </p>
             </div>
-            <div className={`mr-2 ${subTab === 'groups' ? 'text-blue-500' : 'text-purple-500'}`}>
+            <div className={`mr-2 text-[#0494f4]`}>
               <Plus size={20} />
             </div>
           </Link>

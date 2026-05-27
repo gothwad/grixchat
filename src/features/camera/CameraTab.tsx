@@ -1,8 +1,14 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, X, RefreshCw, Zap, ZapOff, Image as ImageIcon, ArrowLeft, Send, Check, RotateCcw } from 'lucide-react';
+import { Camera as CameraIcon, X, RefreshCw, Zap, ZapOff, Image as ImageIcon, Send, Clock, RotateCcw, Music, Sparkles } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../providers/AuthProvider.tsx';
+import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
+import { CAMERA_FILTERS, CameraFilter } from './utils/filters';
+import FilterSelector from './components/FilterSelector';
+import MusicSearchSheet from '../stories/components/MusicSearchSheet';
+import { Track } from '../stories/utils/musicData';
+import { ImageService } from '../../services/ImageService';
 
 export default function CameraTab() {
   const { user: authUser } = useAuth();
@@ -10,12 +16,18 @@ export default function CameraTab() {
   const chatId = searchParams.get('chatId');
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [isFrontCamera, setIsFrontCamera] = useState(false);
+  const [isFrontCamera, setIsFrontCamera] = useState(true);
   const [flash, setFlash] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const navigate = useNavigate();
+
+  // Filters & Audio track states
+  const [activeFilter, setActiveFilter] = useState<CameraFilter>(CAMERA_FILTERS[0]);
+  const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+  const [showMusicSheet, setShowMusicSheet] = useState(false);
+  const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
 
   const startCamera = async () => {
     try {
@@ -25,8 +37,8 @@ export default function CameraTab() {
       const constraints = {
         video: {
           facingMode: isFrontCamera ? 'user' : 'environment',
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+          width: { ideal: 1080 },
+          height: { ideal: 1920 }
         }
       };
       const newStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -37,7 +49,7 @@ export default function CameraTab() {
       setError(null);
     } catch (err) {
       console.error("Camera error:", err);
-      setError("Could not access camera. Please ensure you have granted permission.");
+      setError("Please grant camera permission to use interactive filters.");
     }
   };
 
@@ -47,28 +59,54 @@ export default function CameraTab() {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
+      if (audioPreviewRef.current) {
+        audioPreviewRef.current.pause();
+      }
     };
   }, [isFrontCamera]);
 
-  const toggleCamera = () => {
-    setIsFrontCamera(!isFrontCamera);
-  };
+  // Handle live snapping page background music playing
+  useEffect(() => {
+    if (audioPreviewRef.current) {
+      audioPreviewRef.current.pause();
+      audioPreviewRef.current = null;
+    }
+
+    if (selectedTrack && !capturedImage) {
+      const audio = new Audio(selectedTrack.url);
+      audio.volume = 0.4;
+      audio.loop = true;
+      audioPreviewRef.current = audio;
+      audio.play().catch(err => console.log("Sound autoplay blocked or issue:", err));
+    }
+
+    return () => {
+      if (audioPreviewRef.current) {
+        audioPreviewRef.current.pause();
+      }
+    };
+  }, [selectedTrack, capturedImage]);
 
   const takePhoto = () => {
     if (videoRef.current) {
       const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
+      canvas.width = videoRef.current.videoWidth || 1080;
+      canvas.height = videoRef.current.videoHeight || 1920;
       const ctx = canvas.getContext('2d');
       if (ctx) {
         if (isFrontCamera) {
           ctx.translate(canvas.width, 0);
           ctx.scale(-1, 1);
         }
+        // Draw image with filters
+        if (activeFilter.filterStyle !== 'none') {
+          ctx.filter = activeFilter.filterStyle;
+        }
         ctx.drawImage(videoRef.current, 0, 0);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
         setCapturedImage(dataUrl);
-        // Stop camera stream when previewing
+        
+        // Stop stream
         if (stream) {
           stream.getTracks().forEach(track => track.stop());
           setStream(null);
@@ -77,13 +115,49 @@ export default function CameraTab() {
     }
   };
 
-  const handleSend = async () => {
+  // Convert Base64 Data URL to File for Supabase storage
+  const dataURLtoFile = (dataUrl: string, filename: string): File => {
+    const arr = dataUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
+  };
+
+  const handlePostStory = async () => {
+    if (!capturedImage || !authUser || !supabase) return;
+    setIsSending(true);
+
+    try {
+      const file = dataURLtoFile(capturedImage, `snap_${Date.now()}.jpg`);
+      const url = await ImageService.uploadImage(file, () => {}, 'stories');
+
+      const { error } = await supabase.from('stories').insert({
+        user_id: authUser.id,
+        media_url: url,
+        type: 'image',
+        filter_applied: activeFilter.filterStyle !== 'none' ? activeFilter.filterStyle : null,
+        music_title: selectedTrack?.title || null,
+        music_artist: selectedTrack?.artist || null,
+        music_url: selectedTrack?.url || null
+      } as any);
+
+      if (error) throw error;
+      navigate('/chats');
+    } catch (err) {
+      console.error("Error saving filter snap:", err);
+      alert("Failed to share snap to stories.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleSendToChat = async () => {
     if (!capturedImage || !chatId) return;
-    
-    // Pass the captured image back to the chat screen
-    navigate(-1);
-    // Note: Since navigate(-1) doesn't easily pass state, 
-    // we'll use a custom event or just update the logic to navigate to the chat with state
     const receiverId = chatId.split('_').find(id => id !== authUser?.id) || chatId.split('_')[0];
     navigate(`/chat/${receiverId}`, { state: { capturedImage } });
   };
@@ -93,29 +167,8 @@ export default function CameraTab() {
     startCamera();
   };
 
-  const handleGalleryClick = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = (e: any) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          setCapturedImage(event.target?.result as string);
-          if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            setStream(null);
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-    input.click();
-  };
-
   return (
-    <div className="h-full bg-black flex flex-col relative overflow-hidden">
+    <div className="h-full bg-black flex flex-col relative overflow-hidden font-sans select-none">
       <AnimatePresence mode="wait">
         {!capturedImage ? (
           <motion.div 
@@ -126,31 +179,51 @@ export default function CameraTab() {
             className="h-full flex flex-col"
           >
             {/* Top Controls */}
-            <div className="absolute top-0 inset-x-0 p-6 flex justify-between items-center z-10 bg-gradient-to-b from-black/50 to-transparent">
+            <div className="absolute top-0 inset-x-0 p-5 flex justify-between items-center z-20 bg-gradient-to-b from-black/80 to-transparent">
               <button 
                 onClick={() => navigate(-1)}
-                className="p-2 bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-black/40 transition-all"
+                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-black/40 transition-all cursor-pointer"
               >
-                <X size={24} />
+                <X size={22} />
               </button>
-              <button 
-                onClick={() => setFlash(!flash)}
-                className="p-2 bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-black/40 transition-all"
-              >
-                {flash ? <Zap size={24} className="text-yellow-400 fill-yellow-400" /> : <ZapOff size={24} />}
-              </button>
+              
+              {selectedTrack && (
+                <div className="flex items-center gap-2 bg-[#0494f4]/20 border border-[#0494f4]/30 rounded-full px-3 py-1 animate-pulse">
+                  <Music size={12} className="text-[#0494f4]" />
+                  <span className="text-[10px] font-extrabold text-[#0494f4] truncate max-w-[120px]">
+                    {selectedTrack.title}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setShowMusicSheet(true)}
+                  className={`p-2.5 rounded-full transition-all cursor-pointer ${
+                    selectedTrack ? 'bg-[#0494f4] text-white' : 'bg-black/20 text-white'
+                  }`}
+                >
+                  <Music size={22} />
+                </button>
+                <button 
+                  onClick={() => setFlash(!flash)}
+                  className="p-2.5 bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-black/40 transition-all cursor-pointer"
+                >
+                  {flash ? <Zap size={22} className="text-yellow-400 fill-yellow-400" /> : <ZapOff size={22} />}
+                </button>
+              </div>
             </div>
 
-            {/* Camera View */}
-            <div className="flex-1 relative flex items-center justify-center">
+            {/* Live Camera Feed */}
+            <div className="flex-1 relative flex items-center justify-center bg-black">
               {error ? (
-                <div className="p-8 text-center">
-                  <p className="text-white/70 mb-6 font-medium">{error}</p>
+                <div className="p-8 text-center text-white z-10">
+                  <p className="text-white/70 mb-6 font-bold text-sm">{error}</p>
                   <button 
                     onClick={startCamera}
-                    className="px-6 py-3 bg-primary text-white rounded-2xl font-bold uppercase tracking-widest text-xs active:scale-95 transition-all"
+                    className="px-6 py-3 bg-[#0494f4] hover:bg-[#0381d6] text-white rounded-2xl font-black uppercase tracking-wider text-xs active:scale-95 transition-all cursor-pointer"
                   >
-                    Try Again
+                    Allow Camera Acccess
                   </button>
                 </div>
               ) : (
@@ -159,33 +232,56 @@ export default function CameraTab() {
                   autoPlay 
                   playsInline 
                   muted
-                  className={`w-full h-full object-cover ${isFrontCamera ? 'scale-x-[-1]' : ''}`}
+                  className={`w-full h-full object-cover transition-transform duration-300 ${isFrontCamera ? 'scale-x-[-1]' : ''}`}
+                  style={{ filter: activeFilter.filterStyle }}
                 />
               )}
+
+              {/* Snapchat Face Glow Overlay indicator */}
+              <div className="absolute inset-0 border-[2px] border-white/10 pointer-events-none rounded-3xl m-4" />
             </div>
 
-            {/* Bottom Controls */}
-            <div className="absolute bottom-0 inset-x-0 p-10 flex justify-between items-center z-10 bg-gradient-to-t from-black/50 to-transparent">
-              <button 
-                onClick={handleGalleryClick}
-                className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all"
-              >
-                <ImageIcon size={28} />
-              </button>
+            {/* Live Filter selector and Snap action bar */}
+            <div className="absolute bottom-0 inset-x-0 flex flex-col items-center gap-4 z-20 pb-8 bg-gradient-to-t from-black/80 to-transparent">
+              {/* Filter Carousel Slider */}
+              <FilterSelector selectedFilterId={activeFilter.id} onSelectFilter={setActiveFilter} />
 
-              <button 
-                onClick={takePhoto}
-                className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-all"
-              >
-                <div className="w-16 h-16 bg-white rounded-full" />
-              </button>
+              <div className="w-full flex justify-between items-center px-10">
+                {/* Gallery Select */}
+                <button 
+                  onClick={() => {
+                    const inp = document.createElement('input');
+                    inp.type = 'file'; inp.accept = 'image/*';
+                    inp.onchange = (e: any) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const r = new FileReader();
+                        r.onload = (ev) => setCapturedImage(ev.target?.result as string);
+                        r.readAsDataURL(file);
+                      }
+                    }; inp.click();
+                  }}
+                  className="p-3.5 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all cursor-pointer"
+                >
+                  <ImageIcon size={24} />
+                </button>
 
-              <button 
-                onClick={toggleCamera}
-                className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all"
-              >
-                <RefreshCw size={28} />
-              </button>
+                {/* Snap Capture Ball */}
+                <button 
+                  onClick={takePhoto}
+                  className="w-20 h-20 rounded-full border-[6px] border-white flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                >
+                  <div className="w-14 h-14 bg-white rounded-full group-hover:scale-90 transition-transform" />
+                </button>
+
+                {/* Flip Cam */}
+                <button 
+                  onClick={() => setIsFrontCamera(!isFrontCamera)}
+                  className="p-3.5 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all cursor-pointer"
+                >
+                  <RefreshCw size={24} />
+                </button>
+              </div>
             </div>
           </motion.div>
         ) : (
@@ -195,40 +291,63 @@ export default function CameraTab() {
             animate={{ opacity: 1, scale: 1 }}
             className="h-full flex flex-col relative"
           >
-            <img src={capturedImage} className="w-full h-full object-cover" alt="Preview" />
+            <img src={capturedImage} className="w-full h-full object-cover" alt="Preview" style={{ filter: activeFilter.filterStyle }} />
             
-            <div className="absolute top-0 inset-x-0 p-6 flex justify-between items-center z-10 bg-gradient-to-b from-black/50 to-transparent">
+            <div className="absolute top-0 inset-x-0 p-5 flex justify-between items-center z-20 bg-gradient-to-b from-black/80 to-transparent">
               <button 
                 onClick={retake}
-                className="p-2 bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-black/40 transition-all flex items-center gap-2 px-4"
+                className="p-2.5 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-black/60 transition-all flex items-center gap-2 px-4 cursor-pointer"
               >
-                <RotateCcw size={20} />
-                <span className="text-xs font-bold uppercase tracking-widest">Retake</span>
+                <RotateCcw size={18} />
+                <span className="text-[10px] font-extrabold uppercase tracking-wider">Retake</span>
               </button>
+
+              {activeFilter.id !== 'normal' && (
+                <div className="flex items-center gap-1 bg-[#0494f4]/80 text-white rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider">
+                  <Sparkles size={11} />
+                  <span>{activeFilter.name}</span>
+                </div>
+              )}
             </div>
 
-            <div className="absolute bottom-0 inset-x-0 p-10 flex justify-center items-center z-10 bg-gradient-to-t from-black/50 to-transparent">
-              <button 
-                onClick={handleSend}
-                disabled={isSending}
-                className="flex items-center gap-3 bg-primary text-white px-8 py-4 rounded-full font-black uppercase tracking-[0.2em] shadow-2xl shadow-primary/40 active:scale-95 transition-all disabled:opacity-50"
-              >
-                {isSending ? (
-                  <>
-                    <RefreshCw size={20} className="animate-spin" />
-                    <span>Sending...</span>
-                  </>
+            {/* Action buttons */}
+            <div className="absolute bottom-0 inset-x-0 p-8 flex flex-col items-center gap-3 z-20 bg-gradient-to-t from-black/80 to-transparent">
+              <div className="flex gap-4 w-full justify-center">
+                {chatId ? (
+                  <button 
+                    onClick={handleSendToChat}
+                    disabled={isSending}
+                    className="flex-1 max-w-xs flex items-center justify-center gap-2.5 bg-[#0494f4] hover:bg-[#0381d6] text-white px-6 py-3.5 rounded-2xl font-black uppercase tracking-wider text-[11px] shadow-2xl active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    <Send size={16} />
+                    <span>Send to Chat</span>
+                  </button>
                 ) : (
                   <>
-                    <Send size={20} />
-                    <span>Send to Chat</span>
+                    <button 
+                      onClick={handlePostStory}
+                      disabled={isSending}
+                      className="flex-1 max-w-xs flex items-center justify-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3.5 rounded-2xl font-black uppercase tracking-wider text-[11px] shadow-2xl active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSending ? <RefreshCw size={16} className="animate-spin" /> : <Clock size={16} />}
+                      <span>Share story</span>
+                    </button>
                   </>
                 )}
-              </button>
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Music Selector Bottom Sheet overlay */}
+      {showMusicSheet && (
+        <MusicSearchSheet 
+          selectedTrack={selectedTrack} 
+          onSelectTrack={setSelectedTrack} 
+          onClose={() => setShowMusicSheet(false)} 
+        />
+      )}
     </div>
   );
 }

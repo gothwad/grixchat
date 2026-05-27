@@ -127,6 +127,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                 performReactToMessage={performReactToMessage}
                 onJumpToMessage={onJumpToMessage}
                 isHighlighted={highlightedMessageId === msg.id}
+                isLatestMessage={index === currentMessages.length - 1}
               />
             );
           });

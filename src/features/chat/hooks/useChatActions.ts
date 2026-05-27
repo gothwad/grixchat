@@ -6,7 +6,7 @@ import { SupabaseStorageService } from '../../../services/SupabaseStorageService
 import { LocalDataCache } from '../../../services/LocalDataCache';
 
 export const useChatActions = (conversationId: string, receiverId: string) => {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
 
   const sendMessage = useCallback(async ({
     text,
@@ -44,11 +44,40 @@ export const useChatActions = (conversationId: string, receiverId: string) => {
     try {
       const displayContent = text || (mediaData ? `Sent a ${mediaData.type}` : 'Sent a file');
       LocalDataCache.updateLastMessage(user.id, conversationId, displayContent);
-      await chatService.sendMessage(conversationId, user.id, text, mediaData, replyTo);
+      const dbMessage = await chatService.sendMessage(conversationId, user.id, text, mediaData, replyTo);
+      
+      if (dbMessage) {
+        dbMessage.content = dbMessage.text || dbMessage.content || '';
+        
+        // Immediately replace the optimistic sending block with the confirmed message in cache
+        const cached = LocalDataCache.getMessages(conversationId) || [];
+        const filtered = cached.filter((m: any) => {
+          if (m.status !== 'sending') return true;
+          // Match text or media content from this sender
+          const contentMatch = m.content === dbMessage.content;
+          const mediaMatch = (!m.media_url && !dbMessage.media_url) || (m.media_url && dbMessage.media_url);
+          return !(contentMatch && mediaMatch && m.sender_id === user.id);
+        });
+
+        const stableMessage = {
+          ...dbMessage,
+          sender: {
+            id: user.id,
+            username: userData?.username || 'user',
+            full_name: userData?.fullName || 'User',
+            photo_url: userData?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'
+          }
+        };
+
+        const finalMsgs = [...filtered, stableMessage].sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        LocalDataCache.saveMessages(conversationId, finalMsgs);
+        LocalDataCache.notify(`messages:${conversationId}`, finalMsgs);
+        return stableMessage;
+      }
     } catch (error) {
       console.error('Error sending message:', error);
     }
-  }, [conversationId, user, receiverId]);
+  }, [conversationId, user, userData, receiverId]);
 
   const editMessage = useCallback(async (msgId: string, newText: string) => {
     if (!supabase) return;
@@ -57,7 +86,7 @@ export const useChatActions = (conversationId: string, receiverId: string) => {
     }
     await supabase
       .from('messages')
-      .update({ content: newText, is_edited: true } as any)
+      .update({ text: newText } as any)
       .eq('id', msgId);
   }, [conversationId, user]);
 

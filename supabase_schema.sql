@@ -99,8 +99,14 @@ CREATE TABLE public.messages (
 CREATE TABLE public.stories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
-    media_url TEXT NOT NULL,
-    type TEXT DEFAULT 'image',
+    media_url TEXT,
+    type TEXT DEFAULT 'image', -- 'image', 'text', 'video'
+    text_content TEXT,
+    bg_color TEXT,
+    music_title TEXT,
+    music_artist TEXT,
+    music_url TEXT,
+    filter_applied TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -257,8 +263,14 @@ CREATE POLICY "Allow database users to send messages to their chats"
         )
     );
 
-CREATE POLICY "Allow senders to edit/delete their own messages" 
-    ON public.messages FOR UPDATE USING (auth.uid() = sender_id);
+CREATE POLICY "Allow participants to update messages" 
+    ON public.messages FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM public.conversation_participants 
+            WHERE conversation_participants.conversation_id = messages.conversation_id 
+              AND conversation_participants.user_id = auth.uid()
+        )
+    );
 
 
 -- Policies for public.stories

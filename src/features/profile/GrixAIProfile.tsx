@@ -41,17 +41,17 @@ export default function GrixAIProfile() {
       </div>
 
       {/* Profile Header */}
-      <div className="px-4 py-8 flex flex-col items-center text-center border-b border-[var(--border-color)] bg-gradient-to-b from-[var(--primary)]/5 to-transparent">
+      <div className="px-4 py-8 flex flex-col items-center text-center border-b border-[var(--border-color)] bg-[var(--bg-card)]">
         <motion.div 
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className="relative mb-4"
         >
-          <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-tr from-[var(--primary)] to-emerald-500 shadow-xl">
+          <div className="w-28 h-28 rounded-full overflow-hidden border border-[var(--border-color)]/80 flex items-center justify-center bg-[var(--bg-main)]">
             <img 
               src="/assets/favicon.png" 
               alt="Grix AI" 
-              className="w-full h-full rounded-full object-cover border-4 border-[var(--bg-main)]"
+              className="w-full h-full object-cover rounded-full"
             />
           </div>
           <div className="absolute bottom-1 right-1 bg-green-500 p-1.5 rounded-full border-4 border-[var(--bg-main)] shadow-lg">

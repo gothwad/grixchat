@@ -80,6 +80,7 @@ export default function ChatScreen() {
     loadingMore, 
     loadMore,
     addOptimisticMessage,
+    confirmOptimisticMessage,
     lastMessageCount 
   } = useChatMessages(chatId);
 
@@ -153,7 +154,6 @@ export default function ChatScreen() {
 
     const newPreviewUrls = [...filePreviewUrls];
     for (const file of files) {
-      // Create a local URL for all file types for instant preview
       try {
         const url = URL.createObjectURL(file);
         newPreviewUrls.push(url);
@@ -190,17 +190,21 @@ export default function ChatScreen() {
       } else {
         // Optimistic UI for text
         if (textToSend) {
-          addOptimisticMessage({
+          const tempId = addOptimisticMessage({
             content: textToSend,
-            type: 'text'
+            type: 'text',
+            reply_to: filesToSend.length === 0 ? replyContext : null
           });
           
           performSendMessage({
             text: textToSend,
             replyTo: filesToSend.length === 0 ? replyContext : null
+          }).then(result => {
+            if (result && tempId) {
+              confirmOptimisticMessage(tempId, result);
+            }
           }).catch(err => {
             console.error("Error sending text:", err);
-            // Optionally handle error by showing a "Retry" or "Failed" state
           });
         }
         
@@ -212,11 +216,12 @@ export default function ChatScreen() {
                            file.type.startsWith('video/') ? 'video' : 
                            file.type.startsWith('audio/') ? 'audio' : 'file';
 
-          addOptimisticMessage({
+          const tempId = addOptimisticMessage({
             content: '',
             media_url: localUrl,
             media_type: fileType,
-            type: fileType
+            type: fileType,
+            reply_to: i === 0 && !textToSend ? replyContext : null
           });
           
           performSendMessage({
@@ -224,6 +229,10 @@ export default function ChatScreen() {
             file,
             localPreviewUrl: localUrl,
             replyTo: i === 0 && !textToSend ? replyContext : null
+          }).then(result => {
+            if (result && tempId) {
+              confirmOptimisticMessage(tempId, result);
+            }
           }).catch(err => console.error("Error sending file:", err));
         }
       }
@@ -369,7 +378,7 @@ export default function ChatScreen() {
       {!isAccepted ? (
         <div className="p-5 bg-[var(--bg-card)] border-t border-[var(--border-color)]/25 flex flex-col items-center text-center gap-3.5 shrink-0 z-40 select-none">
           <p className="text-xs text-[var(--text-secondary)] font-semibold leading-relaxed max-w-[280px]">
-            The sender is not in your chat list. Do you want to accept this message request and start chatting?
+             Do you want to accept this friend request and start chatting?
           </p>
           <div className="flex gap-3.5 w-full max-w-[280px]">
             <button
@@ -382,13 +391,24 @@ export default function ChatScreen() {
               Block & Delete
             </button>
             <button
-              onClick={() => {
+              onClick={async () => {
                 acceptChat(chatId);
+                // Dynamically establish mutual friendship links on follow
+                if (supabase && user?.id && receiverId) {
+                  try {
+                    await supabase.from('follows').insert([
+                      { follower_id: user.id, following_id: receiverId },
+                      { follower_id: receiverId, following_id: user.id }
+                    ]);
+                  } catch (e) {
+                    console.error("Error creating friends followers links:", e);
+                  }
+                }
                 setIsAccepted(true);
               }}
-              className="flex-1 py-3 bg-indigo-650 text-white font-black text-[11px] uppercase tracking-wider rounded-2xl hover:bg-indigo-550 transition-all cursor-pointer active:scale-95 shadow-md"
+              className="flex-1 py-3 bg-[#0494f4] text-white font-black text-[11px] uppercase tracking-wider rounded-2xl hover:bg-[#0494f4]/95 transition-all cursor-pointer active:scale-95 shadow-md animate-pulse"
             >
-              Accept Chat
+              Accept Request
             </button>
           </div>
         </div>

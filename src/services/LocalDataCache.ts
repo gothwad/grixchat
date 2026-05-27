@@ -147,6 +147,31 @@ class LocalDataCacheService {
     }
   }
 
+  /**
+   * Instantly marks a cached conversation's unread badge to 0.
+   */
+  public clearUnreadCount(myUserId: string, conversationId: string): void {
+    const list = this.getConversations(myUserId);
+    if (list && Array.isArray(list)) {
+      let changed = false;
+      const updated = list.map((conv: any) => {
+        if (conv.id === conversationId && (conv.unread || conv.unreadCount > 0)) {
+          changed = true;
+          return {
+            ...conv,
+            unread: false,
+            unreadCount: 0
+          };
+        }
+        return conv;
+      });
+      if (changed) {
+        this.saveConversations(myUserId, updated);
+        this.notify('conversations', updated);
+      }
+    }
+  }
+
   private formatTimeForCache(date: Date): string {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
