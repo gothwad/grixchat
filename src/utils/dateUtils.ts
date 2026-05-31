@@ -37,12 +37,19 @@ export function toDate(timestamp: any): Date | null {
 }
 
 /**
- * Formats a timestamp into a human-readable time string (e.g., "10:30").
+ * Formats a timestamp into a human-readable 12-hour time string with AM/PM (e.g., "01:19 PM").
  */
 export function formatTime(timestamp: any): string {
   const date = toDate(timestamp);
   if (!date) return '';
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  let hours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12; // the hour '0' should be '12'
+  const hoursStr = hours < 10 ? '0' + hours : hours;
+  const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+  return `${hoursStr}:${minutesStr} ${ampm}`;
 }
 
 /**

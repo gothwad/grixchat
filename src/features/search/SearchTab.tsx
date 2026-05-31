@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useConversations } from '../chat/hooks/useConversations';
 import { getAcceptedChats, acceptChat } from '../../utils/acceptedChats';
 import { chatService } from '../chat/services/chatService';
+import { isUserOnline } from '../../utils/presence';
 
 interface UserProfile {
   uid: string;
@@ -28,6 +29,30 @@ export default function SearchTab() {
   const [requestCount, setRequestCount] = useState(0);
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [followerIds, setFollowerIds] = useState<string[]>([]);
+  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!supabase || !authUser?.id || !userData?.hiddenChats || userData.hiddenChats.length === 0) {
+      setHiddenUserIds([]);
+      return;
+    }
+    const fetchHiddenUserIds = async () => {
+      try {
+        const { data } = await supabase
+          .from('conversation_participants')
+          .select('conversation_id, user_id')
+          .in('conversation_id', userData.hiddenChats)
+          .neq('user_id', authUser.id);
+        
+        if (data) {
+          setHiddenUserIds(data.map(d => d.user_id));
+        }
+      } catch (e) {
+        console.warn("Failed to fetch hidden user ids inside search:", e);
+      }
+    };
+    fetchHiddenUserIds();
+  }, [userData?.hiddenChats, authUser?.id]);
 
   const fetchInitialData = async (showLoading = false) => {
     if (!supabase || !authUser?.id) return;
@@ -64,7 +89,7 @@ export default function SearchTab() {
       // Fetch Suggested Users
       const { data: usersData } = await supabase
         .from('users')
-        .select('id, username, full_name, photo_url, is_online')
+        .select('id, username, full_name, photo_url, is_online, last_seen')
         .neq('id', authUser?.id)
         .limit(60);
       
@@ -78,7 +103,7 @@ export default function SearchTab() {
               username: u.username,
               fullName: u.full_name,
               photoURL: u.photo_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
-              isOnline: u.is_online
+              isOnline: isUserOnline(u.is_online, u.last_seen)
             });
           }
         });
@@ -126,7 +151,7 @@ export default function SearchTab() {
     try {
       const { data } = await supabase
         .from('users')
-        .select('id, username, full_name, photo_url, is_online')
+        .select('id, username, full_name, photo_url, is_online, last_seen')
         .or(`username.ilike.%${term}%,full_name.ilike.%${term}%`)
         .neq('id', authUser?.id)
         .limit(50);
@@ -138,7 +163,7 @@ export default function SearchTab() {
             username: u.username,
             fullName: u.full_name,
             photoURL: u.photo_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
-            isOnline: u.is_online
+            isOnline: isUserOnline(u.is_online, u.last_seen)
           }))
         );
       }
@@ -346,7 +371,7 @@ export default function SearchTab() {
             )}
 
             <div className="mt-1">
-              {(searchTerm ? userResults : suggestedUsers).map((profile) => {
+              {(searchTerm ? userResults : suggestedUsers).filter(profile => !hiddenUserIds.includes(profile.uid)).map((profile) => {
                 const isFollowing = followingIds.includes(profile.uid) || localRequestedUids.includes(profile.uid);
                 const isFollower = followerIds.includes(profile.uid);
                 const isMutual = isFollowing && isFollower;

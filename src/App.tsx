@@ -43,13 +43,12 @@ const ArchivedChatScreen = React.lazy(() => import('./features/chat/ArchivedChat
 const HideChatSettings = React.lazy(() => import('./features/chat/HideChatSettings'));
 const MessageRequestsScreen = React.lazy(() => import('./features/chat/MessageRequestsScreen'));
 const SearchUserScreen = React.lazy(() => import('./features/chat/SearchUserScreen'));
-const GrixAIScreen = React.lazy(() => import('./features/chat/GrixAIScreen'));
+const GrixAIScreen = React.lazy(() => import('./features/grixai/GrixAIScreen'));
 const ChatSettingsScreen = React.lazy(() => import('./features/chat/ChatSettingsScreen'));
 
 const SearchTab = React.lazy(() => import('./features/search/SearchTab'));
 const FriendsScreen = React.lazy(() => import('./features/search/FriendsScreen'));
 
-const StoryMakerScreen = React.lazy(() => import('./features/stories/StoryMakerScreen'));
 const StoryWatcherScreen = React.lazy(() => import('./features/stories/StoryWatcherScreen'));
 const NotificationsScreen = React.lazy(() => import('./features/notifications/NotificationsScreen.tsx'));
 const LikeNotificationsScreen = React.lazy(() => import('./features/notifications/LikeNotificationsScreen.tsx'));
@@ -57,12 +56,11 @@ const LikeNotificationsScreen = React.lazy(() => import('./features/notification
 // ProfileTab directly imported above
 const EditProfileScreen = React.lazy(() => import('./features/profile/EditProfileScreen'));
 const UserProfileScreen = React.lazy(() => import('./features/profile/UserProfileScreen'));
-const GrixAIProfile = React.lazy(() => import('./features/profile/GrixAIProfile'));
+const GrixAIProfile = React.lazy(() => import('./features/grixai/GrixAIProfile'));
 
 
 const CallsTab = React.lazy(() => import('./features/call/CallsTab'));
 const GroupsTab = React.lazy(() => import('./features/chat/GroupsTab'));
-const CameraTab = React.lazy(() => import('./features/camera/CameraTab'));
 
 const PrivacySettingsScreen = React.lazy(() => import('./features/settings/PrivacySettingsScreen'));
 const AppPreferencesScreen = React.lazy(() => import('./features/settings/AppPreferencesScreen'));
@@ -71,9 +69,10 @@ const ChatSettingsMainScreen = React.lazy(() => import('./features/settings/Chat
 const AccountSettingsScreen = React.lazy(() => import('./features/settings/AccountSettingsScreen'));
 const NotificationsSettingsScreen = React.lazy(() => import('./features/settings/NotificationsSettingsScreen'));
 const HelpScreen = React.lazy(() => import('./features/settings/HelpScreen'));
+const HelpFaqScreen = React.lazy(() => import('./features/settings/HelpFaqScreen'));
+const HelpContactScreen = React.lazy(() => import('./features/settings/HelpContactScreen'));
 const AppInfoScreen = React.lazy(() => import('./features/settings/AppInfoScreen'));
 const GithubScreen = React.lazy(() => import('./features/github/GithubScreen'));
-const TimeSpentScreen = React.lazy(() => import('./features/settings/TimeSpentScreen'));
 const FavoritesScreen = React.lazy(() => import('./features/settings/FavoritesScreen'));
 const BlockedAccountsScreen = React.lazy(() => import('./features/settings/BlockedAccountsScreen'));
 const MutedAccountsScreen = React.lazy(() => import('./features/settings/MutedAccountsScreen'));
@@ -157,18 +156,58 @@ export default function App() {
     }
   }, [location]);
 
-  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(() => {
+    return storage.getItem('grix_session_unlocked') === 'true';
+  });
   const [initialLockCheckDone, setInitialLockCheckDone] = useState(false);
 
   useEffect(() => {
     if (isAuthReady) {
       const lockData = LockService.getLockDataFromProfile(userData);
-      if (!lockData.isEnabled) {
+      if (!lockData.isEnabled || storage.getItem('grix_session_unlocked') === 'true') {
         setIsUnlocked(true);
+      } else {
+        setIsUnlocked(false);
       }
       setInitialLockCheckDone(true);
     }
   }, [isAuthReady, userData]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Tab went background/hidden, save current epoch
+        storage.setItem('gx_last_active', Date.now().toString());
+      } else {
+        // Tab is foregrounded
+        const lockData = LockService.getLockDataFromProfile(userData);
+        if (lockData && lockData.isEnabled) {
+          const lastActiveStr = storage.getItem('gx_last_active');
+          const timeoutStr = storage.getItem('app-lock-timeout') || '0'; // default: immediate
+          
+          if (lastActiveStr && timeoutStr !== 'never') {
+            const lastActive = parseInt(lastActiveStr);
+            const timeout = parseInt(timeoutStr); // seconds
+            const elapsed = (Date.now() - lastActive) / 1000;
+            
+            if (elapsed > timeout) {
+              storage.removeItem('grix_session_unlocked');
+              setIsUnlocked(false);
+            }
+          } else if (timeoutStr === '0') {
+            // Lock immediately on tab focus loss
+            storage.removeItem('grix_session_unlocked');
+            setIsUnlocked(false);
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [userData]);
 
   useEffect(() => {
     const loadCount = parseInt(storage.getItem('loadCount') || '0');
@@ -232,12 +271,20 @@ export default function App() {
   }
 
   if (!isUnlocked) {
-    return <GlobalLockScreen onUnlock={() => setIsUnlocked(true)} />;
+    return (
+      <GlobalLockScreen 
+        onUnlock={() => {
+          storage.setItem('grix_session_unlocked', 'true');
+          setIsUnlocked(true);
+        }} 
+      />
+    );
   }
 
   // Guard Logic
   const needsVerification = user && !user.email_confirmed_at && !(user.app_metadata?.providers || []).some((p: string) => ['google', 'github'].includes(p));
-  const needsProfileCompletion = user && isAuthReady && (!userData || !userData.username);
+  const isLocalStorageOffline = !navigator.onLine;
+  const needsProfileCompletion = user && isAuthReady && !isLocalStorageOffline && (!userData || !userData.username);
 
   if (user && isAuthReady) {
     const isPublicRoute = ['/login', '/signup', '/forgot-password', '/privacy-policy', '/terms', '/complete-profile', '/verify-email'].includes(location.pathname);
@@ -300,11 +347,9 @@ export default function App() {
                     <Route path="/complete-profile" element={
                       user && (!userData || !userData.username) ? <CompleteProfileScreen /> : <Navigate to="/chats" replace />
                     } />
-                    <Route path="/camera" element={user ? <CameraTab /> : <Navigate to="/login" />} />
                     <Route path="/call/:id" element={user ? <CallScreen /> : <Navigate to="/login" />} />
                     <Route path="/notifications" element={user ? <NotificationsScreen /> : <Navigate to="/login" />} />
                     <Route path="/notifications/likes" element={user ? <LikeNotificationsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/stories/create" element={user ? <StoryMakerScreen /> : <Navigate to="/login" />} />
                     <Route path="/stories/view/:userId" element={user ? <StoryWatcherScreen /> : <Navigate to="/login" />} />
                     <Route path="/settings" element={<Navigate to="/profile" replace />} />
                     <Route path="/edit-profile" element={user ? <EditProfileScreen /> : <Navigate to="/login" />} />
@@ -318,9 +363,10 @@ export default function App() {
                     <Route path="/notifications-settings" element={user ? <NotificationsSettingsScreen /> : <Navigate to="/login" />} />
                     <Route path="/data-usage" element={user ? <DataUsageScreen /> : <Navigate to="/login" />} />
                     <Route path="/help" element={user ? <HelpScreen /> : <Navigate to="/login" />} />
+                    <Route path="/help/faq" element={user ? <HelpFaqScreen /> : <Navigate to="/login" />} />
+                    <Route path="/help/contact" element={user ? <HelpContactScreen /> : <Navigate to="/login" />} />
                     <Route path="/app-info" element={user ? <AppInfoScreen /> : <Navigate to="/login" />} />
                     <Route path="/github" element={user ? <GithubScreen /> : <Navigate to="/login" />} />
-                    <Route path="/time-spent" element={user ? <TimeSpentScreen /> : <Navigate to="/login" />} />
                     <Route path="/favorites" element={user ? <FavoritesScreen /> : <Navigate to="/login" />} />
                     <Route path="/blocked-accounts" element={user ? <BlockedAccountsScreen /> : <Navigate to="/login" />} />
                     <Route path="/muted-accounts" element={user ? <MutedAccountsScreen /> : <Navigate to="/login" />} />

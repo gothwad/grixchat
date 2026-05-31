@@ -72,7 +72,7 @@ export default function GlobalLockScreen({ onUnlock }: GlobalLockScreenProps) {
     if (!isNumeric) return null;
     const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'info', '0', 'delete'];
     return (
-      <div className="grid grid-cols-3 gap-4 w-full max-w-[280px] mt-8">
+      <div className="grid grid-cols-3 gap-x-6 gap-y-4 w-full max-w-[270px] mt-8 justify-items-center">
         {keys.map((key, i) => (
           <button
             key={i}
@@ -81,13 +81,13 @@ export default function GlobalLockScreen({ onUnlock }: GlobalLockScreenProps) {
               else if (key === 'delete') handleKeyPress('delete');
               else if (key) handleKeyPress(key);
             }}
-            className={`h-16 rounded-2xl flex items-center justify-center text-xl font-black transition-all active:scale-90 ${
+            className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-semibold transition-all active:scale-90 shadow-sm cursor-pointer ${
               key === 'info' 
               ? 'bg-[var(--bg-card)] text-[var(--text-secondary)]' 
-              : 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-color)]'
+              : 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)]/10 hover:bg-zinc-100 dark:hover:bg-zinc-850'
             }`}
           >
-            {key === 'delete' ? <Delete size={24} /> : key === 'info' ? <Info size={24} /> : key}
+            {key === 'delete' ? <Delete size={20} /> : key === 'info' ? <Info size={18} /> : key}
           </button>
         ))}
       </div>

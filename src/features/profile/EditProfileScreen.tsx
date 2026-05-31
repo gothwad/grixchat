@@ -59,7 +59,7 @@ export default function EditProfileScreen() {
     setLoading(true);
     setError(null);
 
-    const trimmedUsername = username.trim().toLowerCase();
+    const trimmedUsername = username.trim().toLowerCase().substring(0, 15);
 
     try {
       // Username uniqueness check
@@ -131,13 +131,30 @@ export default function EditProfileScreen() {
             )}
           </div>
         ) : (
-          <input 
-            type={type}
-            value={value}
-            onChange={(e) => setter(e.target.value)}
-            className="w-full px-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all placeholder:text-[var(--text-secondary)]/50"
-            placeholder={`Enter your ${label.toLowerCase()}`}
-          />
+          <div>
+            <input 
+              type={type}
+              value={value}
+              onChange={(e) => {
+                if (field === 'username') {
+                  const val = e.target.value.toLowerCase().replace(/\s/g, '_').substring(0, 15);
+                  if (/^[a-z0-9_]*$/.test(val)) {
+                    setter(val);
+                  }
+                } else {
+                  setter(e.target.value);
+                }
+              }}
+              maxLength={field === 'username' ? 15 : undefined}
+              className="w-full px-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
+              placeholder={`Enter your ${label.toLowerCase()}`}
+            />
+            {field === 'username' && (
+              <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-1 ml-1 opacity-70">
+                Max 15 characters. Only small letters (a-z), numbers (0-9), and underscores (_) allowed.
+              </p>
+            )}
+          </div>
         )}
       </div>
     );

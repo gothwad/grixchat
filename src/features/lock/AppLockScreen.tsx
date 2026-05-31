@@ -53,9 +53,13 @@ export default function AppLockScreen() {
   const Toggle = ({ active, onClick }: { active: boolean, onClick: () => void }) => (
     <button 
       onClick={onClick}
-      className={`w-10 h-5 rounded-full transition-all relative ${active ? 'bg-primary' : 'bg-zinc-300'}`}
+      className={`w-11 h-6 rounded-full transition-all relative cursor-pointer outline-none ${
+        active ? 'bg-[var(--primary)]' : 'bg-[#e2e8f0] dark:bg-zinc-700'
+      }`}
     >
-      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${active ? 'right-0.5' : 'left-0.5'}`} />
+      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-200 shadow-sm ${
+        active ? 'left-[22px]' : 'left-1'
+      }`} />
     </button>
   );
 
@@ -65,15 +69,15 @@ export default function AppLockScreen() {
 
       <div className="flex-1 overflow-y-auto no-scrollbar py-6">
         {/* Status Section */}
-        <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)] mb-6">
+        <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)]/50 mb-6">
           <div className="flex items-center justify-between px-6 py-4">
             <div className="flex items-center gap-4">
-              <div className={`p-2 rounded-lg bg-zinc-50/10 ${lockData.isEnabled ? 'text-primary' : 'text-zinc-400'}`}>
+              <div className={`p-2.5 rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)]/20 ${lockData.isEnabled ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)]'}`}>
                 <Lock size={20} />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-[var(--text-primary)]">App Lock</h4>
-                <p className="text-[11px] text-[var(--text-secondary)]">
+                <h4 className="text-sm font-black text-[var(--text-primary)]">App Lock</h4>
+                <p className="text-[11px] text-[var(--text-secondary)] font-semibold">
                   {lockData.isEnabled ? 'Protection is active' : 'Secure your chats with a lock'}
                 </p>
               </div>
@@ -85,24 +89,24 @@ export default function AppLockScreen() {
         {/* Options Section */}
         {!lockData.isEnabled && (
           <>
-            <h3 className="px-6 mb-2 text-[11px] font-bold text-zinc-400 uppercase tracking-wider">LOCK OPTIONS</h3>
-            <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)] mb-6">
+            <h3 className="px-6 mb-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest">LOCK OPTIONS</h3>
+            <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)]/50 mb-6">
               {lockOptions.map((option, index) => (
                 <button 
                   key={option.id}
                   onClick={() => navigate(`/setup-lock/${option.id}`)}
-                  className={`w-full flex items-center gap-4 px-6 py-4 hover:bg-zinc-50/10 transition-colors ${
-                    index !== lockOptions.length - 1 ? 'border-b border-[var(--border-color)]' : ''
+                  className={`w-full flex items-center gap-4 px-6 py-4 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer ${
+                    index !== lockOptions.length - 1 ? 'border-b border-[var(--border-color)]/50' : ''
                   }`}
                 >
-                  <div className={`p-2 rounded-lg bg-zinc-50/10 ${option.color}`}>
+                  <div className={`p-2.5 rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)]/20 ${option.color}`}>
                     <option.icon size={20} />
                   </div>
                   <div className="flex-1 text-left">
-                    <h4 className="text-sm font-bold text-[var(--text-primary)]">{option.label}</h4>
-                    <p className="text-[11px] text-[var(--text-secondary)]">{option.sub}</p>
+                    <h4 className="text-sm font-black text-[var(--text-primary)]">{option.label}</h4>
+                    <p className="text-[11px] text-[var(--text-secondary)] font-medium">{option.sub}</p>
                   </div>
-                  <ChevronRight size={18} className="text-zinc-300" />
+                  <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-60" />
                 </button>
               ))}
             </div>

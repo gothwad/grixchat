@@ -6,6 +6,8 @@ import multer from "multer";
 import FormData from "form-data";
 import fs from "fs";
 import os from "os";
+import { GoogleAuth } from "google-auth-library";
+import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
 
@@ -39,9 +41,154 @@ app.get("/sitemap.xml", (req, res) => {
 </urlset>`);
 });
 
-// Send Notification Proxy (Disabled during Supabase migration)
+// Send Notification Proxy using Firebase Cloud Messaging HTTP v1 API
 app.post("/api/send-notification", async (req, res) => {
-  res.status(501).json({ error: 'Push notifications are currently disabled during Supabase migration' });
+  const { tokens, title, body, data } = req.body;
+
+  if (!tokens || !Array.isArray(tokens) || tokens.length === 0) {
+    return res.status(400).json({ error: "Missing recipient registration tokens" });
+  }
+
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!serviceAccountJson) {
+    console.warn("FCM Server: FIREBASE_SERVICE_ACCOUNT variable not set. Simulating push notification dispatch in terminal logs.");
+    console.log(`[PUSH NOTIFICATION SIMULATION]`);
+    console.log(`Title: ${title}`);
+    console.log(`Body: ${body}`);
+    console.log(`Tokens:`, tokens);
+    return res.json({ 
+      success: true, 
+      simulated: true, 
+      message: "Push simulate successful. Configure FIREBASE_SERVICE_ACCOUNT in env to enable active Google FCM sending." 
+    });
+  }
+
+  try {
+    const credentials = JSON.parse(serviceAccountJson);
+    const projectId = credentials.project_id;
+    if (!projectId) {
+      throw new Error("project_id missing from FIREBASE_SERVICE_ACCOUNT credentials");
+    }
+
+    // Authenticate with Google APIs scope for Firebase Cloud Messaging
+    const auth = new GoogleAuth({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/firebase.messaging'],
+    });
+    const client = await auth.getClient();
+    const accessTokenObj = await client.getAccessToken();
+    const accessToken = accessTokenObj.token;
+    if (!accessToken) {
+      throw new Error("Failed to retrieve Google Access Token for FCM scope");
+    }
+
+    console.log(`FCM Server: Dispatching push alerts to ${tokens.length} registration tokens.`);
+    const results = await Promise.all(
+      tokens.map(async (token) => {
+        try {
+          const payload = {
+            message: {
+              token,
+              notification: { title, body },
+              data: {
+                click_action: data?.click_action || '/chats',
+                conversationId: data?.conversationId || '',
+                senderId: data?.senderId || '',
+                ...(data || {})
+              }
+            }
+          };
+
+          const response = await axios.post(
+            `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
+            payload,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          return { token, success: true, messageId: response.data?.name };
+        } catch (err: any) {
+          console.error(`FCM Server: Failed to send to token: ${token.substring(0, 10)}... Error:`, err.response?.data || err.message);
+          return { token, success: false, error: err.response?.data || err.message };
+        }
+      })
+    );
+
+    const successCount = results.filter(r => r.success).length;
+    res.json({
+      success: true,
+      total: tokens.length,
+      sentCount: successCount,
+      results
+    });
+  } catch (error: any) {
+    console.error("FCM Send Notification failed:", error);
+    res.status(500).json({ error: error.message || "Failed to process push dispatch" });
+  }
+});
+
+// Secure Server-side Gemini AI Completion Proxy (GrixAI)
+app.post("/api/grix-ai", async (req, res) => {
+  const { messages, model, modelType } = req.body;
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error("Server GrixAI Proxy: GEMINI_API_KEY not found in environment.");
+    return res.status(400).json({ 
+      error: "Gemini API key is not configured on the server. Please register GEMINI_API_KEY in server environment settings." 
+    });
+  }
+
+  try {
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+
+    const formattedMessages = Array.isArray(messages) ? messages : [];
+    
+    // Extract system instruction
+    const systemMsg = formattedMessages.find(m => m.role === "system");
+    const systemInstruction = systemMsg ? (systemMsg.content || systemMsg.text) : "You are Grix AI, a helpful and friendly assistant for GrixChat.";
+
+    // Format thread to Gemini dynamic-contents array
+    const conversationContents = formattedMessages
+      .filter(m => m.role !== "system")
+      .map(m => {
+        const role = (m.role === "assistant" || m.role === "model") ? "model" : "user";
+        return {
+          role,
+          parts: [{ text: m.content || m.text || "" }]
+        };
+      });
+
+    const mType = model || modelType || 'grix-ai';
+    const modelId = "gemini-3.5-flash"; // Active, highly performant, free-tier model
+
+    const response = await ai.models.generateContent({
+      model: modelId,
+      contents: conversationContents,
+      config: {
+        systemInstruction,
+        temperature: mType === 'grix-ai-pro' ? 1.0 : 0.7,
+      }
+    });
+
+    const reply = response.text || "I'm sorry, I couldn't process that.";
+    res.json({ success: true, reply });
+  } catch (error: any) {
+    console.error("Server GrixAI SDK Error:", error);
+    res.status(500).json({ 
+      error: error.message || "An error occurred while communicating with Gemini." 
+    });
+  }
 });
 
 // File Upload Proxy (Catbox for images/videos, Gofile.io for others)

@@ -33,7 +33,7 @@ CREATE TABLE public.users (
     id UUID PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
     email TEXT,
     full_name TEXT,
-    username TEXT UNIQUE NOT NULL,
+    username TEXT UNIQUE NOT NULL CONSTRAINT username_length_check CHECK (char_length(username) <= 15),
     photo_url TEXT DEFAULT 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
     bio TEXT DEFAULT 'Available',
     is_verified BOOLEAN DEFAULT FALSE,
@@ -42,11 +42,14 @@ CREATE TABLE public.users (
     last_seen TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     settings JSONB DEFAULT '{}'::jsonb,
+    lock JSONB DEFAULT NULL,
     blocked_users TEXT[] DEFAULT '{}'::text[],
     muted_users TEXT[] DEFAULT '{}'::text[],
     favorites TEXT[] DEFAULT '{}'::text[],
     hidden_chats TEXT[] DEFAULT '{}'::text[],
-    archived_chats TEXT[] DEFAULT '{}'::text[]
+    archived_chats TEXT[] DEFAULT '{}'::text[],
+    hidden_chat_settings JSONB DEFAULT '{"secretCode": null, "showMenuEntry": true}'::jsonb,
+    fcm_tokens TEXT[] DEFAULT '{}'::text[]
 );
 
 -- Follows Table (Connections/Friends)
@@ -92,6 +95,7 @@ CREATE TABLE public.messages (
     reply_to UUID REFERENCES public.messages(id) ON DELETE SET NULL,
     reactions JSONB DEFAULT '{}'::jsonb,
     is_read BOOLEAN DEFAULT FALSE,
+    is_edited BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -433,3 +437,24 @@ CREATE INDEX IF NOT EXISTS idx_stories_user ON public.stories(user_id);
 CREATE INDEX IF NOT EXISTS idx_calls_participants ON public.calls(caller_id, receiver_id);
 CREATE INDEX IF NOT EXISTS idx_chat_settings_user ON public.chat_settings(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON public.notifications(user_id);
+
+
+-- ===================================================
+-- 8. SUPABASE REALTIME ENABLEMENT (CRITICAL FOR INSTANT CHAT)
+-- ===================================================
+-- Please execute these lines in your Supabase SQL Editor to make sure 
+-- instant message sync, typing indicators, and presence tracking are enabled!
+-- 
+-- ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+-- ALTER PUBLICATION supabase_realtime ADD TABLE public.conversations;
+-- ALTER PUBLICATION supabase_realtime ADD TABLE public.users;
+
+-- ===================================================
+-- 9. USER TABLE DATABASE MIGRATIONS (IF YOU HAVE AN EXISTING DB)
+-- ===================================================
+-- If you are already running GrixChat and get a code: "PGRST204" error when setting up the app lock,
+-- run this SQL command in your Supabase SQL Editor:
+--
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS lock JSONB DEFAULT NULL;
+
+

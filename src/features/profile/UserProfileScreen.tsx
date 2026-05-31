@@ -30,6 +30,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { truncateToChars } from '../../utils/bioHelper';
 import { chatService } from '../chat/services/chatService';
 import { acceptChat } from '../../utils/acceptedChats';
+import { isUserOnline, formatLastSeen } from '../../utils/presence';
 
 export default function UserProfileScreen() {
   const { id: userId } = useParams();
@@ -44,6 +45,7 @@ export default function UserProfileScreen() {
   const [isRequested, setIsRequested] = useState(false);
   const [isIncoming, setIsIncoming] = useState(false);
   const [requestProgress, setRequestProgress] = useState(false);
+  const [hasActiveStories, setHasActiveStories] = useState(false);
 
   const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
@@ -68,6 +70,8 @@ export default function UserProfileScreen() {
             bio: u.bio,
             profileType: u.profile_type,
             hidePhoto: u.hide_photo,
+            is_online: u.is_online,
+            last_seen: u.last_seen,
             followers: [],
             following: []
           });
@@ -112,8 +116,22 @@ export default function UserProfileScreen() {
       }
     };
 
+    const checkStories = async () => {
+      try {
+        const { data } = await supabase
+          .from('stories')
+          .select('id')
+          .eq('user_id', userId)
+          .limit(1);
+        setHasActiveStories(data && data.length > 0 ? true : false);
+      } catch (err) {
+        console.error("Error checkStories:", err);
+      }
+    };
+
     fetchUser();
     checkFriendship();
+    checkStories();
 
     // Sync isBlocked
     if (myUserData) {
@@ -184,12 +202,15 @@ export default function UserProfileScreen() {
       </div>
 
       <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
-        <div className="px-4 pt-6">
-          {/* Beautiful and Compact Profile Card */}
-          <div className="flex flex-col items-center text-center bg-[var(--bg-card)] p-6 rounded-2xl border border-[var(--border-color)]/60 shadow-sm mb-6 relative overflow-hidden">
-            <div className="relative mb-4 shrink-0">
-              <div className="w-22 h-22 rounded-full p-[2.5px] border-[2.5px] border-[#0494f4] bg-[var(--bg-main)] flex items-center justify-center shrink-0">
-                <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
+        <div className="px-4 pt-4">
+          {/* Beautiful and Compact Profile Card (Centered Telegram Style) */}
+          <div className="flex flex-col items-center text-center bg-[var(--bg-card)] py-5 px-4 rounded-2xl border border-[var(--border-color)]/60 shadow-sm mb-4 relative overflow-hidden">
+            <div className="relative mb-3 shrink-0">
+              <div 
+                onClick={() => hasActiveStories && navigate(`/stories/view/${userId}`)}
+                className={`w-20 h-20 rounded-full p-[2px] border-2 bg-[var(--bg-main)] flex items-center justify-center shrink-0 ${hasActiveStories ? 'border-[#0494f4] cursor-pointer active:scale-95 transition-all shadow-md' : 'border-zinc-300 dark:border-zinc-700'}`}
+              >
+                <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-[var(--bg-main)]">
                   <img 
                     src={user.hidePhoto ? DEFAULT_LOGO : (user.photoURL || DEFAULT_LOGO)} 
                     className="w-full h-full object-cover shrink-0"
@@ -200,19 +221,32 @@ export default function UserProfileScreen() {
               </div>
             </div>
 
-            <h2 className="text-lg font-black tracking-tight text-[var(--text-primary)] leading-tight">
+            <h2 className="text-base font-black tracking-tight text-[var(--text-primary)] leading-tight">
               {user.fullName || 'GrixChat User'}
             </h2>
-            <p className="text-xs text-[var(--text-secondary)] font-mono mt-1">
+            <span className="text-[10px] text-[#0494f4] font-semibold font-mono tracking-wide mt-1.5 px-2.5 py-0.5 bg-[#0494f4]/10 rounded-full select-none">
               @{user.username || 'username'}
-            </p>
+            </span>
 
-            <p className="text-xs text-[var(--text-secondary)] mt-3 max-w-xs font-semibold leading-relaxed">
-              {user.bio ? truncateToChars(user.bio) : 'Available'}
-            </p>
+            <div className="flex items-center gap-1.5 mt-2 bg-black/5 dark:bg-white/5 px-2.5 py-1 rounded-full border border-[var(--border-color)]/30">
+              <span className={`w-2 h-2 rounded-full ${isUserOnline(user.is_online, user.last_seen) ? 'bg-[#22c55e]' : 'bg-gray-400'}`}></span>
+              <span className="text-[9px] text-[var(--text-secondary)] font-mono font-semibold uppercase tracking-wider">
+                {formatLastSeen(user.is_online, user.last_seen)}
+              </span>
+            </div>
+
+            {/* Bio & Status section */}
+            <div className="mt-3.5 pt-3 border-t border-[var(--border-color)]/30 w-full text-center">
+              <span className="text-[8.5px] font-black text-[var(--text-secondary)] uppercase tracking-wider block mb-0.5 font-mono opacity-80">
+                Bio & status
+              </span>
+              <p className="text-xs text-[var(--text-secondary)] leading-normal max-w-xs mx-auto break-words whitespace-pre-line font-medium">
+                {user.bio ? truncateToChars(user.bio) : 'Available'}
+              </p>
+            </div>
 
             {/* Symmetrical Action Button for Message / Request */}
-            <div className="mt-5 w-full max-w-[180px]">
+            <div className="mt-3.5 w-full max-w-[180px]">
               {isFriend ? (
                 <button 
                   onClick={() => navigate(`/chat/${userId}`)}

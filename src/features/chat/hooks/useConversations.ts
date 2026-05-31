@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../providers/AuthProvider.tsx';
 import { LocalDataCache } from '../../../services/LocalDataCache';
+import { isUserOnline } from '../../../utils/presence';
 
 export const useConversations = (activeFilter: string) => {
   const { user } = useAuth();
@@ -162,7 +163,7 @@ export const useConversations = (activeFilter: string) => {
               : (firstOther?.photo_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`),
             unread: unreadCount > 0,
             unreadCount: unreadCount,
-            isOnline: isGroup ? false : firstOther?.is_online
+            isOnline: isGroup ? false : isUserOnline(firstOther?.is_online, firstOther?.last_seen)
           };
         })
         .filter(Boolean);
@@ -258,7 +259,7 @@ export const useConversations = (activeFilter: string) => {
           username: u.username,
           fullName: u.full_name,
           photoURL: u.photo_url,
-          isOnline: u.is_online
+          isOnline: isUserOnline(u.is_online, u.last_seen)
         })));
       }
     };

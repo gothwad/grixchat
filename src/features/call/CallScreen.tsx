@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
+import { useCall } from '../../providers/CallProvider';
 import { motion, AnimatePresence } from 'motion/react';
 
 const servers = {
@@ -31,6 +32,7 @@ export default function CallScreen() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user: authUser } = useAuth();
+  const { playOutgoingBeep, stopSounds } = useCall();
   const queryParams = new URLSearchParams(location.search);
   const type = queryParams.get('type') || 'voice'; 
   const isReceiver = queryParams.get('role') === 'receiver';
@@ -40,7 +42,7 @@ export default function CallScreen() {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(type === 'voice');
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
-  const [callStatus, setCallStatus] = useState<'connecting' | 'ringing' | 'connected' | 'ended' | 'denied' | 'error'>('connecting');
+  const [callStatus, setCallStatus] = useState<'connecting' | 'ringing' | 'connected' | 'ended' | 'denied' | 'error' | 'offline'>('connecting');
   const [timer, setTimer] = useState(0);
   
   const pc = useRef<RTCPeerConnection>(new RTCPeerConnection(servers));
@@ -52,6 +54,13 @@ export default function CallScreen() {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   
   const [currentCallId, setCurrentCallId] = useState<string | null>(urlCallId);
+
+  // Stop outgoing ringtone/beeps when connected or finalized
+  useEffect(() => {
+    if (callStatus === 'connected' || callStatus === 'ended' || callStatus === 'denied' || callStatus === 'error' || callStatus === 'offline') {
+      stopSounds();
+    }
+  }, [callStatus, stopSounds]);
 
   // Timer effect
   useEffect(() => {
@@ -172,6 +181,7 @@ export default function CallScreen() {
 
     return () => {
       if (channel) channel.unsubscribe();
+      stopSounds();
       endCallLocally();
     };
   }, [otherUserId, isReceiver, type, currentCallId, authUser]);
@@ -231,6 +241,44 @@ export default function CallScreen() {
   };
 
   const startNewCall = async () => {
+    setCallStatus('connecting');
+    playOutgoingBeep(); // Play premium dialing tone!
+
+    // Check remote recipient online status
+    let isOnline = false;
+    try {
+      const { data: userDoc } = await supabase.from('users').select('is_online, last_seen').eq('id', otherUserId).single();
+      if (userDoc) {
+        const lastSeen = userDoc.last_seen;
+        isOnline = !!(userDoc.is_online && lastSeen && (new Date().getTime() - new Date(lastSeen).getTime()) < 65000);
+      }
+    } catch (e) {
+      console.warn("Could not retrieve recipient online status:", e);
+    }
+
+    if (!isOnline) {
+      setCallStatus('offline');
+      // Create instant finished missed call
+      const { data: callData } = await supabase.from('calls').insert({
+        caller_id: authUser?.id,
+        receiver_id: otherUserId,
+        type: type === 'voice' ? 'audio' : type,
+        status: 'ended',
+        is_missed: true
+      } as any).select().single();
+
+      if (callData) {
+        await addMessageToChat('missed', callData.id);
+      }
+
+      // Allow 4 seconds of dialing so the user is updated before closing
+      setTimeout(() => {
+        stopSounds();
+        endCallLocally();
+      }, 4000);
+      return;
+    }
+
     setCallStatus('ringing');
     
     const offerDescription = await pc.current.createOffer();
@@ -239,7 +287,7 @@ export default function CallScreen() {
     const { data: callData, error: callError } = await supabase.from('calls').insert({
       caller_id: authUser?.id,
       receiver_id: otherUserId,
-      type,
+      type: type === 'voice' ? 'audio' : type,
       status: 'ringing',
       offer: { sdp: offerDescription.sdp, type: offerDescription.type }
     } as any).select().single();
@@ -247,6 +295,7 @@ export default function CallScreen() {
     if (callError || !callData) {
       console.error("Error creating call record:", callError);
       setCallStatus('error');
+      stopSounds();
       return;
     }
 
@@ -270,6 +319,7 @@ export default function CallScreen() {
       if (snap && snap.status === 'ringing') {
         await supabase.from('calls').update({ status: 'ended', is_missed: true } as any).eq('id', cid);
         await addMessageToChat('missed', cid);
+        stopSounds();
         endCallLocally();
       }
     }, 60000);
@@ -437,7 +487,7 @@ export default function CallScreen() {
               </div>
               
               {/* Pulse effect for Ringing */}
-              {(callStatus === 'ringing' || callStatus === 'connecting') && (
+              {(callStatus === 'ringing' || callStatus === 'connecting' || callStatus === 'offline') && (
                 <>
                   <div className="absolute inset-0 rounded-full border-2 border-emerald-500/30 animate-ping-slow"></div>
                   <div className="absolute -inset-4 rounded-full border border-white/5 animate-pulse"></div>
@@ -454,6 +504,7 @@ export default function CallScreen() {
                 {callStatus === 'ringing' ? 'Ringing...' : 
                  callStatus === 'connecting' ? 'Establishing Secure Line...' : 
                  callStatus === 'connected' ? formatTime(timer) : 
+                 callStatus === 'offline' ? 'User Offline (Missed Call Logged)' : 
                  callStatus === 'ended' ? 'Call Ended' : 
                  callStatus === 'error' ? 'Connection Failed' : 'Waiting...'}
               </span>

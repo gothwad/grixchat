@@ -3,7 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../providers/AuthProvider.tsx';
 import { LocalDataCache } from '../../../services/LocalDataCache';
 
-export const useChatMessages = (conversationId: string, initialLimit: number = 30) => {
+export const useChatMessages = (conversationId: string, initialLimit: number = 20) => {
   const [messages, setMessages] = useState<any[]>(() => {
     if (conversationId) {
       const cached = LocalDataCache.getMessages(conversationId);
@@ -85,7 +85,7 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
           full_name,
           photo_url
         ),
-        reply_to:messages!reply_to (
+        reply_to:reply_to (
           id,
           text,
           sender_id
@@ -102,8 +102,21 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
       reversed.forEach((m: any) => {
         m.content = m.text || m.content || '';
       });
-      LocalDataCache.saveMessages(conversationId, reversed);
-      setMessages(reversed);
+      
+      setMessages(prev => {
+        const mergedMap = new Map();
+        prev.forEach(msg => {
+          if (msg && msg.id) mergedMap.set(msg.id, msg);
+        });
+        reversed.forEach(msg => {
+          if (msg && msg.id) mergedMap.set(msg.id, msg);
+        });
+        const mergedList = Array.from(mergedMap.values())
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        
+        LocalDataCache.saveMessages(conversationId, mergedList);
+        return mergedList;
+      });
     }
     
     setLoading(false);
@@ -128,37 +141,73 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
     setMessageLimit(initialLimit);
   }, [conversationId, initialLimit]);
 
+  // Stabilize fetchMessages callback via a ref so real-time subscription doesn't thrash
+  const fetchMessagesRef = useRef(fetchMessages);
   useEffect(() => {
-    fetchMessages();
+    fetchMessagesRef.current = fetchMessages;
+  }, [fetchMessages]);
 
+  // Mark as read function that will be stored in a ref to stay fresh but stable
+  const markAsRead = useCallback(async () => {
+    if (!conversationId || !user || !supabase) return;
+    
+    // Instantly clear cached count for zero local UI latency!
+    LocalDataCache.clearUnreadCount(user.id, conversationId);
+
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_read: true } as any)
+        .eq('conversation_id', conversationId)
+        .neq('sender_id', user.id)
+        .eq('is_read', false);
+      
+      if (error) {
+        console.error('Error marking messages as read:', error);
+      } else {
+        console.log('Successfully marked messages as read for conv:', conversationId);
+      }
+    } catch (err) {
+      console.error('Failed to mark messages as read:', err);
+    }
+  }, [conversationId, user?.id]);
+
+  const markAsReadRef = useRef(markAsRead);
+  useEffect(() => {
+    markAsReadRef.current = markAsRead;
+  }, [markAsRead]);
+
+  // 1. Hook for loading initial messages and paging loads
+  useEffect(() => {
+    if (!conversationId) return;
+    const isMore = messageLimit > initialLimit;
+    fetchMessages(isMore);
+  }, [conversationId, messageLimit, initialLimit]);
+
+  // 2. Hook for background polling synchronizer as absolute failsafe backup
+  useEffect(() => {
+    if (!conversationId || !user) return;
+
+    let isActive = true;
+    const intervalId = setInterval(() => {
+      // Only poll gently if the tab is visible and network is active
+      if (isActive && document.visibilityState === 'visible' && navigator.onLine) {
+        fetchMessagesRef.current();
+        markAsReadRef.current();
+      }
+    }, 6000); // Failsafe heart-beat sync every 6 seconds
+
+    return () => {
+      isActive = false;
+      clearInterval(intervalId);
+    };
+  }, [conversationId, user?.id]);
+
+  // 3. Hook for Realtime Postgres Subscription (Bound exclusively to conversation ID)
+  useEffect(() => {
     if (!conversationId || !supabase || !user) return;
 
-    // Mark as read
-    const markAsRead = async () => {
-      if (!conversationId || !user) return;
-      
-      // Instantly clear cached count for zero local UI latency!
-      LocalDataCache.clearUnreadCount(user.id, conversationId);
-
-      try {
-        const { error } = await supabase
-          .from('messages')
-          .update({ is_read: true } as any)
-          .eq('conversation_id', conversationId)
-          .neq('sender_id', user.id)
-          .eq('is_read', false);
-        
-        if (error) {
-          console.error('Error marking messages as read:', error);
-        } else {
-          console.log('Successfully marked messages as read for conv:', conversationId);
-        }
-      } catch (err) {
-        console.error('Failed to mark messages as read:', err);
-      }
-    };
-
-    // Real-time subscription for new messages
+    // Real-time subscription for new messages or edits
     const channel = supabase
       .channel(`chat:${conversationId}`)
       .on('postgres_changes', { 
@@ -169,10 +218,9 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
       }, async (payload) => {
         // If it's a new message from OTHER user, mark it as read since we are in the chat
         if (payload.new.sender_id !== user.id) {
-          markAsRead();
+          markAsReadRef.current();
         }
-        // Fetch full message with sender details
-        // Fetch full message with sender details for the new message only
+        
         try {
           const { data, error } = await supabase
             .from('messages')
@@ -184,7 +232,7 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
                 full_name,
                 photo_url
               ),
-              reply_to:messages!reply_to (
+              reply_to:reply_to (
                 id,
                 text,
                 sender_id
@@ -196,29 +244,22 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
           if (!error && data) {
             data.content = data.text || data.content || '';
             setMessages(prev => {
-              // 1. Remove matching optimistic message if it exists
-              // We match by sender_id and content/media for simple cases
               const filtered = prev.filter(m => {
                 if (m.status !== 'sending') return true;
-                
-                // If it's the same sender and same content/media, it's likely the one we just sent
                 const contentMatch = m.content === data.content;
                 const mediaMatch = (!m.media_url && !data.media_url) || (m.media_url && data.media_url);
-                
                 return !(contentMatch && mediaMatch && m.sender_id === data.sender_id);
               });
 
               if (filtered.some(m => m.id === data.id)) return filtered;
               const newList = [...filtered, data];
-              // Ensure strictly chronological
               return newList.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             });
           } else {
-            // Fallback to full fetch if targeted fetch fails
-            fetchMessages();
+            fetchMessagesRef.current();
           }
         } catch (err) {
-          fetchMessages();
+          fetchMessagesRef.current();
         }
       })
       .on('postgres_changes', {
@@ -226,30 +267,13 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
         schema: 'public', 
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`
-      }, async (payload) => {
-        const { data, error } = await supabase
-          .from('messages')
-          .select(`
-            *,
-            sender:users (
-              id,
-              username,
-              full_name,
-              photo_url
-            ),
-            reply_to:messages!reply_to (
-              id,
-              text,
-              sender_id
-            )
-          `)
-          .eq('id', payload.new.id)
-          .single();
-
-        if (!error && data) {
-          data.content = data.text || data.content || '';
-          setMessages(prev => prev.map(m => m.id === data.id ? data : m));
-        }
+      }, (payload) => {
+        // Merge real-time updates directly to preserve metadata and render instantly
+        setMessages(prev => prev.map(m => m.id === payload.new.id ? {
+          ...m,
+          ...payload.new,
+          content: payload.new.text || payload.new.content || m.content || ''
+        } : m));
       })
       .on('postgres_changes', {
         event: 'DELETE',
@@ -257,7 +281,17 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
-        setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+        setMessages(prev => {
+          const index = prev.findIndex(m => m.id === payload.old.id);
+          if (index === -1) return prev;
+          
+          // If deleted message is more than 30 messages deep from newest, it's db pruning! Keep it in UI from local cache.
+          const isPrune = (prev.length - index) > 30;
+          if (isPrune) {
+            return prev;
+          }
+          return prev.filter(m => m.id !== payload.old.id);
+        });
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
@@ -265,12 +299,13 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
         }
       });
 
-    // Initial mark as read
-    markAsRead();
+    // Mark as read immediately on active screen entering
+    markAsReadRef.current();
 
-    // Also mark as read when window focuses
     const handleFocus = () => {
-      markAsRead();
+      markAsReadRef.current();
+      // Instantly call fetchMessages on focus to capture any updates instantly when returning
+      fetchMessagesRef.current();
     };
     window.addEventListener('focus', handleFocus);
 
@@ -278,30 +313,24 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 3
       window.removeEventListener('focus', handleFocus);
       supabase.removeChannel(channel);
     };
-  }, [conversationId, user?.id, fetchMessages]);
+  }, [conversationId, user?.id]);
 
   const loadMore = useCallback(() => {
-    setMessageLimit(prev => prev + 20);
-  }, []);
+    if (!loading && !loadingMore) setMessageLimit(prev => prev + 20);
+  }, [loading, loadingMore]);
 
-  // Sync messages update with Local Cache
   useEffect(() => {
-    if (messages && messages.length > 0 && conversationId) {
+    if (messages?.length > 0 && conversationId) {
       LocalDataCache.saveMessages(conversationId, messages);
     }
   }, [messages, conversationId]);
 
-  // Listen to local messages caching updates
   useEffect(() => {
     if (!conversationId) return;
-    const unsubscribe = LocalDataCache.subscribe(`messages:${conversationId}`, (updatedMsgs) => {
-      if (updatedMsgs && Array.isArray(updatedMsgs)) {
-        setMessages(updatedMsgs);
-      }
+    const unsubscribe = LocalDataCache.subscribe(`messages:${conversationId}`, (updated) => {
+      if (updated && Array.isArray(updated)) setMessages(updated);
     });
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [conversationId]);
 
   return { 

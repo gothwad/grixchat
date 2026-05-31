@@ -19,6 +19,7 @@ import { useTheme, Theme } from '../../contexts/ThemeContext';
 import { ImageService } from '../../services/ImageService';
 import { storage } from '../../services/StorageService';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
+import BubbleCustomizer from './components/BubbleCustomizer.tsx';
 
 export default function ChatSettingsMainScreen() {
   const navigate = useNavigate();
@@ -26,7 +27,13 @@ export default function ChatSettingsMainScreen() {
   const { theme, setTheme, chatBackground, setChatBackground } = useTheme();
   const [uploading, setUploading] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   const archivedCount = userData?.archivedChats?.length || 0;
   const hiddenCount = userData?.hiddenChats?.length || 0;
@@ -55,7 +62,7 @@ export default function ChatSettingsMainScreen() {
       const url = await ImageService.uploadImage(file);
       setChatBackground(`url(${url})`);
     } catch (error: any) {
-      alert(error.message || "Failed to upload image.");
+      showToast(error.message || "Failed to upload image.");
     } finally {
       setUploading(false);
     }
@@ -66,7 +73,7 @@ export default function ChatSettingsMainScreen() {
     setTimeout(() => {
       storage.removeItem('gx_user_cache');
       setClearing(false);
-      alert("Local data Cache cleared successfully!");
+      showToast("Local data Cache cleared successfully!");
     }, 800);
   };
 
@@ -79,7 +86,7 @@ export default function ChatSettingsMainScreen() {
       <div className="flex-1 overflow-y-auto no-scrollbar py-4 pb-20">
         
         {/* Safe Folders section */}
-        <h3 className="px-6 mb-2 text-[11px] font-black text-zinc-400 uppercase tracking-[0.15em]">Privacy Folders</h3>
+        <h3 className="px-6 mb-2 text-[11px] font-bold text-zinc-400 uppercase tracking-[0.15em]">Privacy Folders</h3>
         <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)]/30 divide-y divide-[var(--border-color)]/25 mb-6">
           
           {/* Archived Chats Shortcut */}
@@ -118,7 +125,7 @@ export default function ChatSettingsMainScreen() {
                 <Lock size={18} />
               </div>
               <div className="text-left">
-                <h4 className="text-sm font-bold text-[var(--text-primary)]">Locked Chats</h4>
+                <h4 className="text-sm font-bold text-[var(--text-primary)]">Hidden Chats</h4>
                 <p className="text-[11px] text-[var(--text-secondary)] font-medium">
                   {hiddenCount > 0 ? `${hiddenCount} chats hidden` : 'Access via code or settings'}
                 </p>
@@ -134,7 +141,7 @@ export default function ChatSettingsMainScreen() {
             </div>
           </button>
 
-          {/* Chat Lock Settings */}
+          {/* Hidden Chat Settings */}
           <button 
             onClick={() => navigate('/chats/hidden/settings')}
             className="w-full flex items-center justify-between px-6 py-4 hover:bg-[var(--bg-main)]/30 transition-colors"
@@ -144,7 +151,7 @@ export default function ChatSettingsMainScreen() {
                 <EyeOff size={18} />
               </div>
               <div className="text-left">
-                <h4 className="text-sm font-bold text-[var(--text-primary)]">Lock & Secret Code Settings</h4>
+                <h4 className="text-sm font-bold text-[var(--text-primary)]">Hidden Chat & Secret Code</h4>
                 <p className="text-[11px] text-[var(--text-secondary)] font-medium">Configure passcode patterns, visibility</p>
               </div>
             </div>
@@ -152,8 +159,11 @@ export default function ChatSettingsMainScreen() {
           </button>
         </div>
 
+        {/* Custom Bubble Shape & Text Customizer */}
+        <BubbleCustomizer />
+
         {/* Theme Settings Section */}
-        <h3 className="px-6 mb-2 text-[11px] font-black text-zinc-400 uppercase tracking-[0.15em]">Appearance</h3>
+        <h3 className="px-6 mb-2 text-[11px] font-bold text-zinc-400 uppercase tracking-[0.15em]">Appearance</h3>
         <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)]/30 mb-6">
           {themes.map((t, index) => (
             <button 
@@ -184,7 +194,7 @@ export default function ChatSettingsMainScreen() {
         </div>
 
         {/* Chat Background Customizer */}
-        <h3 className="px-6 mb-2 text-[11px] font-black text-zinc-400 uppercase tracking-[0.15em]">Chat Wallpaper</h3>
+        <h3 className="px-6 mb-2 text-[11px] font-bold text-zinc-400 uppercase tracking-[0.15em]">Chat Wallpaper</h3>
         <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)]/30 p-6 mb-6">
           <div className="grid grid-cols-3 gap-3">
             {backgrounds.map((bg) => (
@@ -240,7 +250,7 @@ export default function ChatSettingsMainScreen() {
         </div>
 
         {/* Cache Storage Data */}
-        <h3 className="px-6 mb-2 text-[11px] font-black text-zinc-400 uppercase tracking-[0.15em]">Database Storage</h3>
+        <h3 className="px-6 mb-2 text-[11px] font-bold text-zinc-400 uppercase tracking-[0.15em]">Database Storage</h3>
         <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)]/30">
           <button 
             onClick={handleClearCache}
@@ -261,6 +271,12 @@ export default function ChatSettingsMainScreen() {
         </div>
 
       </div>
+
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-zinc-900 border border-zinc-800 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-lg opacity-90 transition-all pointer-events-none">
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 }

@@ -86,7 +86,7 @@ export const chatService = {
           full_name,
           photo_url
         ),
-        reply_to:messages!reply_to (
+        reply_to:reply_to (
           id,
           text,
           sender_id

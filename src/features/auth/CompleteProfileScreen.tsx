@@ -130,8 +130,9 @@ export default function CompleteProfileScreen() {
               type="text" 
               placeholder="Choose username"
               value={username}
+              maxLength={15}
               onChange={(e) => {
-                const val = e.target.value.toLowerCase().replace(/\s/g, '_');
+                const val = e.target.value.toLowerCase().replace(/\s/g, '_').substring(0, 15);
                 // Only allow small letters, numbers, and underscores
                 if (/^[a-z0-9_]*$/.test(val)) {
                   setUsername(val);
@@ -143,10 +144,13 @@ export default function CompleteProfileScreen() {
             <div className="group absolute right-4 top-1/2 -translate-y-1/2">
               <HelpCircle size={14} className="text-[var(--text-secondary)] cursor-help" />
               <span className="hidden group-hover:block absolute right-0 bottom-full mb-2 w-48 p-2 bg-zinc-800 text-white text-[10px] rounded-lg shadow-xl z-50">
-                Only small letters (a-z), numbers (0-9), and underscores (_) allowed.
+                Only small letters (a-z), numbers (0-9), and underscores (_) allowed. Max 15 letters.
               </span>
             </div>
           </div>
+          <p className="text-[10px] text-[var(--text-secondary)] font-semibold mt-1 ml-1 opacity-70">
+            Username must be unique and up to 15 characters.
+          </p>
 
           <div className="pt-2">
             <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 ml-1 opacity-60">Security (Optional for Social Login)</p>

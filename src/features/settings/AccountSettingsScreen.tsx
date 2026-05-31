@@ -16,6 +16,12 @@ export default function AccountSettingsScreen() {
   const [isPasswordSheetOpen, setIsPasswordSheetOpen] = useState(false);
   const [isDeleteSheetOpen, setIsDeleteSheetOpen] = useState(false);
   const [reauthCallback, setReauthCallback] = useState<'email' | 'password' | 'delete' | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   // In Supabase, identities can have multiple providers
   const isPasswordUser = authUser?.id ? true : false; // For now assuming password user if id exists, or check metadata
@@ -33,7 +39,7 @@ export default function AccountSettingsScreen() {
   };
 
   const accountItems = [
-    { icon: Shield, label: 'Security notifications', sub: 'Get notified of security changes', color: 'text-primary', onClick: () => alert("Security notifications are enabled by default for your protection.") },
+    { icon: Shield, label: 'Security notifications', sub: 'Get notified of security changes', color: 'text-primary', onClick: () => showToast("Security notifications are active globally for your protection.") },
     { 
       icon: Mail, 
       label: 'Change Email', 
@@ -41,7 +47,7 @@ export default function AccountSettingsScreen() {
       color: 'text-blue-500',
       onClick: () => {
         if (!isPasswordUser) {
-          alert("You are signed in with a social account. Please manage your email through your provider settings.");
+          showToast("You are using a social account login provider.");
           return;
         }
         setReauthCallback('email');
@@ -55,7 +61,7 @@ export default function AccountSettingsScreen() {
       color: 'text-orange-500',
       onClick: () => {
         if (!isPasswordUser) {
-          alert("You are signed in with a social account. Please manage your password through your provider settings.");
+          showToast("Password cannot be updated for social accounts.");
           return;
         }
         setReauthCallback('password');
@@ -123,6 +129,12 @@ export default function AccountSettingsScreen() {
         isOpen={isDeleteSheetOpen} 
         onClose={() => setIsDeleteSheetOpen(false)} 
       />
+
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-zinc-900 border border-zinc-800 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-lg opacity-90 transition-all pointer-events-none">
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 }

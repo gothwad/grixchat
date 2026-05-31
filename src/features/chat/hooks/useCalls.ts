@@ -4,7 +4,7 @@ import { useAuth } from '../../../providers/AuthProvider.tsx';
 import { toDate } from '../../../utils/dateUtils.ts';
 
 export const useCalls = (activeFilter: string) => {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const [calls, setCalls] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -15,6 +15,23 @@ export const useCalls = (activeFilter: string) => {
     setLoading(true);
 
     const fetchCalls = async () => {
+      let hiddenUserIds: string[] = [];
+      if (userData?.hiddenChats && userData.hiddenChats.length > 0) {
+        try {
+          const { data: partData } = await supabase
+            .from('conversation_participants')
+            .select('user_id')
+            .in('conversation_id', userData.hiddenChats)
+            .neq('user_id', user.id);
+          
+          if (partData) {
+            hiddenUserIds = partData.map((d: any) => d.user_id).filter(Boolean);
+          }
+        } catch (err) {
+          console.warn("Failed to fetch hidden user ids for calls hook:", err);
+        }
+      }
+
       const { data, error } = await supabase
         .from('calls')
         .select(`
@@ -32,21 +49,27 @@ export const useCalls = (activeFilter: string) => {
         return;
       }
 
-      const callList = data.map((call: any) => {
-        const isCaller = call.caller_id === user.id;
-        const otherUser = isCaller ? call.receiver : call.caller;
-        
-        return {
-          id: call.id,
-          otherUserId: otherUser?.id,
-          user: otherUser?.full_name || otherUser?.username || 'Unknown User',
-          avatar: otherUser?.photo_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`,
-          type: call.type, // 'audio' or 'video'
-          isIncoming: !isCaller,
-          isMissed: call.is_missed || false,
-          time: toDate(call.created_at) ? new Date(toDate(call.created_at)!).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently'
-        };
-      });
+      const callList = data
+        .map((call: any) => {
+          const isCaller = call.caller_id === user.id;
+          const otherUser = isCaller ? call.receiver : call.caller;
+          
+          if (otherUser && hiddenUserIds.includes(otherUser.id)) {
+            return null;
+          }
+          
+          return {
+            id: call.id,
+            otherUserId: otherUser?.id,
+            user: otherUser?.full_name || otherUser?.username || 'Unknown User',
+            avatar: otherUser?.photo_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`,
+            type: call.type, // 'audio' or 'video'
+            isIncoming: !isCaller,
+            isMissed: call.is_missed || false,
+            time: toDate(call.created_at) ? new Date(toDate(call.created_at)!).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently'
+          };
+        })
+        .filter(Boolean);
 
       setCalls(callList);
       setLoading(false);

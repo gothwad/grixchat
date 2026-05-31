@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase';
 
 export default function HideChatSettings() {
   const navigate = useNavigate();
-  const { userData, user } = useAuth();
+  const { userData, user, refreshUserData } = useAuth();
   
   const [secretCode, setSecretCode] = useState(userData?.hiddenChatSettings?.secretCode || '');
   const [showMenuEntry, setShowMenuEntry] = useState(userData?.hiddenChatSettings?.showMenuEntry !== false);
@@ -18,18 +18,37 @@ export default function HideChatSettings() {
     setLoading(true);
     setMessage(null);
 
+    const payload = {
+      secretCode: secretCode.trim() || null,
+      showMenuEntry: showMenuEntry
+    };
+
     try {
-      const { error } = await supabase
+      // Try dedicated columns first
+      const { error: primaryError } = await supabase
         .from('users')
         .update({
-          hidden_chat_settings: {
-            secretCode: secretCode.trim() || null,
-            showMenuEntry: showMenuEntry
-          }
+          hidden_chat_settings: payload
         } as any)
         .eq('id', user.uid);
 
-      if (error) throw error;
+      if (primaryError) {
+        console.warn("Dedicated column missing or failed, trying nested settings fallback...", primaryError);
+        // Fallback to storing inside the general JSONB 'settings' column
+        const { error: fallbackError } = await supabase
+          .from('users')
+          .update({
+            settings: {
+              ...(userData?.settings || {}),
+              hidden_chat_settings: payload
+            }
+          } as any)
+          .eq('id', user.uid);
+
+        if (fallbackError) throw fallbackError;
+      }
+
+      await refreshUserData();
 
       setMessage({ type: 'success', text: 'Settings updated successfully' });
       setTimeout(() => setMessage(null), 3000);
@@ -50,7 +69,7 @@ export default function HideChatSettings() {
             <ArrowLeft size={22} className="text-[var(--header-text)]" />
           </button>
           <h1 className="text-xl font-black text-[var(--header-text)] tracking-tight">
-            Chat lock settings
+            Hidden Chat Settings
           </h1>
         </div>
         <button 
@@ -112,7 +131,7 @@ export default function HideChatSettings() {
               className="w-full flex items-center justify-between p-4 hover:bg-[var(--bg-main)] transition-all"
             >
               <div className="flex flex-col items-start text-left gap-1 pr-4">
-                <span className="text-sm font-bold text-[var(--text-primary)]">Hide Locked Chats</span>
+                <span className="text-sm font-bold text-[var(--text-primary)]">Hide Hidden Chats</span>
                 <span className="text-[10px] text-[var(--text-secondary)] leading-tight">
                   Remove the "Hidden chats" entry point from the main menu. They will only be accessible via your secret code.
                 </span>

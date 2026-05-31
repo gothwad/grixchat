@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { Search, X, ArrowLeft, Loader2, Play, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { isUserOnline } from '../../utils/presence';
 
 interface UserProfile {
   uid: string;
@@ -105,7 +106,7 @@ export default function SearchUserScreen() {
       // Fetch Suggested Users
       const { data: usersData } = await supabase
         .from('users')
-        .select('id, username, full_name, photo_url, is_online')
+        .select('id, username, full_name, photo_url, is_online, last_seen')
         .neq('id', authUser?.id)
         .limit(20);
       
@@ -115,7 +116,7 @@ export default function SearchUserScreen() {
           username: u.username,
           fullName: u.full_name,
           photoURL: u.photo_url,
-          isOnline: u.is_online
+          isOnline: isUserOnline(u.is_online, u.last_seen)
         })));
       }
 
@@ -144,7 +145,7 @@ export default function SearchUserScreen() {
     try {
       const { data } = await supabase
         .from('users')
-        .select('id, username, full_name, photo_url, is_online')
+        .select('id, username, full_name, photo_url, is_online, last_seen')
         .or(`username.ilike.%${term}%,full_name.ilike.%${term}%`)
         .neq('id', authUser?.id)
         .limit(30);
@@ -155,7 +156,7 @@ export default function SearchUserScreen() {
           username: u.username,
           fullName: u.full_name,
           photoURL: u.photo_url,
-          isOnline: u.is_online
+          isOnline: isUserOnline(u.is_online, u.last_seen)
         })));
       }
     } catch (error) {

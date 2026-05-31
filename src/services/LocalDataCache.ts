@@ -188,8 +188,8 @@ class LocalDataCacheService {
   }
 
   public saveMessages(conversationId: string, messages: any[]): void {
-    // Only cache last 50 messages to keep local footprint light & super fast
-    const pruned = messages.slice(-50);
+    // Only cache last 200 messages to keep local footprint light & super fast
+    const pruned = messages.slice(-200);
     this.set(`gx_msgs_${conversationId}`, pruned);
   }
 

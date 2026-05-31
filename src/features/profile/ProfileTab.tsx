@@ -15,7 +15,9 @@ import {
   LogOut,
   Check,
   Copy,
-  MessageSquare
+  MessageSquare,
+  User,
+  Sliders
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +28,27 @@ import { truncateToChars } from '../../utils/bioHelper';
 export default function ProfileTab() {
   const { user: authUser, userData: authUserData } = useAuth();
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [hasActiveStories, setHasActiveStories] = useState(false);
+
+  useEffect(() => {
+    const checkMyStories = async () => {
+      if (!supabase || !authUser?.id) return;
+      try {
+        const { data } = await supabase
+          .from('stories')
+          .select('id')
+          .eq('user_id', authUser.id)
+          .limit(1);
+        
+        if (data && data.length > 0) {
+          setHasActiveStories(true);
+        }
+      } catch (err) {
+        console.error('Error fetching user active stories on ProfileTab:', err);
+      }
+    };
+    checkMyStories();
+  }, [authUser?.id]);
   
   const navigate = useNavigate();
 
@@ -54,16 +77,17 @@ export default function ProfileTab() {
     {
       title: 'Account & Security',
       items: [
-        { icon: Lock, label: 'Privacy & Security', sub: userData?.isPrivate ? 'Private Account' : 'Public Account', color: 'bg-indigo-500/10 text-indigo-500', onClick: () => navigate('/privacy-settings') },
-        { icon: Shield, label: 'App Lock', sub: 'Enable PIN/Passcode protection', color: 'bg-emerald-500/10 text-emerald-500', onClick: () => navigate('/app-lock') },
+        { icon: User, label: 'Account Settings', sub: 'Change email, password, delete account', color: 'bg-emerald-500/10 text-emerald-500', onClick: () => navigate('/account-settings') },
+        { icon: Lock, label: 'Privacy Settings', sub: userData?.isPrivate ? 'Private Account' : 'Public Account', color: 'bg-indigo-500/10 text-indigo-500', onClick: () => navigate('/privacy-settings') },
+        { icon: Shield, label: 'App Lock PIN', sub: 'Enable PIN/Passcode protection', color: 'bg-cyan-500/10 text-cyan-500', onClick: () => navigate('/app-lock') },
       ]
     },
     {
-      title: 'Grix Settings & Sounds',
+      title: 'App Preferences & Sounds',
       items: [
         { icon: Bell, label: 'Notifications & Sounds', sub: 'Ringtones, Vibrations & Alerts', color: 'bg-amber-500/10 text-amber-500', onClick: () => navigate('/notifications-settings') },
-        { icon: MessageSquare, label: 'Chat Settings', sub: 'Archived, Hidden chats, Wallpaper & Theme', color: 'bg-purple-500/10 text-purple-500', onClick: () => navigate('/chat-settings') },
-        { icon: Clock, label: 'Usage Stats & Time', sub: 'Daily usage log tracker', color: 'bg-teal-500/10 text-teal-500', onClick: () => navigate('/time-spent') },
+        { icon: MessageSquare, label: 'Chat Customizer & Wallpaper', sub: 'Bubbles shape, text size, wallpapers', color: 'bg-purple-500/10 text-purple-500', onClick: () => navigate('/chat-settings') },
+        { icon: Sliders, label: 'System Preferences', sub: 'App theme, network download, local database Backups', color: 'bg-rose-500/10 text-rose-500', onClick: () => navigate('/app-preferences') },
       ]
     },
     {
@@ -77,68 +101,63 @@ export default function ProfileTab() {
     {
       title: 'Help & Info',
       items: [
-        { icon: HelpCircle, label: 'GrixChat FAQ & Support', sub: 'Knowledgebase and system status', color: 'bg-cyan-500/10 text-cyan-500', onClick: () => navigate('/help') },
-        { icon: InfoIcon, label: 'About App', sub: 'GrixChat V 1.0.0 Stable Build', color: 'bg-sky-500/10 text-sky-500', onClick: () => navigate('/app-info') },
+        { icon: HelpCircle, label: 'Grixvibe FAQ & Support', sub: 'Knowledgebase and system status', color: 'bg-cyan-500/10 text-cyan-500', onClick: () => navigate('/help') },
+        { icon: InfoIcon, label: 'About App', sub: 'Grixvibe V1.2.0 Stable Build', color: 'bg-sky-500/10 text-sky-500', onClick: () => navigate('/app-info') },
       ]
     }
   ];
 
   return (
     <div className="flex flex-col bg-[var(--bg-main)] font-sans h-full overflow-y-auto no-scrollbar pb-24 animate-fade-in">
-      {/* Beautiful Dynamic Profile Header Section (Unified Mobile Card style) */}
+      {/* Beautiful Dynamic Profile Header Section (Centered Telegram Style) */}
       <div className="px-4 pt-4 mb-4">
         <div 
           onClick={() => navigate('/edit-profile')}
-          className="relative bg-[var(--bg-card)] text-[var(--text-primary)] py-4 px-5 border border-[var(--border-color)]/50 rounded-2xl shadow-sm shrink-0 cursor-pointer hover:bg-[var(--bg-card)]/90 transition-colors"
+          className="relative bg-[var(--bg-card)] text-[var(--text-primary)] py-5 px-4 border border-[var(--border-color)]/50 rounded-2xl shadow-sm shrink-0 cursor-pointer hover:bg-[var(--bg-card)]/90 transition-colors flex flex-col items-center justify-center text-center"
         >
-          <div className="relative flex flex-col gap-3">
-            {/* Top Row: Avatar on Left, Name and Username on Right */}
-            <div className="flex items-center gap-4">
-              {/* Solid Avatar Wrapper with Edit Pencil icon overlay and custom #0494f4 ring */}
-              <div className="relative group shrink-0">
-                <div className="w-16 h-16 rounded-full p-[2.5px] border-[2.5px] border-[#0494f4] bg-[var(--bg-main)] flex items-center justify-center shrink-0">
-                  <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
-                    <img 
-                      src={profilePic || DEFAULT_LOGO} 
-                      className="w-full h-full object-cover shrink-0"
-                      referrerPolicy="no-referrer"
-                      alt="Profile Avatar"
-                    />
-                  </div>
-                </div>
-                {/* Pencil Edit Icon replacing online dot */}
-                <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#0494f4] text-white rounded-full flex items-center justify-center shadow-md border-2 border-[var(--bg-card)]">
-                  <Pencil size={11} strokeWidth={2.5} />
-                </span>
-              </div>
-
-              {/* Name & Username Column */}
-              <div className="flex flex-col min-w-0">
-                <h2 className="text-base font-extrabold tracking-tight text-[var(--text-primary)] leading-tight truncate">
-                  {userData?.fullName || 'GrixChat User'}
-                </h2>
-                <span className="text-[11px] text-[var(--text-secondary)] font-mono tracking-wide mt-1 select-none">
-                  @{userData?.username || 'user'}
-                </span>
+          {/* Centered Avatar Wrapper with Edit Pencil icon overlay and custom ring depending on stories */}
+          <div className="relative group shrink-0 mb-3">
+            <div className={`w-20 h-20 rounded-full p-[2px] border-2 bg-[var(--bg-main)] flex items-center justify-center shrink-0 ${hasActiveStories ? 'border-[#0494f4]' : 'border-zinc-300 dark:border-zinc-700'}`}>
+              <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-[var(--bg-main)]">
+                <img 
+                  src={profilePic || DEFAULT_LOGO} 
+                  className="w-full h-full object-cover shrink-0"
+                  referrerPolicy="no-referrer"
+                  alt="Profile Avatar"
+                />
               </div>
             </div>
+            {/* Pencil Edit Icon replacing online dot */}
+            <span className="absolute bottom-0 right-0 w-6.5 h-6.5 bg-[#0494f4] text-white rounded-full flex items-center justify-center shadow-lg border-2 border-[var(--bg-card)] hover:scale-105 active:scale-95 transition-all">
+              <Pencil size={11} strokeWidth={2.5} />
+            </span>
+          </div>
 
-            {/* Bottom column: Bio section */}
-            <div className="pt-3 border-t border-[var(--border-color)]/30">
-              <span className="text-[9px] font-black text-[var(--text-secondary)] uppercase tracking-wider block mb-0.5 font-mono">
-                Bio & status
-              </span>
-              <p className="text-xs text-[var(--text-primary)] leading-relaxed break-words whitespace-pre-line">
-                {userData?.bio ? truncateToChars(userData.bio) : 'Tap to describe yourself & write a custom bio.'}
-              </p>
-            </div>
+          {/* Name & Username Column */}
+          <div className="flex flex-col items-center min-w-0">
+            <h2 className="text-base font-extrabold tracking-tight text-[var(--text-primary)] leading-tight">
+              {userData?.fullName || 'GrixChat User'}
+            </h2>
+            <span className="text-[10px] text-[#0494f4] font-semibold font-mono tracking-wide mt-1.5 px-2.5 py-0.5 bg-[#0494f4]/10 rounded-full select-none">
+              @{userData?.username || 'user'}
+            </span>
+          </div>
+
+          {/* Bio & Status section */}
+          <div className="mt-3.5 pt-3 border-t border-[var(--border-color)]/30 w-full text-center">
+            <span className="text-[8.5px] font-bold text-[var(--text-secondary)] uppercase tracking-wider block mb-0.5 font-mono opacity-80">
+              Bio & status
+            </span>
+            <p className="text-xs text-[var(--text-primary)] leading-normal max-w-xs mx-auto break-words whitespace-pre-line text-[var(--text-secondary)] font-medium">
+              {userData?.bio ? truncateToChars(userData.bio) : 'Tap to describe yourself & write a custom bio.'}
+            </p>
           </div>
         </div>
       </div>
 
       {/* Account Quick-Info Block (Telegram Account section style) */}
       <div className="px-4 mb-4">
-        <h3 className="px-2 mb-2 text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em]">
+        <h3 className="px-2 mb-2 text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em]">
           Account info
         </h3>
         <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)]/50 divide-y divide-[var(--border-color)]/30 overflow-hidden shadow-sm">
@@ -167,7 +186,7 @@ export default function ProfileTab() {
       <div className="px-4 space-y-6">
         {settingsOptions.map((section) => (
           <div key={section.title} className="space-y-2">
-            <h3 className="px-2 text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em]">
+            <h3 className="px-2 text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em]">
               {section.title}
             </h3>
             <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl divide-y divide-[var(--border-color)]/30 overflow-hidden shadow-sm">
@@ -193,7 +212,7 @@ export default function ProfileTab() {
 
         {/* Telegram Styled Authentication Section */}
         <div className="space-y-2">
-          <h3 className="px-2 text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em]">
+          <h3 className="px-2 text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em]">
             Session
           </h3>
           <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl overflow-hidden shadow-sm">

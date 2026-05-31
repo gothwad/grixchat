@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { Search, X, Loader2, MessageSquare, ArrowLeft, Users, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { isUserOnline } from '../../utils/presence';
 
 interface FriendProfile {
   id: string;
@@ -15,11 +16,35 @@ interface FriendProfile {
 
 export default function FriendsScreen() {
   const navigate = useNavigate();
-  const { user: authUser } = useAuth();
+  const { user: authUser, userData } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [friends, setFriends] = useState<FriendProfile[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!supabase || !authUser?.id || !userData?.hiddenChats || userData.hiddenChats.length === 0) {
+      setHiddenUserIds([]);
+      return;
+    }
+    const fetchHiddenUserIds = async () => {
+      try {
+        const { data } = await supabase
+          .from('conversation_participants')
+          .select('conversation_id, user_id')
+          .in('conversation_id', userData.hiddenChats)
+          .neq('user_id', authUser.id);
+        
+        if (data) {
+          setHiddenUserIds(data.map(d => d.user_id));
+        }
+      } catch (e) {
+        console.warn("Failed to fetch hidden user ids inside friends screen:", e);
+      }
+    };
+    fetchHiddenUserIds();
+  }, [userData?.hiddenChats, authUser?.id]);
 
   useEffect(() => {
     fetchFriends();
@@ -56,7 +81,7 @@ export default function FriendsScreen() {
       if (mutualIds.length > 0) {
         const { data: friendsData, error: friendsError } = await supabase
           .from('users')
-          .select('id, username, full_name, photo_url, is_online')
+          .select('id, username, full_name, photo_url, is_online, last_seen')
           .in('id', mutualIds)
           .limit(100);
         
@@ -68,7 +93,7 @@ export default function FriendsScreen() {
             username: f.username,
             fullName: f.full_name,
             photoURL: f.photo_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
-            isOnline: f.is_online
+            isOnline: isUserOnline(f.is_online, f.last_seen)
           })));
         }
       } else {
@@ -82,14 +107,16 @@ export default function FriendsScreen() {
     }
   };
 
-  const filteredFriends = friends.filter(friend => {
-    const term = searchTerm.toLowerCase().trim();
-    if (!term) return true;
-    return (
-      (friend.fullName || '').toLowerCase().includes(term) ||
-      (friend.username || '').toLowerCase().includes(term)
-    );
-  });
+  const filteredFriends = friends
+    .filter(friend => !hiddenUserIds.includes(friend.id))
+    .filter(friend => {
+      const term = searchTerm.toLowerCase().trim();
+      if (!term) return true;
+      return (
+        (friend.fullName || '').toLowerCase().includes(term) ||
+        (friend.username || '').toLowerCase().includes(term)
+      );
+    });
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden font-sans">
@@ -105,7 +132,7 @@ export default function FriendsScreen() {
         <div className="flex-1 min-w-0">
           <h2 className="text-[17px] font-bold text-[var(--text-primary)] tracking-tight">GrixChat Friends</h2>
           <p className="text-[11px] text-[var(--text-secondary)] font-medium leading-none mt-1">
-            {friends.length} {friends.length === 1 ? 'connection' : 'connections'} on Grix
+            {filteredFriends.length} {filteredFriends.length === 1 ? 'connection' : 'connections'} on Grix
           </p>
         </div>
       </div>

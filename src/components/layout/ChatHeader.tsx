@@ -126,7 +126,7 @@ export default function ChatHeader({
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        {receiverId !== 'gx-ai' && !isGroup && (
+        {receiverId !== 'gx-ai' && receiverId !== 'grix-ai' && !isGroup && (
           <>
             <button 
               onClick={() => startCall('video')}

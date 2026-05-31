@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MessageCircle, Lock, Archive } from 'lucide-react';
 import { motion } from 'motion/react';
+import { aiService } from '../../../services/AIService';
 
 interface ChatItem {
   id: string;
@@ -37,6 +38,8 @@ interface ChatUserListProps {
   emptyMessage?: string;
   emptySubMessage?: string;
   loading?: boolean;
+  usersWithStories?: string[];
+  showHiddenChatsEntry?: boolean;
 }
 
 export const ChatUserList: React.FC<ChatUserListProps> = ({
@@ -49,7 +52,9 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
   secretCount = 0,
   emptyMessage = "No messages yet",
   emptySubMessage = "Start a conversation with your friends.",
-  loading = false
+  loading = false,
+  usersWithStories = [],
+  showHiddenChatsEntry = true
 }) => {
   const navigate = useNavigate();
 
@@ -62,83 +67,87 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
     );
   }
 
-  const renderChatItem = (chat: ChatItem) => (
-    <Link 
-      to={`/chat/${chat.otherUserId}`} 
-      key={chat.id} 
-      className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group"
-    >
-      <div className="relative shrink-0">
-        <img 
-          src={chat.avatar || `https://cdn-icons-png.flaticon.com/512/149/149071.png`} 
-          className="w-[52px] h-[52px] object-cover shadow-sm group-hover:scale-105 transition-transform rounded-full border border-[var(--border-color)]/30"
-          referrerPolicy="no-referrer"
-          alt={chat.user}
-        />
-        {chat.isOnline && (
-          <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
-        )}
-      </div>
-      <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 relative">
-        <div className="flex justify-between items-baseline mb-0.5">
-          <h3 className={`text-[15px] truncate font-bold text-[var(--text-primary)] ${chat.unread ? 'font-black' : ''}`}>
-            {chat.user}
-          </h3>
-          <span className={`text-[10px] whitespace-nowrap ${chat.unread ? 'text-[var(--primary)] font-bold' : 'text-[var(--text-secondary)]'}`}>
-            {chat.time}
-          </span>
-        </div>
-        <div className="flex justify-between items-center">
-          <p className={`text-xs truncate font-medium ${chat.unread ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-secondary)]'}`}>
-            {chat.lastMsg}
-          </p>
-          {chat.unread && (
-            <div className="min-w-[18px] h-[18px] px-1.5 bg-[var(--primary)] rounded-full flex items-center justify-center shadow-lg shadow-[var(--primary-shadow)]/20 ml-2">
-              <span className="text-[10.5px] text-white font-black leading-none">
-                {chat.unreadCount && chat.unreadCount > 4 ? '4+' : chat.unreadCount}
-              </span>
-            </div>
+  const renderChatItem = (chat: ChatItem) => {
+    return (
+      <Link 
+        to={`/chat/${chat.otherUserId}`} 
+        key={chat.id} 
+        className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group"
+      >
+        <div className="relative shrink-0 select-none">
+          <img 
+            src={chat.avatar || `https://cdn-icons-png.flaticon.com/512/149/149071.png`} 
+            className="w-[52px] h-[52px] object-cover rounded-full border border-[var(--border-color)]/30 shadow-sm group-hover:scale-105 transition-transform"
+            referrerPolicy="no-referrer"
+            alt={chat.user}
+          />
+          {chat.isOnline && (
+            <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
           )}
+        </div>
+        <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 relative">
+          <div className="flex justify-between items-baseline mb-0.5">
+            <h3 className={`text-[15px] truncate font-bold text-[var(--text-primary)] ${chat.unread ? 'font-black' : ''}`}>
+              {chat.user}
+            </h3>
+            <span className={`text-[10px] whitespace-nowrap ${chat.unread ? 'text-[var(--primary)] font-bold' : 'text-[var(--text-secondary)]'}`}>
+              {chat.time}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <p className={`text-xs truncate font-medium ${chat.unread ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-secondary)]'}`}>
+              {chat.lastMsg}
+            </p>
+            {chat.unread && (
+              <div className="min-w-[18px] h-[18px] px-1.5 bg-[var(--primary)] rounded-full flex items-center justify-center shadow-lg shadow-[var(--primary-shadow)]/20 ml-2">
+                <span className="text-[10.5px] text-white font-black leading-none">
+                  {chat.unreadCount && chat.unreadCount > 4 ? '4+' : chat.unreadCount}
+                </span>
+              </div>
+            )}
+  
+          </div>
+        </div>
+      </Link>
+    );
+  };
 
+  const renderOtherUser = (user: OtherUser) => {
+    return (
+      <Link 
+        to={`/chat/${user.uid}`} 
+        key={user.uid} 
+        className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group"
+      >
+        <div className="relative shrink-0 select-none">
+          <img 
+            src={user.photoURL || `https://cdn-icons-png.flaticon.com/512/149/149071.png`} 
+            className="w-[52px] h-[52px] object-cover shadow-sm group-hover:scale-105 transition-transform rounded-full border border-[var(--border-color)]/30"
+            referrerPolicy="no-referrer"
+            alt={user.fullName || user.username}
+          />
+          {user.isOnline && (
+            <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
+          )}
         </div>
-      </div>
-    </Link>
-  );
-
-  const renderOtherUser = (user: OtherUser) => (
-    <Link 
-      to={`/chat/${user.uid}`} 
-      key={user.uid} 
-      className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group"
-    >
-      <div className="relative shrink-0">
-        <img 
-          src={user.photoURL || `https://cdn-icons-png.flaticon.com/512/149/149071.png`} 
-          className="w-[52px] h-[52px] object-cover shadow-sm group-hover:scale-105 transition-transform rounded-full border border-[var(--border-color)]/30"
-          referrerPolicy="no-referrer"
-          alt={user.fullName || user.username}
-        />
-        {user.isOnline && (
-          <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
-        )}
-      </div>
-      <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 relative">
-        <div className="flex justify-between items-baseline mb-0.5">
-          <h3 className="text-[15px] truncate font-bold text-[var(--text-primary)]">
-            {user.fullName || user.username}
-          </h3>
-          <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] uppercase font-bold tracking-tight opacity-40">
-            Suggested
-          </span>
+        <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 relative">
+          <div className="flex justify-between items-baseline mb-0.5">
+            <h3 className="text-[15px] truncate font-bold text-[var(--text-primary)]">
+              {user.fullName || user.username}
+            </h3>
+            <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] uppercase font-bold tracking-tight opacity-40">
+              Suggested
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <p className="text-xs truncate font-medium text-[var(--text-secondary)] italic">
+              Say hi! 👋
+            </p>
+          </div>
         </div>
-        <div className="flex justify-between items-center">
-          <p className="text-xs truncate font-medium text-[var(--text-secondary)] italic">
-            Say hi! 👋
-          </p>
-        </div>
-      </div>
-    </Link>
-  );
+      </Link>
+    );
+  };
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-card)]">
@@ -146,60 +155,86 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       {showSecretHeader && (
         <div 
           onClick={onSecretHeaderClick}
-          className="flex items-center gap-[15px] px-4 py-4 bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 transition-all cursor-pointer border-b border-[var(--primary)]/10"
+          className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer border-b border-[var(--border-color)]/30"
         >
-          <div className="w-[52px] h-[52px] rounded-full bg-[var(--primary)]/20 flex items-center justify-center text-[var(--primary)] shrink-0 shadow-inner">
-            <Lock size={24} />
+          <div className="relative shrink-0 z-10 animate-pulse">
+            <div className="w-[52px] h-[52px] rounded-full bg-indigo-500/10 dark:bg-zinc-800 flex items-center justify-center text-indigo-500 group-hover:scale-105 transition-transform border border-[var(--border-color)]/30">
+              <Lock size={21} className="text-indigo-500 animate-bounce" />
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[15px] font-black text-[var(--primary)] uppercase tracking-widest leading-none mb-1">
-              Hidden chats
-            </h3>
-            <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-tight">
-              {secretCount} locked conversations
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Grix AI */}
-      {showGrixAI && (
-        <div 
-          onClick={() => navigate('/chat/grix-ai')}
-          className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer"
-        >
-          <div 
-            className="relative shrink-0 z-10"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate('/profile/grix-ai');
-            }}
-          >
-            <img 
-              src="/assets/favicon.png" 
-              className="w-[52px] h-[52px] rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform border border-[var(--border-color)]/30"
-              referrerPolicy="no-referrer"
-              alt="Grix AI"
-            />
-            <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
-          </div>
-          <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 relative">
+          <div className="flex-1 min-w-0 relative">
             <div className="flex justify-between items-baseline mb-0.5">
               <h3 className="text-[15px] truncate font-black text-[var(--text-primary)]">
-                Grix AI
+                Hidden Chats
               </h3>
-              <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] font-bold">
-                Online
+              <span className="text-[11px] whitespace-nowrap text-indigo-500 font-bold tracking-tight bg-indigo-500/10 px-2 py-0.5 rounded-full">
+                Unlocked
               </span>
             </div>
             <div className="flex justify-between items-center">
               <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
-                Ask me anything! I'm here to help.
+                {secretCount > 0 ? `${secretCount} hidden conversations available` : 'Private conversations space'}
               </p>
             </div>
           </div>
         </div>
       )}
+
+      {/* Grix AI */}
+      {showGrixAI && (() => {
+        const aiMessages = aiService.getMessages();
+        const lastAiMsg = aiMessages[aiMessages.length - 1];
+        const lastAiText = lastAiMsg ? lastAiMsg.text : "Ask me anything! I'm here to help.";
+        
+        let lastAiTime = "Online";
+        if (lastAiMsg) {
+          const msgDate = new Date(lastAiMsg.timestamp);
+          const now = new Date();
+          if (msgDate.toDateString() === now.toDateString()) {
+            lastAiTime = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          } else {
+            lastAiTime = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+          }
+        }
+
+        return (
+          <div 
+            onClick={() => navigate('/chat/grix-ai')}
+            className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer"
+          >
+            <div 
+              className="relative shrink-0 z-10"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/profile/grix-ai');
+              }}
+            >
+              <img 
+                src="/assets/favicon.png" 
+                className="w-[52px] h-[52px] rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform border border-[var(--border-color)]/30"
+                referrerPolicy="no-referrer"
+                alt="Grix AI"
+              />
+              <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
+            </div>
+            <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 relative">
+              <div className="flex justify-between items-baseline mb-0.5">
+                <h3 className="text-[15px] truncate font-black text-[var(--text-primary)]">
+                  Grix AI
+                </h3>
+                <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] font-bold">
+                  {lastAiTime}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
+                  {lastAiText}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Archived Chats Pinned Shortcut */}
       {showGrixAI && (
@@ -224,6 +259,35 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
             <div className="flex justify-between items-center">
               <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
                 Some of your conversion can be in archived
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden Chats Pinned Shortcut */}
+      {showGrixAI && showHiddenChatsEntry && !showSecretHeader && (
+        <div 
+          onClick={() => navigate('/chats/hidden')}
+          className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer"
+        >
+          <div className="relative shrink-0 z-10">
+            <div className="w-[52px] h-[52px] rounded-full bg-indigo-500/10 dark:bg-zinc-800 flex items-center justify-center text-indigo-500 group-hover:scale-105 transition-transform border border-[var(--border-color)]/30">
+              <Lock size={21} className="text-indigo-500" />
+            </div>
+          </div>
+          <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 relative">
+            <div className="flex justify-between items-baseline mb-0.5">
+              <h3 className="text-[15px] truncate font-black text-[var(--text-primary)]">
+                Hidden Chats
+              </h3>
+              <span className="text-[11px] whitespace-nowrap text-indigo-500 font-bold tracking-tight">
+                Secret
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
+                Private conversations protected with secret code
               </p>
             </div>
           </div>
