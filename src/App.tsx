@@ -97,7 +97,7 @@ const GlobalLockScreen = React.lazy(() => import('./features/lock/GlobalLockScre
 
 const CallScreen = React.lazy(() => import('./features/call/CallScreen'));
 
-import { storage } from './services/StorageService.ts';
+import { storage, safeSessionStorage } from './services/StorageService.ts';
 import MainLayout from './components/layout/MainLayout.tsx';
 import { LayoutProvider } from './contexts/LayoutContext.tsx';
 import { NavProvider } from './contexts/NavContext.tsx';
@@ -157,58 +157,141 @@ export default function App() {
     }
   }, [location]);
 
+  // In-memory tab active unlock keeper (does NOT survive browser refresh/restorations)
   const [isUnlocked, setIsUnlocked] = useState(() => {
-    return storage.getItem('grix_session_unlocked') === 'true';
+    return false; // Force lock validation on every fresh boot/load for absolute security
   });
   const [initialLockCheckDone, setInitialLockCheckDone] = useState(false);
 
+  // Throttled user activity tracker using mouse, touch, scroll, keys
   useEffect(() => {
-    if (isAuthReady) {
-      const lockData = LockService.getLockDataFromProfile(userData);
-      if (!lockData.isEnabled || storage.getItem('grix_session_unlocked') === 'true') {
-        setIsUnlocked(true);
-      } else {
-        setIsUnlocked(false);
+    let lastUpdate = 0;
+    const updateActivity = () => {
+      const now = Date.now();
+      if (now - lastUpdate > 3000) { // update at most every 3 seconds
+        lastUpdate = now;
+        storage.setItem('gx_last_active', now.toString());
       }
-      setInitialLockCheckDone(true);
-    }
-  }, [isAuthReady, userData]);
+    };
 
+    updateActivity(); // run once on tab boot
+
+    const docEvents = ['mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+    docEvents.forEach(evt => {
+      window.addEventListener(evt, updateActivity, { passive: true });
+    });
+
+    return () => {
+      docEvents.forEach(evt => {
+        window.removeEventListener(evt, updateActivity);
+      });
+    };
+  }, []);
+
+  // Main app lock verification logic
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // Tab went background/hidden, save current epoch
-        storage.setItem('gx_last_active', Date.now().toString());
-      } else {
-        // Tab is foregrounded
-        const lockData = LockService.getLockDataFromProfile(userData);
-        if (lockData && lockData.isEnabled) {
+    if (!isAuthReady) return;
+
+    const performLockCheck = (source: 'mount' | 'focus' | 'interval') => {
+      const lockData = LockService.getLockDataFromProfile(userData);
+      
+      // If lock is disabled, unlock immediately
+      if (!lockData || !lockData.isEnabled) {
+        setIsUnlocked(true);
+        setInitialLockCheckDone(true);
+        return;
+      }
+
+      const timeoutStr = storage.getItem('app-lock-timeout') || '0'; // default: '0' (immediate)
+
+      if (timeoutStr === 'never') {
+        const currentlyUnlocked = safeSessionStorage.getItem('grix_session_unlocked') === 'true';
+        setIsUnlocked(currentlyUnlocked);
+      } else if (timeoutStr === '0') {
+        // Immediate Lock rules:
+        if (source === 'mount') {
+          // Fresh page refresh/load always triggers lock to respect "lock on refresh"
+          setIsUnlocked(false);
+          safeSessionStorage.removeItem('grix_session_unlocked');
+        } else if (source === 'focus') {
+          // Returning from background/blur. 
+          // Check activity grace period (Issue 6) - 15 second grace to select files or allow popups without locking.
           const lastActiveStr = storage.getItem('gx_last_active');
-          const timeoutStr = storage.getItem('app-lock-timeout') || '0'; // default: immediate
-          
-          if (lastActiveStr && timeoutStr !== 'never') {
-            const lastActive = parseInt(lastActiveStr);
-            const timeout = parseInt(timeoutStr); // seconds
+          if (lastActiveStr) {
+            const lastActive = parseInt(lastActiveStr, 10);
             const elapsed = (Date.now() - lastActive) / 1000;
-            
-            if (elapsed > timeout) {
-              storage.removeItem('grix_session_unlocked');
+            if (elapsed > 15) {
               setIsUnlocked(false);
+              safeSessionStorage.removeItem('grix_session_unlocked');
+            } else {
+              // Within grace period (e.g. file upload or prompt is open), stay unlocked
+              setIsUnlocked(true);
             }
-          } else if (timeoutStr === '0') {
-            // Lock immediately on tab focus loss
-            storage.removeItem('grix_session_unlocked');
+          } else {
             setIsUnlocked(false);
           }
+        } else {
+          // Active interval inside the app viewing stay unlocked
+          const currentlyUnlocked = safeSessionStorage.getItem('grix_session_unlocked') === 'true';
+          setIsUnlocked(currentlyUnlocked);
         }
+      } else {
+        // Idle timeout limits: 60s (1m) or 300s (5m)
+        const lastActiveStr = storage.getItem('gx_last_active');
+        const timeoutSeconds = parseInt(timeoutStr, 10);
+        
+        if (lastActiveStr) {
+          const lastActive = parseInt(lastActiveStr, 10);
+          const elapsed = (Date.now() - lastActive) / 1000;
+          
+          if (elapsed > timeoutSeconds) {
+            safeSessionStorage.removeItem('grix_session_unlocked');
+            setIsUnlocked(false);
+          } else {
+            const currentlyUnlocked = safeSessionStorage.getItem('grix_session_unlocked') === 'true';
+            setIsUnlocked(currentlyUnlocked);
+          }
+        } else {
+          // Fallback lock
+          setIsUnlocked(false);
+        }
+      }
+
+      setInitialLockCheckDone(true);
+    };
+
+    // 1. Initial lock evaluation on load
+    performLockCheck('mount');
+
+    // 2. Tab Visibility and Focus State Updates
+    const handleStateChange = () => {
+      if (document.hidden) {
+        storage.setItem('gx_last_active', Date.now().toString());
+      } else {
+        performLockCheck('focus');
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    const handleFocus = () => {
+      performLockCheck('focus');
     };
-  }, [userData]);
+
+    document.addEventListener('visibilitychange', handleStateChange);
+    window.addEventListener('focus', handleFocus);
+
+    // 3. Robust realtime inactivity checker
+    const activeInterval = setInterval(() => {
+      if (!document.hidden) {
+        performLockCheck('interval');
+      }
+    }, 4000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleStateChange);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(activeInterval);
+    };
+  }, [isAuthReady, userData]);
 
   useEffect(() => {
     const loadCount = parseInt(storage.getItem('loadCount') || '0');
@@ -275,7 +358,7 @@ export default function App() {
     return (
       <GlobalLockScreen 
         onUnlock={() => {
-          storage.setItem('grix_session_unlocked', 'true');
+          safeSessionStorage.setItem('grix_session_unlocked', 'true');
           setIsUnlocked(true);
         }} 
       />

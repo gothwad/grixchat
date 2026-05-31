@@ -103,9 +103,19 @@ export const MessageList: React.FC<MessageListProps> = ({
         ) : (() => {
           // Use all messages or limit if specified
           const currentMessages = messageLimit > 0 ? messages.slice(-messageLimit) : messages;
-          return currentMessages.map((msg, index) => {
+          
+          // Deduplicate messages on the fly to prevent any runtime dupe-key issues under high network concurrency
+          const seenIds = new Set<string>();
+          const uniqueMessages = currentMessages.filter(msg => {
+            if (!msg || !msg.id) return false;
+            if (seenIds.has(msg.id)) return false;
+            seenIds.add(msg.id);
+            return true;
+          });
+
+          return uniqueMessages.map((msg, index) => {
             const isMe = msg.sender_id === user?.id;
-            const prevMsg = index > 0 ? currentMessages[index - 1] : null;
+            const prevMsg = index > 0 ? uniqueMessages[index - 1] : null;
             const isSameSender = prevMsg?.sender_id === msg.sender_id;
             
             return (

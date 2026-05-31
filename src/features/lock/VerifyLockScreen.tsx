@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { LockService } from '../../services/LockService.ts';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../providers/AuthProvider';
-import { storage } from '../../services/StorageService';
+import { storage, safeSessionStorage } from '../../services/StorageService';
 
 export default function VerifyLockScreen() {
   const navigate = useNavigate();
@@ -44,7 +44,7 @@ export default function VerifyLockScreen() {
       setVerifying(true);
       try {
         await LockService.disableLock();
-        storage.removeItem('grix_session_unlocked');
+        safeSessionStorage.removeItem('grix_session_unlocked');
         await refreshUserData();
         navigate('/app-lock');
       } catch (err) {

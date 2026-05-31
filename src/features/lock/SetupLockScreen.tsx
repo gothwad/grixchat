@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { LockService, LockType } from '../../services/LockService.ts';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../providers/AuthProvider';
-import { storage } from '../../services/StorageService';
+import { storage, safeSessionStorage } from '../../services/StorageService';
 
 export default function SetupLockScreen() {
   const { type } = useParams<{ type: string }>();
@@ -58,7 +58,7 @@ export default function SetupLockScreen() {
       if (value === confirmValue) {
         try {
           await LockService.enableLock(type as LockType, value);
-          storage.setItem('grix_session_unlocked', 'true');
+          safeSessionStorage.setItem('grix_session_unlocked', 'true');
           await refreshUserData();
           setSuccess(true);
           setTimeout(() => {

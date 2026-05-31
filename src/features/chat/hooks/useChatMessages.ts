@@ -321,7 +321,17 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
 
   useEffect(() => {
     if (messages?.length > 0 && conversationId) {
-      LocalDataCache.saveMessages(conversationId, messages);
+      const seenIds = new Set<string>();
+      const unique = messages.filter(m => {
+        if (!m || !m.id) return false;
+        if (seenIds.has(m.id)) return false;
+        seenIds.add(m.id);
+        return true;
+      });
+      if (unique.length !== messages.length) {
+        setMessages(unique);
+      }
+      LocalDataCache.saveMessages(conversationId, unique);
     }
   }, [messages, conversationId]);
 

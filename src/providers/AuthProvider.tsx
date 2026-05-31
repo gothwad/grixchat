@@ -1,11 +1,13 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useMemo } from 'react';
 import { User, RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
 import { storage, safeSessionStorage } from '../services/StorageService';
+import { userProfileService } from '../services/db/userProfileService';
+import { sessionService } from '../services/db/sessionService';
 
 interface CustomUser extends User {
-  uid: string; // Add uid to match Firebase interface expected by the rest of the app
+  uid: string;
 }
 
 interface AuthContextType {
@@ -24,253 +26,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cached = storage.getItem('grix_cached_user');
       return cached ? JSON.parse(cached) : null;
-    } catch (_) {
-      return null;
-    }
+    } catch (_) { return null; }
   });
 
   const [userData, setUserData] = useState<UserProfile | null>(() => {
     try {
       const cached = storage.getItem('grix_cached_userdata');
       return cached ? JSON.parse(cached) : null;
-    } catch (_) {
-      return null;
-    }
+    } catch (_) { return null; }
   });
 
-  const [loading, setLoading] = useState(() => {
-    try {
-      return !storage.getItem('grix_cached_user');
-    } catch (_) {
-      return true;
-    }
-  });
-
-  const [isAuthReady, setIsAuthReady] = useState(() => {
-    try {
-      return !!storage.getItem('grix_cached_user');
-    } catch (_) {
-      return false;
-    }
-  });
-
+  const [loading, setLoading] = useState(() => !storage.getItem('grix_cached_user'));
+  const [isAuthReady, setIsAuthReady] = useState(() => !!storage.getItem('grix_cached_user'));
   const [followingIds, setFollowingIds] = useState<string[]>([]);
 
-  const profileChannelRef = React.useRef<RealtimeChannel | null>(null);
-  const presenceChannelRef = React.useRef<RealtimeChannel | null>(null);
+  const profileChannelRef = useRef<RealtimeChannel | null>(null);
+  const presenceChannelRef = useRef<RealtimeChannel | null>(null);
+  const sessionRegisteredRef = useRef<boolean>(false);
 
-  const fetchProfileData = async (currentUserId: string, isSubscribed: boolean) => {
-    if (!supabase) return;
-    try {
-      // Offline fallback check first
-      if (!navigator.onLine) {
-        console.log('Detected offline state during profile fetch, using cached profile.');
-        const cachedRaw = storage.getItem('grix_cached_userdata');
-        if (cachedRaw) {
-          try {
-            const cached = JSON.parse(cachedRaw);
-            if (cached && cached.id === currentUserId) {
-              setUserData(cached);
-              if (cached.following) {
-                setFollowingIds(cached.following);
-              }
-              return;
-            }
-          } catch (_) {}
-        }
-      }
-
-      let { data: profile, error: fetchError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', currentUserId)
-        .maybeSingle();
-
-      if (fetchError) {
-        console.warn('Error fetching profile:', fetchError);
-        // Fallback to cache on query error if offline/network issue
-        const isNetworkErr = !navigator.onLine || fetchError.message?.toLowerCase().includes('fetch') || fetchError.message?.toLowerCase().includes('network');
-        if (isNetworkErr) {
-          const cachedRaw = storage.getItem('grix_cached_userdata');
-          if (cachedRaw) {
-            try {
-              const cached = JSON.parse(cachedRaw);
-              if (cached && cached.id === currentUserId) {
-                // Ensure local offline cache is also truncated if it was legacy too-long
-                if (cached.username && cached.username.length > 15) {
-                  cached.username = cached.username.substring(0, 15);
-                }
-                setUserData(cached);
-                if (cached.following) {
-                  setFollowingIds(cached.following);
-                }
-                return;
-              }
-            } catch (_) {}
-          }
-        }
-      }
-
-      // Automatically truncate legacy too-long user names on load
-      if (profile && profile.username && profile.username.length > 15) {
-        const truncated = profile.username.substring(0, 15);
-        console.log(`Auto-truncating legacy username for user ${currentUserId}: ${profile.username} -> ${truncated}`);
-        const { data: updatedProfile, error: updateError } = await supabase
-          .from('users')
-          .update({ username: truncated } as any)
-          .eq('id', currentUserId)
-          .select()
-          .maybeSingle();
-
-        if (!updateError && updatedProfile) {
-          profile = updatedProfile;
-        } else {
-          profile.username = truncated;
-        }
-      }
-
-      if (!profile) {
-        // If we get here and we are truly offline/network is broken, we should avoid auto-creating as it will fail
-        if (!navigator.onLine) {
-          return;
-        }
-        // Safe auto-creation of profile row
-        const email = user?.email || '';
-        const emailPrefix = email ? email.split('@')[0] : 'grix_user';
-        const baseUsername = emailPrefix.toLowerCase().replace(/[^a-z0-9_]/g, '');
-        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-        // Strict 15-char substring
-        const finalUsername = `${baseUsername || 'user'}_${randomSuffix}`.substring(0, 15);
-        const fullName = user?.user_metadata?.full_name || emailPrefix || 'Grix User';
-        const photoUrl = user?.user_metadata?.avatar_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`;
-
-        console.log('Inserting auto-generated profile for', currentUserId);
-        const { data: insertedProfile, error: insertError } = await supabase
-          .from('users')
-          .upsert({
-            id: currentUserId,
-            email: email,
-            full_name: fullName,
-            username: finalUsername,
-            photo_url: photoUrl,
-            updated_at: new Date().toISOString()
-          } as any)
-          .select()
-          .maybeSingle();
-
-        if (insertError) {
-          console.error('Error inserting auto-generated profile:', insertError);
-        } else if (insertedProfile) {
-          profile = insertedProfile;
-        }
-      } else if (!profile.username) {
-        // Profile exists but username is missing
-        const email = profile.email || user?.email || '';
-        const emailPrefix = email ? email.split('@')[0] : 'grix_user';
-        const baseUsername = emailPrefix.toLowerCase().replace(/[^a-z0-9_]/g, '');
-        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-        // Strict 15-char substring
-        const finalUsername = `${baseUsername || 'user'}_${randomSuffix}`.substring(0, 15);
-
-        console.log('Updating missing username for existing profile', currentUserId);
-        const { data: updatedProfile, error: updateError } = await supabase
-          .from('users')
-          .update({ username: finalUsername } as any)
-          .eq('id', currentUserId)
-          .select()
-          .maybeSingle();
-
-        if (updateError) {
-          console.error('Error updating missing username:', updateError);
-        } else if (updatedProfile) {
-          profile = updatedProfile;
-        }
-      }
-
-      // Fetch following and followers with safety catch blocks to prevent crash block on offline
-      let following: string[] = [];
-      let followerIds: string[] = [];
-      try {
-        const { data: followings } = await supabase
-          .from('follows')
-          .select('following_id')
-          .eq('follower_id', currentUserId);
-
-        const { data: followers } = await supabase
-          .from('follows')
-          .select('follower_id')
-          .eq('following_id', currentUserId);
-
-        following = followings?.map(f => f.following_id) || [];
-        followerIds = followers?.map(f => f.follower_id) || [];
-        setFollowingIds(following);
-      } catch (followsErr) {
-        console.warn('Error fetching follows offline, falling back:', followsErr);
-        const cachedRaw = storage.getItem('grix_cached_userdata');
-        if (cachedRaw) {
-          try {
-            const cached = JSON.parse(cachedRaw);
-            following = cached.following || [];
-            followerIds = cached.followers || [];
-            setFollowingIds(following);
-          } catch (_) {}
-        }
-      }
-
-      if (isSubscribed && profile) {
-        const p = profile as any;
-        setUserData({
-          id: p.id,
-          uid: p.id,
-          email: p.email,
-          fullName: p.full_name,
-          username: p.username,
-          photoURL: p.photo_url,
-          bio: p.bio,
-          isVerified: p.is_verified,
-          profileType: p.profile_type,
-          lastSeen: p.last_seen,
-          status: p.is_online ? 'online' : 'offline',
-          hiddenChats: p.hidden_chats || [],
-          archivedChats: p.archived_chats || [],
-          hiddenChatSettings: p.hidden_chat_settings || p.settings?.hidden_chat_settings || {},
-          fcmTokens: p.fcm_tokens || [],
-          settings: p.settings,
-          lock: p.lock,
-          saved_posts: p.saved_posts || [],
-          blockedUsers: p.blocked_users || [],
-          blocked_users: p.blocked_users || [],
-          muted_users: p.muted_users || [],
-          favorites: p.favorites || [],
-          following,
-          followers: followerIds
-        } as any);
-      }
-    } catch (err) {
-      console.warn('Profile fetch error:', err);
-      // Main fallback on catch
-      const cachedRaw = storage.getItem('grix_cached_userdata');
-      if (cachedRaw) {
-        try {
-          const cached = JSON.parse(cachedRaw);
-          if (cached && cached.id === currentUserId) {
-            setUserData(cached);
-            if (cached.following) {
-              setFollowingIds(cached.following);
-            }
-          }
-        } catch (_) {}
-      }
+  const fetchProfileData = async (currentUserId: string, email: string, meta: any) => {
+    const { profileData, following } = await userProfileService.fetchFullProfileData(currentUserId, email, meta);
+    if (profileData) {
+      setUserData(profileData);
+      setFollowingIds(following);
     }
   };
 
   const refreshUserData = async () => {
     if (user?.id) {
-      await fetchProfileData(user.id, true);
+      await fetchProfileData(user.id, user.email || '', user.user_metadata);
     }
   };
 
-  // 1. Auth Listener (Runs once on mount)
+  // 1. Auth Listener and Session Bootstrap
   useEffect(() => {
     if (!supabase) {
       setLoading(false);
@@ -284,12 +72,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const currentUser = supabaseUser ? { ...supabaseUser, uid: supabaseUser.id } as CustomUser : null;
         
         if (event === 'SIGNED_OUT') {
-          // Explicitly set offline when signing out
           if (user?.id) {
-            supabase.from('users')
-              .update({ is_online: false, last_seen: new Date().toISOString() } as any)
-              .eq('id', user.id)
-              .then(() => {}, (e) => console.warn('Signout offline status update error:', e));
+            await userProfileService.throttledSetStatus(user.id, false, true);
           }
           setUserData(null);
           setUser(null);
@@ -297,13 +81,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsAuthReady(true);
         } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || (event as string) === 'USER_UPDATED') {
           if (supabaseUser) {
-            supabase.from('users')
-              .update({ is_online: true, last_seen: new Date().toISOString() } as any)
-              .eq('id', supabaseUser.id)
-              .then(() => {}, (e) => console.warn('Signin online status update error:', e));
+            await userProfileService.throttledSetStatus(supabaseUser.id, true, true);
           }
           setUser(currentUser);
-          // If there's no user, we're ready. If there is, the profile effect will handle it.
           if (!supabaseUser) {
             setLoading(false);
             setIsAuthReady(true);
@@ -316,24 +96,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       } catch (err) {
-        console.error('onAuthStateChange execution catch:', err);
+        console.error('onAuthStateChange execution error:', err);
         setLoading(false);
         setIsAuthReady(true);
       }
     });
 
-    // Get initial session and ensure loading states are set correctly
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        const supabaseUser = session?.user ?? null;
-        const currentUser = supabaseUser ? { ...supabaseUser, uid: supabaseUser.id } as CustomUser : null;
-        
-        if (currentUser) {
-          setUser(currentUser);
-          // If already logged in, the second effect will handle fetching profile and setting ready
-        } else {
-          setUser(null);
+        const currentUser = session?.user ? { ...session.user, uid: session.user.id } as CustomUser : null;
+        setUser(currentUser);
+        if (!currentUser) {
           setLoading(false);
           setIsAuthReady(true);
         }
@@ -345,13 +119,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     initAuth();
+    return () => subscription.unsubscribe();
+  }, [user?.id]);
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // 2. Profile and Presence Effect (Runs when user changes)
+  // 2. Profile and Realtime Presence Subscriptions
   useEffect(() => {
     if (!user || !supabase) return;
 
@@ -363,95 +134,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthReady(false);
 
       try {
-        // Cleanup previous
-        if (profileChannelRef.current) {
-          supabase.removeChannel(profileChannelRef.current);
-          profileChannelRef.current = null;
-        }
-        if (presenceChannelRef.current) {
-          supabase.removeChannel(presenceChannelRef.current);
-          presenceChannelRef.current = null;
-        }
+        if (profileChannelRef.current) supabase.removeChannel(profileChannelRef.current);
+        if (presenceChannelRef.current) supabase.removeChannel(presenceChannelRef.current);
 
-        // 1. Initial Fetch with strict 3-second timeout protection
-        const fetchPromise = fetchProfileData(currentUserId, isSubscribed);
-        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('timeout'), 3000));
-        
-        const fetchResult = await Promise.race([fetchPromise, timeoutPromise]);
-        if (fetchResult === 'timeout') {
-          console.warn('Profile fetch timed out (3s), proceeding in background to prevent splash screen lock.');
-        }
+        // Fetch primary profile data with timeout race protection
+        const fetchPromise = fetchProfileData(currentUserId, user.email || '', user.user_metadata);
+        await Promise.race([fetchPromise, new Promise((res) => setTimeout(res, 2500))]);
 
-        // 2. Profile Subscription (Listen to ALL events for this user)
+        // Setup realtime profile change listener
         const profileChannel = supabase
           .channel(`profile-${currentUserId}`)
-          .on('postgres_changes', { 
-            event: '*', 
-            schema: 'public', 
-            table: 'users',
-            filter: `id=eq.${currentUserId}`
-          }, (payload) => {
-            if (!isSubscribed) return;
-            fetchProfileData(currentUserId, isSubscribed);
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `id=eq.${currentUserId}` }, () => {
+            if (isSubscribed) fetchProfileData(currentUserId, user.email || '', user.user_metadata);
           })
-          .on('postgres_changes', {
-            event: '*',
-            schema: 'public',
-            table: 'follows',
-            filter: `follower_id=eq.${currentUserId}`
-          }, () => {
-            if (!isSubscribed) return;
-            fetchProfileData(currentUserId, isSubscribed);
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'follows', filter: `follower_id=eq.${currentUserId}` }, () => {
+            if (isSubscribed) fetchProfileData(currentUserId, user.email || '', user.user_metadata);
           })
-          .on('postgres_changes', {
-            event: '*',
-            schema: 'public',
-            table: 'follows',
-            filter: `following_id=eq.${currentUserId}`
-          }, () => {
-            if (!isSubscribed) return;
-            fetchProfileData(currentUserId, isSubscribed);
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'follows', filter: `following_id=eq.${currentUserId}` }, () => {
+            if (isSubscribed) fetchProfileData(currentUserId, user.email || '', user.user_metadata);
           });
         
         profileChannel.subscribe();
         profileChannelRef.current = profileChannel;
 
-        // 3. Presence Subscription
-        const presenceChannel = supabase.channel('online-users', {
-          config: { presence: { key: currentUserId } },
-        });
-
+        // Setup Presence synchronization
+        const presenceChannel = supabase.channel('online-users', { config: { presence: { key: currentUserId } } });
         presenceChannel
           .on('presence', { event: 'sync' }, () => {})
           .on('presence', { event: 'join' }, ({ key }) => {
-            if (key === currentUserId) {
-              supabase.from('users')
-                .update({ is_online: true, last_seen: new Date().toISOString() } as any)
-                .eq('id', currentUserId)
-                .then();
-            }
+            if (key === currentUserId) userProfileService.throttledSetStatus(currentUserId, true);
           })
           .on('presence', { event: 'leave' }, ({ key }) => {
-            if (key === currentUserId) {
-              supabase.from('users')
-                .update({ is_online: false, last_seen: new Date().toISOString() } as any)
-                .eq('id', currentUserId)
-                .then();
-            }
+            if (key === currentUserId) userProfileService.throttledSetStatus(currentUserId, false);
           });
 
         presenceChannel.subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {
-            await presenceChannel.track({
-              user_id: currentUserId,
-              online_at: new Date().toISOString(),
-            });
+            await presenceChannel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
           }
         });
         presenceChannelRef.current = presenceChannel;
-
       } catch (err) {
-        console.error('Profile setup error:', err);
+        console.error('Presence setup error:', err);
       } finally {
         if (isSubscribed) {
           setLoading(false);
@@ -469,69 +193,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [user?.id]);
 
-  // 3. Visibility, Heartbeat, and BeforeUnload Handler
+  // 3. Heartbeat & Tab Visibility (Throttled write-prevention: Issue 2)
   useEffect(() => {
+    if (!user?.id) return;
     let heartbeatInterval: any = null;
 
-    const setStatus = async (isOnline: boolean) => {
-      if (supabase && user?.id) {
-        try {
-          await supabase.from('users')
-            .update({
-              is_online: isOnline,
-              last_seen: new Date().toISOString()
-            } as any)
-            .eq('id', user.id);
-        } catch (e) {
-          console.warn('Unable to notify presence status change:', e);
-        }
-      }
+    const updateStatus = (online: boolean) => {
+      userProfileService.throttledSetStatus(user.id, online);
     };
 
-    const handleVisibilityChange = () => {
+    const handleVisibility = () => {
       const isVisible = document.visibilityState === 'visible';
-      setStatus(isVisible);
-      
-      // Control heartbeat interval based on active visibility
+      updateStatus(isVisible);
       if (isVisible) {
         if (!heartbeatInterval) {
-          heartbeatInterval = setInterval(() => {
-            setStatus(true);
-          }, 60000);
+          heartbeatInterval = setInterval(() => updateStatus(true), 60000);
         }
-      } else {
-        if (heartbeatInterval) {
-          clearInterval(heartbeatInterval);
-          heartbeatInterval = null;
-        }
+      } else if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
       }
     };
 
-    const handleBeforeUnload = () => {
-      setStatus(false);
-    };
-
-    // First trigger and establish heartbeat on mount
-    setStatus(true);
+    updateStatus(true);
     if (document.visibilityState === 'visible') {
-      heartbeatInterval = setInterval(() => {
-        setStatus(true);
-      }, 60000);
+      heartbeatInterval = setInterval(() => updateStatus(true), 60000);
     }
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('beforeunload', () => updateStatus(false));
     
     return () => {
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-      }
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [user?.id]);
 
-  // Sync state changes with local offline backup cache
+  // Sync cache records
   useEffect(() => {
     if (user) {
       storage.setItem('grix_cached_user', JSON.stringify(user));
@@ -547,127 +245,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [userData]);
 
-  // --- CLIENT ACTIVE SESSION SYNCHRONIZER (SECURE WORKSPACE INTERNET METADATA) ---
+  // Sync Device Login Session Metadata
   useEffect(() => {
-    if (!user || !userData || !isAuthReady || !supabase) return;
-
-    let isSubscribed = true;
-
-    const registerActiveSession = async () => {
-      // 1. Generate or fetch current active session ID
-      let sessId = safeSessionStorage.getItem('grix_current_session_id');
-      if (!sessId) {
-        sessId = 'sess_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
-        safeSessionStorage.setItem('grix_current_session_id', sessId);
-      }
-
-      // 2. Resolve client device environment labels (Tizen TV, Android TV, Windows, iOS, etc.)
-      const ua = navigator.userAgent;
-      let deviceType = "Desktop PC";
-      if (/mobile/i.test(ua)) deviceType = "Mobile Device";
-      else if (/tablet/i.test(ua)) deviceType = "Tablet";
-      else if (/smart-tv|smarttv|google-tv|appl-tv|hbbtv|netcast|tizen/i.test(ua)) deviceType = "Smart TV Browser";
-
-      let browser = "Browser";
-      if (/chrome|crios/i.test(ua) && !/edge|edg/i.test(ua) && !/opr|opera/i.test(ua)) browser = "Chrome";
-      else if (/safari/i.test(ua) && !/chrome|crios/i.test(ua)) browser = "Safari";
-      else if (/firefox|fxios/i.test(ua)) browser = "Firefox";
-      else if (/edge|edg/i.test(ua)) browser = "Edge";
-      else if (/opr|opera/i.test(ua)) browser = "Opera";
-
-      let os = "System";
-      if (/windows/i.test(ua)) os = "Windows";
-      else if (/macintosh|mac os x/i.test(ua)) os = "macOS";
-      else if (/android/i.test(ua)) os = "Android";
-      else if (/iphone|ipad|ipod/i.test(ua)) os = "iOS";
-      else if (/linux/i.test(ua)) os = "Linux";
-      else if (/tizen/i.test(ua)) os = "Tizen TV";
-      else if (/webos/i.test(ua)) os = "webOS";
-
-      const deviceName = `${deviceType} (${browser} on ${os})`;
-
-      // 3. Dynamic client geo IP fetch (100% Real-time info)
-      let ip = '103.88.22.41'; // Standard Grix default
-      let locationLabel = 'Mumbai, India';
-
-      try {
-        const ipRes = await fetch('https://ipapi.co/json/');
-        if (ipRes.ok && isSubscribed) {
-          const geoData = await ipRes.json();
-          ip = geoData.ip || ip;
-          if (geoData.city && geoData.country_name) {
-            locationLabel = `${geoData.city}, ${geoData.country_name}`;
-          } else if (geoData.country_name) {
-            locationLabel = geoData.country_name;
-          }
-        }
-      } catch (_) {
-        // Safe fetch query backup
-        try {
-          const fallbackRes = await fetch('https://api.ipify.org?format=json');
-          if (fallbackRes.ok && isSubscribed) {
-            const fbData = await fallbackRes.json();
-            ip = fbData.ip || ip;
-          }
-        } catch (__) {}
-      }
-
-      if (!isSubscribed) return;
-
-      // 4. Update the active sessions table array inside settings
-      const currentSettings = (userData.settings as any) || {};
-      const activeSessions = Array.isArray(currentSettings.active_sessions) ? [...currentSettings.active_sessions] : [];
-
-      const existingSession = activeSessions.find((s: any) => s.id === sessId);
-      let listUpdated = false;
-
-      if (!existingSession) {
-        // Enforce maximum sessions to keep database extremely cost effective and light (e.g. max 15 sessions)
-        if (activeSessions.length >= 15) {
-          activeSessions.shift(); // remove oldest
-        }
-        
-        activeSessions.push({
-          id: sessId,
-          device_name: deviceName,
-          ip_address: ip,
-          location: locationLabel,
-          login_time: new Date().toISOString(),
-          last_active: new Date().toISOString()
-        });
-        listUpdated = true;
-      } else {
-        // Ensure last active updates if older than 5 minutes
-        const minutesDiff = (Date.now() - new Date(existingSession.last_active).getTime()) / 60000;
-        if (minutesDiff > 5) {
-          existingSession.last_active = new Date().toISOString();
-          listUpdated = true;
-        }
-      }
-
-      if (listUpdated) {
-        const updatedSettings = {
-          ...currentSettings,
-          active_sessions: activeSessions
-        };
-        
-        await supabase
-          .from('users')
-          .update({ settings: updatedSettings } as any)
-          .eq('id', user.id);
-      }
-    };
-
-    registerActiveSession();
-
-    return () => {
-      isSubscribed = false;
-    };
+    if (!user || !userData || !isAuthReady) return;
+    sessionService.registerActiveSession(user.id, userData.settings).catch(() => {});
   }, [userData?.id]);
 
-  // --- CO-TERMINAL LOGOUT WATCHER (LOG OUT INSTANTLY IF REMOTELY TERMINATED) ---
-  const sessionRegisteredRef = React.useRef<boolean>(false);
-
+  // Secure instant remote logouts
   useEffect(() => {
     if (!user || !userData || !isAuthReady || !supabase) return;
 
@@ -677,13 +261,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const activeSessions = (userData.settings as any)?.active_sessions;
     if (Array.isArray(activeSessions)) {
       const stillRegistered = activeSessions.some((s: any) => s.id === sessId);
-      
       if (stillRegistered) {
-        // Current session is registered and online
         sessionRegisteredRef.current = true;
       } else if (sessionRegisteredRef.current) {
-        // It was registered before, but now it's not! This means it was revoked remotely.
-        console.warn('Authentication session revoked remotely. Signing out.');
+        console.warn('Revocation detected remotely. Signing out.');
         supabase.auth.signOut().then(() => {
           safeSessionStorage.removeItem('grix_current_session_id');
           storage.removeItem('grix_cached_user');
@@ -694,38 +275,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [(userData?.settings as any)?.active_sessions]);
 
-  // 4. Failsafe to guarantee auth ready state and prevent page freeze under slow/blocked connections
+  // Bootstrap failsafe timeout
   useEffect(() => {
-    const backupTimer = setTimeout(() => {
+    const timer = setTimeout(() => {
       if (!isAuthReady) {
-        console.warn('Auth system initialization is taking too long. Activating failsafe auth-ready fallback.');
         setLoading(false);
         setIsAuthReady(true);
       }
-    }, 6000);
-    return () => clearTimeout(backupTimer);
+    }, 5000);
+    return () => clearTimeout(timer);
   }, [isAuthReady]);
 
-  const authContextValue = React.useMemo(() => ({ 
-    user, 
-    userData, 
-    loading, 
-    isAuthReady,
-    refreshUserData,
-    followingIds
+  const authContextValue = useMemo(() => ({ 
+    user, userData, loading, isAuthReady, refreshUserData, followingIds 
   }), [user, userData, loading, isAuthReady, followingIds]);
 
-  return (
-    <AuthContext.Provider value={authContextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={authContextValue}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (context === undefined) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };

@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase';
 import { getAcceptedChats, initializeAcceptedConversations } from '../../utils/acceptedChats';
 import { storage } from '../../services/StorageService';
 import { ImageService } from '../../services/ImageService';
+import { transactionQueue } from '../../services/db/transactionQueueService';
 
 interface StoryGroup {
   userId: string;
@@ -78,17 +79,27 @@ export default function ChatsTab() {
     try {
       const url = await ImageService.uploadImage(file, () => {}, 'stories');
       
-      const { error } = await supabase.from('stories').insert({
-        user_id: authUser.id,
-        media_url: url,
-        type: 'image'
-      } as any);
+      try {
+        const { error } = await supabase.from('stories').insert({
+          user_id: authUser.id,
+          media_url: url,
+          type: 'image'
+        } as any);
 
-      if (error) throw error;
-      await fetchStories();
+        if (error) throw error;
+        await fetchStories();
+      } catch (dbErr) {
+        console.warn("Direct story database save failed, queueing offline retry session:", dbErr);
+        await transactionQueue.addTransaction('story_insert', {
+          userId: authUser.id,
+          mediaUrl: url,
+          type: 'image'
+        });
+        alert("Low signal! Story queued in background. It will publish automatically once connection stabilizes.");
+      }
     } catch (err) {
       console.error("Error direct story upload:", err);
-      alert("Failed to share story.");
+      alert("Failed to share story. Please check your network.");
     } finally {
       setIsUploadingStory(false);
       if (storyFileInputRef.current) {
