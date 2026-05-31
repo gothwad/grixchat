@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../providers/AuthProvider.tsx';
+import { isUserOnline } from '../../../utils/presence';
 
 export function useChatSync(receiverId: string | undefined, chatId: string, convType: 'direct' | 'group') {
   const [receiver, setReceiver] = useState<any>(null);
@@ -38,7 +39,7 @@ export function useChatSync(receiverId: string | undefined, chatId: string, conv
             isOnline: data.is_online,
             lastSeen: data.last_seen
           });
-          setReceiverStatus(data.is_online ? 'online' : 'offline');
+          setReceiverStatus(isUserOnline(data.is_online, data.last_seen) ? 'online' : 'offline');
           setReceiverLastSeen(data.last_seen);
         }
       } else {
@@ -63,7 +64,7 @@ export function useChatSync(receiverId: string | undefined, chatId: string, conv
       }, (payload) => {
         const data = payload.new as any;
         if (convType === 'direct') {
-          setReceiverStatus(data.is_online ? 'online' : 'offline');
+          setReceiverStatus(isUserOnline(data.is_online, data.last_seen) ? 'online' : 'offline');
           setReceiverLastSeen(data.last_seen);
           setReceiver(prev => ({ 
             ...prev, 
@@ -83,6 +84,19 @@ export function useChatSync(receiverId: string | undefined, chatId: string, conv
       supabase.removeChannel(channel);
     };
   }, [receiverId, convType]);
+
+  // Periodically refresh the online status locally as time passes (heartbeat window check)
+  useEffect(() => {
+    if (convType !== 'direct' || !receiver) return;
+
+    const interval = setInterval(() => {
+      const currentOnline = isUserOnline(receiver.isOnline, receiverLastSeen);
+      const expectedStatus = currentOnline ? 'online' : 'offline';
+      setReceiverStatus(expectedStatus);
+    }, 15000); // Check every 15 seconds
+
+    return () => clearInterval(interval);
+  }, [receiver?.isOnline, receiverLastSeen, convType]);
 
   useEffect(() => {
     // Clear old watch data states instantly when chatId changes

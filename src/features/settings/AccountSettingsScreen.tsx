@@ -41,6 +41,13 @@ export default function AccountSettingsScreen() {
   const accountItems = [
     { icon: Shield, label: 'Security notifications', sub: 'Get notified of security changes', color: 'text-primary', onClick: () => showToast("Security notifications are active globally for your protection.") },
     { 
+      icon: Smartphone, 
+      label: "Where you're logged in", 
+      sub: 'Manage other active device sessions', 
+      color: 'text-emerald-500', 
+      onClick: () => navigate('/active-sessions') 
+    },
+    { 
       icon: Mail, 
       label: 'Change Email', 
       sub: authUser?.email || 'Update your email address', 

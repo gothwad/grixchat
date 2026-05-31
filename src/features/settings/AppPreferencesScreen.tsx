@@ -5,7 +5,10 @@ import SettingHeader from '../../components/layout/SettingHeader.tsx';
 import PreferencesSubscreen from './components/PreferencesSubscreen.tsx';
 
 export default function AppPreferencesScreen() {
-  const { theme, setTheme } = useTheme();
+  const { 
+    theme, 
+    setTheme 
+  } = useTheme();
 
   const themes: { id: Theme; label: string; sub: string }[] = [
     { id: 'system', label: 'System Default', sub: 'Automatically matches your device appearance' },
@@ -18,7 +21,7 @@ export default function AppPreferencesScreen() {
       <SettingHeader title="App Preferences" />
 
       <div className="flex-1 overflow-y-auto no-scrollbar py-6 pb-24">
-        {/* Theme Settings Section */}
+        {/* System Appearance */}
         <h3 className="px-6 mb-2 text-[11px] font-bold text-zinc-400 uppercase tracking-[0.12em]">System Appearance</h3>
         <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)]/30 mb-6">
           {themes.map((t, index) => (

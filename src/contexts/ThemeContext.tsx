@@ -95,7 +95,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [chatBackground]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, language, setLanguage, t, chatBackground, setChatBackground, resolvedTheme }}>
+    <ThemeContext.Provider value={{ 
+      theme, 
+      setTheme, 
+      language, 
+      setLanguage, 
+      t, 
+      chatBackground, 
+      setChatBackground, 
+      resolvedTheme
+    }}>
       {children}
     </ThemeContext.Provider>
   );

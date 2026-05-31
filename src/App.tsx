@@ -67,6 +67,7 @@ const AppPreferencesScreen = React.lazy(() => import('./features/settings/AppPre
 const ChatSettingsMainScreen = React.lazy(() => import('./features/settings/ChatSettingsMainScreen'));
 // SettingsScreen directly imported above
 const AccountSettingsScreen = React.lazy(() => import('./features/settings/AccountSettingsScreen'));
+const ActiveSessionsScreen = React.lazy(() => import('./features/settings/ActiveSessionsScreen'));
 const NotificationsSettingsScreen = React.lazy(() => import('./features/settings/NotificationsSettingsScreen'));
 const HelpScreen = React.lazy(() => import('./features/settings/HelpScreen'));
 const HelpFaqScreen = React.lazy(() => import('./features/settings/HelpFaqScreen'));
@@ -357,6 +358,7 @@ export default function App() {
                     <Route path="/chat-settings" element={user ? <ChatSettingsMainScreen /> : <Navigate to="/login" />} />
                     <Route path="/app-preferences" element={user ? <AppPreferencesScreen /> : <Navigate to="/login" />} />
                     <Route path="/account-settings" element={user ? <AccountSettingsScreen /> : <Navigate to="/login" />} />
+                    <Route path="/active-sessions" element={user ? <ActiveSessionsScreen /> : <Navigate to="/login" />} />
                     <Route path="/app-lock" element={user ? <AppLockScreen /> : <Navigate to="/login" />} />
                     <Route path="/setup-lock/:type" element={user ? <SetupLockScreen /> : <Navigate to="/login" />} />
                     <Route path="/verify-lock" element={user ? <VerifyLockScreen /> : <Navigate to="/login" />} />

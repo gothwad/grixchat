@@ -41,7 +41,7 @@ CREATE TABLE public.users (
     is_online BOOLEAN DEFAULT FALSE,
     last_seen TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    settings JSONB DEFAULT '{}'::jsonb,
+    settings JSONB DEFAULT '{}'::jsonb, -- JSONB structure: { "active_sessions": [{"id": "sess_...", "device_name": "...", "ip_address": "...", "location": "...", "login_time": "...", "last_active": "..."}] }
     lock JSONB DEFAULT NULL,
     blocked_users TEXT[] DEFAULT '{}'::text[],
     muted_users TEXT[] DEFAULT '{}'::text[],

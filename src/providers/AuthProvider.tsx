@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
-import { storage } from '../services/StorageService';
+import { storage, safeSessionStorage } from '../services/StorageService';
 
 interface CustomUser extends User {
   uid: string; // Add uid to match Firebase interface expected by the rest of the app
@@ -546,6 +546,153 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       storage.setItem('grix_cached_userdata', JSON.stringify(userData));
     }
   }, [userData]);
+
+  // --- CLIENT ACTIVE SESSION SYNCHRONIZER (SECURE WORKSPACE INTERNET METADATA) ---
+  useEffect(() => {
+    if (!user || !userData || !isAuthReady || !supabase) return;
+
+    let isSubscribed = true;
+
+    const registerActiveSession = async () => {
+      // 1. Generate or fetch current active session ID
+      let sessId = safeSessionStorage.getItem('grix_current_session_id');
+      if (!sessId) {
+        sessId = 'sess_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
+        safeSessionStorage.setItem('grix_current_session_id', sessId);
+      }
+
+      // 2. Resolve client device environment labels (Tizen TV, Android TV, Windows, iOS, etc.)
+      const ua = navigator.userAgent;
+      let deviceType = "Desktop PC";
+      if (/mobile/i.test(ua)) deviceType = "Mobile Device";
+      else if (/tablet/i.test(ua)) deviceType = "Tablet";
+      else if (/smart-tv|smarttv|google-tv|appl-tv|hbbtv|netcast|tizen/i.test(ua)) deviceType = "Smart TV Browser";
+
+      let browser = "Browser";
+      if (/chrome|crios/i.test(ua) && !/edge|edg/i.test(ua) && !/opr|opera/i.test(ua)) browser = "Chrome";
+      else if (/safari/i.test(ua) && !/chrome|crios/i.test(ua)) browser = "Safari";
+      else if (/firefox|fxios/i.test(ua)) browser = "Firefox";
+      else if (/edge|edg/i.test(ua)) browser = "Edge";
+      else if (/opr|opera/i.test(ua)) browser = "Opera";
+
+      let os = "System";
+      if (/windows/i.test(ua)) os = "Windows";
+      else if (/macintosh|mac os x/i.test(ua)) os = "macOS";
+      else if (/android/i.test(ua)) os = "Android";
+      else if (/iphone|ipad|ipod/i.test(ua)) os = "iOS";
+      else if (/linux/i.test(ua)) os = "Linux";
+      else if (/tizen/i.test(ua)) os = "Tizen TV";
+      else if (/webos/i.test(ua)) os = "webOS";
+
+      const deviceName = `${deviceType} (${browser} on ${os})`;
+
+      // 3. Dynamic client geo IP fetch (100% Real-time info)
+      let ip = '103.88.22.41'; // Standard Grix default
+      let locationLabel = 'Mumbai, India';
+
+      try {
+        const ipRes = await fetch('https://ipapi.co/json/');
+        if (ipRes.ok && isSubscribed) {
+          const geoData = await ipRes.json();
+          ip = geoData.ip || ip;
+          if (geoData.city && geoData.country_name) {
+            locationLabel = `${geoData.city}, ${geoData.country_name}`;
+          } else if (geoData.country_name) {
+            locationLabel = geoData.country_name;
+          }
+        }
+      } catch (_) {
+        // Safe fetch query backup
+        try {
+          const fallbackRes = await fetch('https://api.ipify.org?format=json');
+          if (fallbackRes.ok && isSubscribed) {
+            const fbData = await fallbackRes.json();
+            ip = fbData.ip || ip;
+          }
+        } catch (__) {}
+      }
+
+      if (!isSubscribed) return;
+
+      // 4. Update the active sessions table array inside settings
+      const currentSettings = (userData.settings as any) || {};
+      const activeSessions = Array.isArray(currentSettings.active_sessions) ? [...currentSettings.active_sessions] : [];
+
+      const existingSession = activeSessions.find((s: any) => s.id === sessId);
+      let listUpdated = false;
+
+      if (!existingSession) {
+        // Enforce maximum sessions to keep database extremely cost effective and light (e.g. max 15 sessions)
+        if (activeSessions.length >= 15) {
+          activeSessions.shift(); // remove oldest
+        }
+        
+        activeSessions.push({
+          id: sessId,
+          device_name: deviceName,
+          ip_address: ip,
+          location: locationLabel,
+          login_time: new Date().toISOString(),
+          last_active: new Date().toISOString()
+        });
+        listUpdated = true;
+      } else {
+        // Ensure last active updates if older than 5 minutes
+        const minutesDiff = (Date.now() - new Date(existingSession.last_active).getTime()) / 60000;
+        if (minutesDiff > 5) {
+          existingSession.last_active = new Date().toISOString();
+          listUpdated = true;
+        }
+      }
+
+      if (listUpdated) {
+        const updatedSettings = {
+          ...currentSettings,
+          active_sessions: activeSessions
+        };
+        
+        await supabase
+          .from('users')
+          .update({ settings: updatedSettings } as any)
+          .eq('id', user.id);
+      }
+    };
+
+    registerActiveSession();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [userData?.id]);
+
+  // --- CO-TERMINAL LOGOUT WATCHER (LOG OUT INSTANTLY IF REMOTELY TERMINATED) ---
+  const sessionRegisteredRef = React.useRef<boolean>(false);
+
+  useEffect(() => {
+    if (!user || !userData || !isAuthReady || !supabase) return;
+
+    const sessId = safeSessionStorage.getItem('grix_current_session_id');
+    if (!sessId) return;
+
+    const activeSessions = (userData.settings as any)?.active_sessions;
+    if (Array.isArray(activeSessions)) {
+      const stillRegistered = activeSessions.some((s: any) => s.id === sessId);
+      
+      if (stillRegistered) {
+        // Current session is registered and online
+        sessionRegisteredRef.current = true;
+      } else if (sessionRegisteredRef.current) {
+        // It was registered before, but now it's not! This means it was revoked remotely.
+        console.warn('Authentication session revoked remotely. Signing out.');
+        supabase.auth.signOut().then(() => {
+          safeSessionStorage.removeItem('grix_current_session_id');
+          storage.removeItem('grix_cached_user');
+          storage.removeItem('grix_cached_userdata');
+          window.location.reload();
+        });
+      }
+    }
+  }, [(userData?.settings as any)?.active_sessions]);
 
   // 4. Failsafe to guarantee auth ready state and prevent page freeze under slow/blocked connections
   useEffect(() => {

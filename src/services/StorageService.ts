@@ -75,4 +75,64 @@ class StorageService {
   }
 }
 
+class SessionStorageService {
+  private isAvailable: boolean;
+  private memoryStorage: Record<string, string> = {};
+
+  constructor() {
+    this.isAvailable = this.checkAvailability();
+  }
+
+  private checkAvailability(): boolean {
+    try {
+      const testKey = '__session_storage_test__';
+      const storageSession = window.sessionStorage;
+      if (!storageSession) return false;
+      
+      storageSession.setItem(testKey, testKey);
+      storageSession.removeItem(testKey);
+      return true;
+    } catch (e) {
+      console.warn('SessionStorage is not available. Using memory fallback.', e);
+      return false;
+    }
+  }
+
+  getItem(key: string): string | null {
+    if (!this.isAvailable) {
+      return this.memoryStorage[key] || null;
+    }
+    try {
+      return window.sessionStorage.getItem(key);
+    } catch (e) {
+      return this.memoryStorage[key] || null;
+    }
+  }
+
+  setItem(key: string, value: string): void {
+    if (!this.isAvailable) {
+      this.memoryStorage[key] = value;
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(key, value);
+    } catch (e) {
+      this.memoryStorage[key] = value;
+    }
+  }
+
+  removeItem(key: string): void {
+    if (!this.isAvailable) {
+      delete this.memoryStorage[key];
+      return;
+    }
+    try {
+      window.sessionStorage.removeItem(key);
+    } catch (e) {
+      delete this.memoryStorage[key];
+    }
+  }
+}
+
 export const storage = new StorageService();
+export const safeSessionStorage = new SessionStorageService();
