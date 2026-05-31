@@ -19,24 +19,32 @@ export default function StoryWatcherScreen() {
     if (!userId || !supabase) return;
 
     const fetchStories = async () => {
-      const { data, error } = await supabase
-        .from('stories')
-        .select('*, users:user_id(username, photo_url)')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: true });
-      
-      if (!error && data) {
-        setStories(data.map(s => ({
-          ...s,
-          username: s.users?.username || 'User',
-          photoURL: s.users?.photo_url || '',
-          imageUrl: s.media_url
-        })));
-      }
-      setLoading(false);
-      
-      if (!data || data.length === 0) {
+      try {
+        const { data, error } = await supabase
+          .from('stories')
+          .select('*, users:user_id(username, photo_url)')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: true });
+        
+        if (!error && data) {
+          setStories(data.map(s => ({
+            ...s,
+            username: s.users?.username || 'User',
+            photoURL: s.users?.photo_url || '',
+            imageUrl: s.media_url
+          })));
+
+          if (data.length === 0) {
+            navigate('/chats');
+          }
+        } else {
+          navigate('/chats');
+        }
+      } catch (err) {
+        console.error('Error fetching stories for watcher:', err);
         navigate('/chats');
+      } finally {
+        setLoading(false);
       }
     };
 

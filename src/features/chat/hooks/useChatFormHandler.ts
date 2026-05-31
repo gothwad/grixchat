@@ -172,8 +172,34 @@ export function useChatFormHandler({
   ]);
 
   const handleMessageTap = useCallback((e: any, msg: any) => {
-    if (e.type === 'touchstart' && e.cancelable) e.preventDefault();
-    e.stopPropagation();
+    if (e && e.type === 'touchstart' && e.cancelable) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+    
+    // Support left and right clicks, capturing exact coordinates for the floating menu
+    let x = window.innerWidth / 2;
+    let y = window.innerHeight / 2;
+    
+    if (e) {
+      if (e.clientX !== undefined && e.clientY !== undefined) {
+        x = e.clientX;
+        y = e.clientY;
+      } else if (e.touches && e.touches[0]) {
+        x = e.touches[0].clientX;
+        y = e.touches[0].clientY;
+      } else if (e.nativeEvent) {
+        const ne = e.nativeEvent;
+        if (ne.clientX !== undefined && ne.clientY !== undefined) {
+          x = ne.clientX;
+          y = ne.clientY;
+        } else if (ne.touches && ne.touches[0]) {
+          x = ne.touches[0].clientX;
+          y = ne.touches[0].clientY;
+        }
+      }
+    }
+
+    // Attach coordinates directly to message menu item object so UI can anchor nicely
+    msg._clickPos = { x, y };
     
     setActiveMessageMenu(msg);
     setShowReactionPicker(null);

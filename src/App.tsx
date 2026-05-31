@@ -8,6 +8,7 @@ import DesktopSidebar from './components/layout/DesktopSidebar';
 import IncomingCallNotification from './components/incoming-call/IncomingCallNotification.tsx';
 import { motion } from 'motion/react';
 import { useAuth } from './providers/AuthProvider';
+import { useTheme } from './contexts/ThemeContext';
 import { ErrorBoundary } from 'react-error-boundary';
 import SplashScreen from './components/SplashScreen';
 
@@ -106,6 +107,7 @@ const ImagePreviewScreen = React.lazy(() => import('./features/chat/ImagePreview
 
 export default function App() {
   const { user, userData, loading: authLoading, isAuthReady } = useAuth();
+  const { resolvedTheme } = useTheme();
   const [splashLoading, setSplashLoading] = useState(true);
   const location = useLocation();
 
@@ -305,14 +307,44 @@ export default function App() {
 
   // Dynamic theme-color meta tag sync
   useEffect(() => {
-    const isDark = (userData?.preferences?.theme || 'light') === 'dark';
-    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-    if (metaThemeColor) {
-      // Light: #ffffff, Dark: #202124
-      const color = isDark ? '#202124' : '#ffffff';
-      metaThemeColor.setAttribute('content', color);
+    const isDark = resolvedTheme === 'dark';
+    const color = isDark ? '#202124' : '#ffffff';
+    
+    // Synchronize all theme-color tags (including with media queries)
+    const metaThemeColors = document.querySelectorAll('meta[name="theme-color"]');
+    if (metaThemeColors.length > 0) {
+      metaThemeColors.forEach(meta => {
+        const media = meta.getAttribute('media');
+        if (!media) {
+          meta.setAttribute('content', color);
+        } else if (media.includes('dark') && isDark) {
+          meta.setAttribute('content', '#202124');
+        } else if (media.includes('light') && !isDark) {
+          meta.setAttribute('content', '#ffffff');
+        }
+      });
     }
-  }, [userData?.preferences?.theme]);
+
+    // Update Windows tile and browser nav colors
+    const msTile = document.querySelector('meta[name="msapplication-TileColor"]');
+    if (msTile) msTile.setAttribute('content', color);
+    
+    const msNav = document.querySelector('meta[name="msapplication-navbutton-color"]');
+    if (msNav) msNav.setAttribute('content', color);
+
+    // Synchronize custom navigation-color tags
+    const metaNavColors = document.querySelectorAll('meta[name="navigation-color"]');
+    metaNavColors.forEach(meta => {
+      const media = meta.getAttribute('media');
+      if (!media) {
+        meta.setAttribute('content', color);
+      } else if (media.includes('dark') && isDark) {
+        meta.setAttribute('content', '#202124');
+      } else if (media.includes('light') && !isDark) {
+        meta.setAttribute('content', '#ffffff');
+      }
+    });
+  }, [resolvedTheme]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

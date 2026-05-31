@@ -25,6 +25,7 @@ interface MessageListProps {
   handleMessageTap: (e: any, msg: any) => void;
   performReactToMessage: (id: string, emoji: string) => void;
   isOtherTyping: boolean;
+  selectedMsgIds?: string[];
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
@@ -47,7 +48,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   receiverStatus,
   handleMessageTap,
   performReactToMessage,
-  isOtherTyping
+  isOtherTyping,
+  selectedMsgIds = []
 }) => {
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const { user } = useAuth();
@@ -138,6 +140,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                 onJumpToMessage={onJumpToMessage}
                 isHighlighted={highlightedMessageId === msg.id}
                 isLatestMessage={index === currentMessages.length - 1}
+                isSelected={selectedMsgIds.includes(msg.id)}
               />
             );
           });

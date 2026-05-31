@@ -8,6 +8,8 @@ import {
   ChatReplyPreview, 
   EmojiPickerMenu 
 } from '../../components/ChatUIComponents.tsx';
+import { useTheme } from '../../contexts/ThemeContext';
+import CameraCaptureModal from '../chat-ui/CameraCaptureModal';
 
 interface ChatBottomProps {
   activeMessageMenu: any;
@@ -17,6 +19,7 @@ interface ChatBottomProps {
   deleteMessage: (id: string) => void;
   currentUserUid: string | undefined;
   setShowReactionPicker: (msg: any) => void;
+  performReactToMessage?: (id: string, emoji: string) => void;
   editingMessage: any;
   setEditingMessage: (msg: any) => void;
   newMessage: string;
@@ -44,6 +47,9 @@ interface ChatBottomProps {
   isSending: boolean;
   selectedFiles: File[];
   placeholder?: string;
+  onForwardClick?: (msg: any) => void;
+  onSelectClick?: (msg: any) => void;
+  onPinClick?: (msg: any) => void;
 }
 
 export default function ChatBottom({
@@ -54,6 +60,7 @@ export default function ChatBottom({
   deleteMessage,
   currentUserUid,
   setShowReactionPicker,
+  performReactToMessage,
   editingMessage,
   setEditingMessage,
   newMessage,
@@ -80,9 +87,23 @@ export default function ChatBottom({
   emojiPickerRef,
   isSending,
   selectedFiles,
-  placeholder = "Message"
+  placeholder = "Message",
+  onForwardClick,
+  onSelectClick,
+  onPinClick
 }: ChatBottomProps) {
   const navigate = useNavigate();
+  const { resolvedTheme } = useTheme();
+  const [showCameraModal, setShowCameraModal] = useState(false);
+
+  const handleCameraCapture = (file: File, captionText: string) => {
+    setSelectedFiles([...selectedFiles, file]);
+    setFilePreviewUrls([...filePreviewUrls, URL.createObjectURL(file)]);
+    if (captionText.trim()) {
+      setNewMessage(captionText);
+    }
+  };
+  const isDark = resolvedTheme === 'dark';
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -178,6 +199,11 @@ export default function ChatBottom({
 
   return (
     <div className="shrink-0 bg-transparent px-2 pb-safe z-50 relative w-full max-w-full">
+      <CameraCaptureModal 
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onCapture={handleCameraCapture}
+      />
       <ChatMessageMenu 
         activeMessageMenu={activeMessageMenu}
         setActiveMessageMenu={setActiveMessageMenu}
@@ -186,6 +212,10 @@ export default function ChatBottom({
         deleteMessage={deleteMessage}
         currentUserUid={currentUserUid}
         setShowReactionPicker={setShowReactionPicker}
+        performReactToMessage={performReactToMessage}
+        onForwardClick={onForwardClick}
+        onSelectClick={onSelectClick}
+        onPinClick={onPinClick}
       />
 
       <ChatEditPreview 
@@ -202,7 +232,9 @@ export default function ChatBottom({
       />
 
       <div className="flex items-end gap-2 w-full max-w-full relative pb-2 pt-1">
-        <div className={`flex-1 min-w-0 bg-[#2b3943] rounded-[24px] px-1 sm:px-2 flex flex-col transition-all shadow-sm ${isRecording ? 'animate-pulse' : ''}`}>
+        <div className={`flex-1 min-w-0 rounded-[24px] px-1 sm:px-2 flex flex-col transition-all shadow-sm ${
+          isDark ? 'bg-[#2a2c30]' : 'bg-[#f0f2f5]'
+        } ${isRecording ? 'animate-pulse' : ''}`}>
           {selectedFiles.length > 0 && !isRecording && (
             <div className="mt-2 mb-1 px-2 relative w-full overflow-x-auto">
               <div className="flex items-center gap-2 pb-1">
@@ -245,11 +277,11 @@ export default function ChatBottom({
               <div className="flex-1 min-w-0 flex items-center justify-between py-2.5 px-3 self-center">
                 <div className="flex items-center gap-3">
                   <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
-                  <span className="text-[15px] font-medium text-white/90">{formatRecTime(recordingTime)}</span>
+                  <span className={`text-[15px] font-medium ${isDark ? 'text-zinc-100' : 'text-zinc-800'}`}>{formatRecTime(recordingTime)}</span>
                 </div>
                 <button 
                   onClick={cancelRecording}
-                  className="px-3 py-1 text-white/60 text-[12px] active:scale-95 transition-all"
+                  className={`px-3 py-1 text-[12px] active:scale-95 transition-all ${isDark ? 'text-white/60' : 'text-black/60'}`}
                 >
                   Swipe to cancel
                 </button>
@@ -280,7 +312,11 @@ export default function ChatBottom({
                     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
                   }}
                   rows={1}
-                  className="flex-1 bg-transparent text-[17px] focus:outline-none text-white placeholder:text-white/40 py-2.5 px-2 resize-none max-h-[120px] leading-tight"
+                  className={`flex-1 bg-transparent text-[17px] focus:outline-none py-2.5 px-2 resize-none max-h-[120px] leading-tight ${
+                    isDark 
+                      ? 'text-zinc-100 placeholder:text-zinc-500' 
+                      : 'text-zinc-800 placeholder:text-zinc-400'
+                  }`}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey && !isMicMode) {
                       e.preventDefault();
@@ -290,6 +326,21 @@ export default function ChatBottom({
                 />
 
                 <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 pr-1 mb-1 self-end">
+                  {!newMessage.trim() && selectedFiles.length === 0 && (
+                    <button 
+                      type="button"
+                      onClick={() => setShowCameraModal(true)}
+                      className={`p-2 transition-colors flex items-center justify-center rounded-full ${
+                        isDark 
+                          ? 'text-[#a0aab8] hover:text-white hover:bg-white/5' 
+                          : 'text-[#64748b] hover:text-black hover:bg-black/5'
+                      }`}
+                      title="Camera"
+                    >
+                      <CameraIcon size={22} />
+                    </button>
+                  )}
+
                   <input 
                     type="file" 
                     ref={fileInputRef} 
@@ -300,7 +351,11 @@ export default function ChatBottom({
                   />
                   <button 
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-2 text-white/60 hover:text-white transition-colors flex items-center justify-center rounded-full hover:bg-white/5"
+                    className={`p-2 transition-colors flex items-center justify-center rounded-full ${
+                      isDark 
+                        ? 'text-[#a0aab8] hover:text-white hover:bg-white/5' 
+                        : 'text-[#64748b] hover:text-black hover:bg-black/5'
+                    }`}
                     title="Attach"
                   >
                     <Paperclip size={22} className="-rotate-45" />
@@ -323,18 +378,20 @@ export default function ChatBottom({
             }
           }}
           disabled={((!newMessage.trim() && selectedFiles.length === 0) && !isMicMode && !isRecording) || isSending}
-          className={`shrink-0 w-[48px] h-[48px] flex items-center justify-center rounded-full text-white transition-all shadow-md active:scale-95 ${
-            isRecording ? 'bg-red-500' : 'bg-sky-500'
+          className={`shrink-0 w-[48px] h-[48px] flex items-center justify-center rounded-full transition-all active:scale-95 text-white shadow-md ${
+            isRecording 
+              ? 'bg-red-500 hover:bg-red-600' 
+              : 'bg-[#0494f4] hover:bg-[#0382d6] disabled:opacity-40'
           }`}
         >
           {isSending ? (
-            <Loader2 size={24} className="animate-spin" />
+            <Loader2 size={24} className="animate-spin text-white" />
           ) : isRecording ? (
             <StopCircle size={24} />
           ) : isMicMode ? (
             <Mic size={24} />
           ) : (
-            <Send size={24} className="ml-1" />
+            <Send size={24} className="ml-1 text-white" />
           )}
         </button>
       </div>

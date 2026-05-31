@@ -28,7 +28,6 @@ interface ChatOptionsSheetProps {
   hideChat: () => void;
   setIsMuted: (muted: boolean) => void;
   deleteChat: () => void;
-  onWatchTogether: () => void;
   children?: React.ReactNode;
 }
 
@@ -44,7 +43,6 @@ export const ChatOptionsSheet: React.FC<ChatOptionsSheetProps> = ({
   hideChat,
   setIsMuted,
   deleteChat,
-  onWatchTogether,
   children
 }) => {
   const navigate = useNavigate();
@@ -128,16 +126,6 @@ export const ChatOptionsSheet: React.FC<ChatOptionsSheetProps> = ({
                       {isArchived ? <ArchiveRestore size={20} /> : <Archive size={20} />}
                     </div>
                     <span>{isArchived ? 'Unarchive Chat' : 'Archive Chat'}</span>
-                  </button>
-
-                  <button 
-                    onClick={() => handleAction(onWatchTogether)}
-                    className="w-full px-5 py-3.5 text-left text-sm font-bold text-[#0494f4] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl"
-                  >
-                    <div className="w-9 h-9 rounded-full bg-[#0494f4]/10 flex items-center justify-center text-[#0494f4]">
-                      <Play size={20} fill="currentColor" />
-                    </div>
-                    <span>Watch Together</span>
                   </button>
 
                   <button 

@@ -41,6 +41,32 @@ app.get("/sitemap.xml", (req, res) => {
 </urlset>`);
 });
 
+// Digital Asset Links for Android PWA/TWA verification
+app.get("/.well-known/assetlinks.json", (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  const assetlinksPath = fs.existsSync(path.resolve(process.cwd(), "dist/.well-known/assetlinks.json"))
+    ? path.resolve(process.cwd(), "dist/.well-known/assetlinks.json")
+    : path.resolve(process.cwd(), "public/.well-known/assetlinks.json");
+
+  if (fs.existsSync(assetlinksPath)) {
+    res.sendFile(assetlinksPath);
+  } else {
+    // Graceful fallback with standard placeholders matching the public file
+    res.json([
+      {
+        "relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {
+          "namespace": "android_app",
+          "package_name": "com.gothwad.grixchat",
+          "sha256_cert_fingerprints": [
+            "F1:A1:DA:3C:A9:74:9C:13:B9:92:EF:CD:AA:E1:92:BB:D4:57:3E:04:9E:FC:D7:E5:A9:DF:11:80:FF:E3:A3:AA"
+          ]
+        }
+      }
+    ]);
+  }
+});
+
 // Send Notification Proxy using Firebase Cloud Messaging HTTP v1 API
 app.post("/api/send-notification", async (req, res) => {
   const { tokens, title, body, data } = req.body;
@@ -367,8 +393,8 @@ app.get(["/auth/github/callback", "/auth/github/callback/"], async (req, res) =>
             }
           </script>
           <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:20px;text-align:center;">
-            <div id="loader" style="width:48px;height:48px;border:4px solid #e4e4e7;border-top-color:#10b981;border-radius:50%;animation:spin 1s linear infinite;"></div>
-            <div id="success-icon" style="display:none;width:60px;height:60px;background:#10b981;border-radius:50%;color:white;display:none;align-items:center;justify-content:center;font-size:30px;margin-bottom:20px;">✓</div>
+            <div id="loader" style="width:48px;height:48px;border:4px solid #e4e4e7;border-top-color:#0494f4;border-radius:50%;animation:spin 1s linear infinite;"></div>
+            <div id="success-icon" style="display:none;width:60px;height:60px;background:#0494f4;border-radius:50%;color:white;display:none;align-items:center;justify-content:center;font-size:30px;margin-bottom:20px;">✓</div>
             <p id="status" style="margin-top:24px;font-weight:600;color:#18181b;font-size:16px;">Authenticating with GitHub...</p>
             <p style="margin-top:8px;color:#71717a;font-size:14px;">Securely connecting your accounts</p>
           </div>
@@ -586,7 +612,7 @@ if (process.env.NODE_ENV !== "production") {
   });
 } else {
   const distPath = path.resolve(process.cwd(), "dist");
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { dotfiles: "allow" }));
   app.get("*", (req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });

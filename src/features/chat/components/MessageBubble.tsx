@@ -12,6 +12,7 @@ import {
   ChatMessageReactions,
   VoiceMessage
 } from '../../../components/ChatUIComponents';
+import { getStatusString } from '../utils/messageListUtils';
 
 interface MessageBubbleProps {
   msg: any;
@@ -31,51 +32,8 @@ interface MessageBubbleProps {
   onJumpToMessage?: (messageId: string) => void;
   isHighlighted?: boolean;
   isLatestMessage?: boolean;
+  isSelected?: boolean;
 }
-
-const getStatusString = (msg: any): string => {
-  if (msg.status === 'sending') {
-    return 'Sending...';
-  }
-
-  const isRead = msg.is_read;
-  const rawTime = isRead ? (msg.updated_at || msg.created_at) : msg.created_at;
-  if (!rawTime) return isRead ? 'Seen' : 'Sent';
-
-  let dateVal: Date;
-  try {
-    dateVal = new Date(rawTime);
-    if (isNaN(dateVal.getTime())) {
-      return isRead ? 'Seen' : 'Sent';
-    }
-  } catch (e) {
-    return isRead ? 'Seen' : 'Sent';
-  }
-
-  const now = new Date();
-  const diffMs = now.getTime() - dateVal.getTime();
-  const diffSec = Math.max(0, Math.floor(diffMs / 1000));
-  const diffMin = Math.floor(diffSec / 60);
-
-  const prefix = isRead ? 'Seen' : 'Sent';
-
-  if (diffSec < 60) {
-    return `${prefix} Just now`;
-  } else if (diffMin === 1) {
-    return `${prefix} 1m ago`;
-  } else if (diffMin === 2) {
-    return `${prefix} 2m ago`;
-  } else if (diffMin === 3) {
-    return `${prefix} 3m ago`;
-  } else if (diffMin === 4) {
-    return `${prefix} 4m ago`;
-  } else if (diffMin === 5) {
-    return `${prefix} 5m ago`;
-  } else {
-    return `${prefix} long time ago`;
-  }
-};
-
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   msg,
   isMe,
@@ -93,7 +51,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   performReactToMessage,
   onJumpToMessage,
   isHighlighted,
-  isLatestMessage
+  isLatestMessage,
+  isSelected
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -138,12 +97,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const mediaType = msg.media_type || msg.type;
 
   const rawTextContent = typeof msg.content === 'string' ? msg.content : (msg.text || '');
-  const isGrixAiMessage = rawTextContent.startsWith('🤖 Grix AI:');
+  const isForwarded = rawTextContent.startsWith('\u200B[FWD]\u200B');
+  const cleanRawText = isForwarded ? rawTextContent.replace('\u200B[FWD]\u200B', '') : rawTextContent;
+  const isGrixAiMessage = cleanRawText.startsWith('🤖 Grix AI:');
   const actualIsMe = isGrixAiMessage ? false : isMe;
 
-  let renderedContent = msg.content;
+  let renderedContent = cleanRawText;
   if (isGrixAiMessage) {
-    renderedContent = rawTextContent.replace(/^🤖 Grix AI:\s*/i, '');
+    renderedContent = cleanRawText.replace(/^🤖 Grix AI:\s*/i, '');
   }
 
   return (
@@ -182,6 +143,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             }
           }}
           onClick={(e) => handleMessageTap(e as any, msg)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            handleMessageTap(e as any, msg);
+          }}
           whileTap={{ scale: 0.98 }}
           animate={isHighlighted ? { 
             backgroundColor: actualIsMe ? 'var(--bubble-own)' : 'var(--bubble-other)',
@@ -194,8 +159,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             actualIsMe 
               ? 'bg-[var(--bubble-own)] text-[var(--bubble-text-own)] ml-auto' 
               : 'bg-[var(--bubble-other)] text-[var(--bubble-text-other)] mr-auto'
-          }`}
+          } ${isSelected ? 'ring-3 ring-[#00a884]/70 bg-[#07362e]/90 animate-pulse' : ''}`}
         >
+          {isForwarded && (
+            <p className="text-[10px] text-zinc-400 font-bold italic mb-0.5 flex items-center gap-1">
+              <span>Forwarded</span>
+            </p>
+          )}
+
           {isGrixAiMessage && (
             <p className="text-[10px] font-black text-indigo-400 dark:text-indigo-650 mb-1 uppercase tracking-widest leading-none flex items-center gap-1">
               🤖 Grix AI Verified

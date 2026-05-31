@@ -225,7 +225,6 @@ export default function GrixAIScreen() {
         receiverStatus="online"
         receiverActiveChatId={null}
         currentUserId={user?.id}
-        onWatchTogether={() => {}}
         type="direct"
       />
 
@@ -261,7 +260,19 @@ export default function GrixAIScreen() {
         setShowReactionPicker={setShowReactionPicker}
         receiverStatus="online"
         handleMessageTap={(e, msg) => {
-          e.stopPropagation();
+          if (e && e.stopPropagation) e.stopPropagation();
+          let x = window.innerWidth / 2;
+          let y = window.innerHeight / 2;
+          if (e) {
+            if (e.clientX !== undefined && e.clientY !== undefined) {
+              x = e.clientX;
+              y = e.clientY;
+            } else if (e.touches && e.touches[0]) {
+              x = e.touches[0].clientX;
+              y = e.touches[0].clientY;
+            }
+          }
+          msg._clickPos = { x, y };
           setActiveMessageMenu(activeMessageMenu?.id === msg.id ? null : msg);
         }}
         performReactToMessage={() => {}}

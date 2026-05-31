@@ -75,52 +75,56 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
 
     if (isMore) setLoadingMore(true);
 
-    const { data, error } = await supabase
-      .from('messages')
-      .select(`
-        *,
-        sender:users (
-          id,
-          username,
-          full_name,
-          photo_url
-        ),
-        reply_to:reply_to (
-          id,
-          text,
-          sender_id
-        )
-      `)
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: false })
-      .limit(messageLimit);
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          sender:users (
+            id,
+            username,
+            full_name,
+            photo_url
+          ),
+          reply_to:reply_to (
+            id,
+            text,
+            sender_id
+          )
+        `)
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: false })
+        .limit(messageLimit);
 
-    if (error) {
-      console.error('Error fetching messages:', error);
-    } else {
-      const reversed = (data as any[] || []).reverse();
-      reversed.forEach((m: any) => {
-        m.content = m.text || m.content || '';
-      });
-      
-      setMessages(prev => {
-        const mergedMap = new Map();
-        prev.forEach(msg => {
-          if (msg && msg.id) mergedMap.set(msg.id, msg);
+      if (error) {
+        console.error('Error fetching messages:', error);
+      } else {
+        const reversed = (data as any[] || []).reverse();
+        reversed.forEach((m: any) => {
+          m.content = m.text || m.content || '';
         });
-        reversed.forEach(msg => {
-          if (msg && msg.id) mergedMap.set(msg.id, msg);
-        });
-        const mergedList = Array.from(mergedMap.values())
-          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         
-        LocalDataCache.saveMessages(conversationId, mergedList);
-        return mergedList;
-      });
+        setMessages(prev => {
+          const mergedMap = new Map();
+          prev.forEach(msg => {
+            if (msg && msg.id) mergedMap.set(msg.id, msg);
+          });
+          reversed.forEach(msg => {
+            if (msg && msg.id) mergedMap.set(msg.id, msg);
+          });
+          const mergedList = Array.from(mergedMap.values())
+            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          
+          LocalDataCache.saveMessages(conversationId, mergedList);
+          return mergedList;
+        });
+      }
+    } catch (e) {
+      console.error('Exception caught inside fetchMessages:', e);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
     }
-    
-    setLoading(false);
-    setLoadingMore(false);
   }, [conversationId, messageLimit]);
 
   // Synchronously sync messages & loading state when conversationId changes
