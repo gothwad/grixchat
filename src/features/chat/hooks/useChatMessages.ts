@@ -27,7 +27,7 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
   const [loadingMore, setLoadingMore] = useState(false);
   const [messageLimit, setMessageLimit] = useState(initialLimit);
   const lastMessageCount = useRef(0);
-  const { user, userData } = useAuth();
+  const { user, userData, isAuthReady } = useAuth();
   
   const confirmOptimisticMessage = useCallback((tempId: string, dbMessage: any) => {
     if (!dbMessage) return;
@@ -183,14 +183,14 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
 
   // 1. Hook for loading initial messages and paging loads
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId || !isAuthReady) return;
     const isMore = messageLimit > initialLimit;
     fetchMessages(isMore);
-  }, [conversationId, messageLimit, initialLimit]);
+  }, [conversationId, messageLimit, initialLimit, isAuthReady]);
 
   // 2. Hook for background polling synchronizer as absolute failsafe backup
   useEffect(() => {
-    if (!conversationId || !user) return;
+    if (!conversationId || !user || !isAuthReady) return;
 
     let isActive = true;
     const intervalId = setInterval(() => {
@@ -205,11 +205,11 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
       isActive = false;
       clearInterval(intervalId);
     };
-  }, [conversationId, user?.id]);
+  }, [conversationId, user?.id, isAuthReady]);
 
   // 3. Hook for Realtime Postgres Subscription (Bound exclusively to conversation ID)
   useEffect(() => {
-    if (!conversationId || !supabase || !user) return;
+    if (!conversationId || !supabase || !user || !isAuthReady) return;
 
     // Real-time subscription for new messages or edits
     const channel = supabase
@@ -317,7 +317,7 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
       window.removeEventListener('focus', handleFocus);
       supabase.removeChannel(channel);
     };
-  }, [conversationId, user?.id]);
+  }, [conversationId, user?.id, isAuthReady]);
 
   const loadMore = useCallback(() => {
     if (!loading && !loadingMore) setMessageLimit(prev => prev + 20);

@@ -61,9 +61,10 @@ const GrixAIProfile = React.lazy(() => import('./features/grixai/GrixAIProfile')
 
 
 const CallsTab = React.lazy(() => import('./features/call/CallsTab'));
-const GroupsTab = React.lazy(() => import('./features/chat/GroupsTab'));
+const PostsTab = React.lazy(() => import('./features/posts/PostsTab'));
 
 const PrivacySettingsScreen = React.lazy(() => import('./features/settings/PrivacySettingsScreen'));
+const SettingsMainScreen = React.lazy(() => import('./features/settings/SettingsMainScreen'));
 const AppPreferencesScreen = React.lazy(() => import('./features/settings/AppPreferencesScreen'));
 const ChatSettingsMainScreen = React.lazy(() => import('./features/settings/ChatSettingsMainScreen'));
 // SettingsScreen directly imported above
@@ -444,7 +445,8 @@ export default function App() {
                       <Route path="/chats/requests" element={user ? <MessageRequestsScreen /> : <Navigate to="/login" />} />
                       <Route path="/chats/hidden" element={user ? <HideChatScreen /> : <Navigate to="/login" />} />
                       <Route path="/chats/hidden/settings" element={user ? <HideChatSettings /> : <Navigate to="/login" />} />
-                      <Route path="/groups" element={user ? <GroupsTab /> : <Navigate to="/login" />} />
+                      <Route path="/posts" element={user ? <PostsTab /> : <Navigate to="/login" />} />
+                      <Route path="/groups" element={<Navigate to="/chats" replace />} />
                       <Route path="/search" element={user ? <SearchTab /> : <Navigate to="/login" />} />
                       <Route path="/search/friends" element={user ? <FriendsScreen /> : <Navigate to="/login" />} />
                       <Route element={<ChatLayout />}>
@@ -467,7 +469,7 @@ export default function App() {
                     <Route path="/notifications" element={user ? <NotificationsScreen /> : <Navigate to="/login" />} />
                     <Route path="/notifications/likes" element={user ? <LikeNotificationsScreen /> : <Navigate to="/login" />} />
                     <Route path="/stories/view/:userId" element={user ? <StoryWatcherScreen /> : <Navigate to="/login" />} />
-                    <Route path="/settings" element={<Navigate to="/profile" replace />} />
+                    <Route path="/settings" element={user ? <SettingsMainScreen /> : <Navigate to="/login" />} />
                     <Route path="/edit-profile" element={user ? <EditProfileScreen /> : <Navigate to="/login" />} />
                     <Route path="/privacy-settings" element={user ? <PrivacySettingsScreen /> : <Navigate to="/login" />} />
                     <Route path="/chat-settings" element={user ? <ChatSettingsMainScreen /> : <Navigate to="/login" />} />

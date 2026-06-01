@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { MessageCircle, Lock, Archive } from 'lucide-react';
 import { motion } from 'motion/react';
 import { aiService } from '../../../services/AIService';
+import { useLayout } from '../../../contexts/LayoutContext';
 
 interface ChatItem {
   id: string;
@@ -57,6 +58,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
   showHiddenChatsEntry = true
 }) => {
   const navigate = useNavigate();
+  const { isChatSelectMode, selectedChatIds, setSelectedChatIds } = useLayout();
 
   if (loading) {
     return (
@@ -67,7 +69,67 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
     );
   }
 
+  const handleToggleSelect = (chatId: string) => {
+    setSelectedChatIds(prev => 
+      prev.includes(chatId) 
+        ? prev.filter(id => id !== chatId) 
+        : [...prev, chatId]
+    );
+  };
+
   const renderChatItem = (chat: ChatItem) => {
+    const isSelected = selectedChatIds.includes(chat.id);
+
+    if (isChatSelectMode) {
+      return (
+        <div 
+          key={chat.id} 
+          onClick={() => handleToggleSelect(chat.id)}
+          className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all cursor-pointer group select-none"
+        >
+          {/* Symmetrical blue/light-border circular checkbox */}
+          <div className="shrink-0 flex items-center justify-center">
+            <div className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-all ${
+              isSelected 
+                ? 'bg-[#0494f4] border-[#0494f4] scale-110 shadow-sm' 
+                : 'border-[var(--text-secondary)]/30 hover:border-[#0494f4]'
+            }`}>
+              {isSelected && (
+                <div className="w-[8px] h-[8px] bg-white rounded-full" />
+              )}
+            </div>
+          </div>
+
+          <div className="relative shrink-0 select-none">
+            <img 
+              src={chat.avatar || `https://cdn-icons-png.flaticon.com/512/149/149071.png`} 
+              className="w-[52px] h-[52px] object-cover rounded-full border border-[var(--border-color)]/30 shadow-sm transition-transform group-hover:scale-105"
+              referrerPolicy="no-referrer"
+              alt={chat.user}
+            />
+            {chat.isOnline && (
+              <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 relative">
+            <div className="flex justify-between items-baseline mb-0.5">
+              <h3 className="text-[15px] truncate font-bold text-[var(--text-primary)]">
+                {chat.user}
+              </h3>
+              <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)]">
+                {chat.time}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <p className="text-xs truncate font-medium text-[var(--text-secondary)]">
+                {chat.lastMsg}
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <Link 
         to={`/chat/${chat.otherUserId}`} 
@@ -295,11 +357,14 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       )}
 
       {/* Conversations List */}
-      {conversations.length > 0 ? (
+      {conversations.length > 0 && (
         <div className="flex flex-col">
           {conversations.map(renderChatItem)}
         </div>
-      ) : !showGrixAI && otherUsers.length === 0 && (
+      )}
+
+      {/* Empty State when no chats are loaded */}
+      {conversations.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 px-10 text-center gap-4">
           <div className="p-4 bg-[var(--bg-main)] rounded-xl text-[var(--text-secondary)] shadow-sm border border-[var(--border-color)]/10">
             <MessageCircle size={40} strokeWidth={1.5} />
@@ -312,7 +377,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
           </div>
           <button 
             onClick={() => navigate('/search')}
-            className="mt-2 bg-[var(--primary)] text-white px-8 py-3 rounded-xl text-xs font-bold shadow-lg shadow-[var(--primary-shadow)]/30 hover:shadow-xl hover:-translate-y-0.5 transition-all"
+            className="mt-2 bg-[var(--primary)] text-white px-8 py-3 rounded-xl text-xs font-bold shadow-lg shadow-[var(--primary-shadow)]/30 hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer"
           >
             Find Friends
           </button>

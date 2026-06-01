@@ -208,8 +208,20 @@ export default function ChatScreen() {
         }
       }
 
-      const forwardPrefix = '\u200B[FWD]\u200B';
-      const textToSend = forwardPrefix + (forwardTargetMsg.content || forwardTargetMsg.text || '');
+      const rawOriginalText = forwardTargetMsg.content || forwardTargetMsg.text || '';
+      
+      let forwardPrefix = '\u200B[FWD]\u200B';
+      let cleanContent = rawOriginalText;
+
+      if (rawOriginalText.includes('\u200B[FWD_MANY]\u200B')) {
+        forwardPrefix = '\u200B[FWD_MANY]\u200B';
+        cleanContent = rawOriginalText.replace(/\u200B\[FWD_MANY\]\u200B/g, '');
+      } else if (rawOriginalText.includes('\u200B[FWD]\u200B')) {
+        forwardPrefix = '\u200B[FWD_MANY]\u200B';
+        cleanContent = rawOriginalText.replace(/\u200B\[FWD\]\u200B/g, '');
+      }
+
+      const textToSend = forwardPrefix + cleanContent;
 
       let mediaData = undefined;
       const mediaUrl = forwardTargetMsg.media_url || forwardTargetMsg.imageUrl || forwardTargetMsg.fileUrl;

@@ -1,123 +1,116 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { 
   Pencil,
-  AtSign,
-  Info as InfoIcon,
-  ChevronRight,
-  Shield,
-  Bell,
-  Clock,
   Star,
-  VolumeX,
-  Lock,
-  UserMinus,
-  HelpCircle,
-  LogOut,
-  Check,
-  Copy,
-  MessageSquare,
-  User,
-  Sliders
+  Loader2,
+  Image,
+  Users
 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../providers/AuthProvider';
-import { authService } from '../auth/services/authService.ts';
 import { truncateToChars } from '../../utils/bioHelper';
+import { PostsService } from '../posts/services/postsSupabase';
+import { Post } from '../posts/types';
+import { supabase } from '../../lib/supabase';
+import { AnimatePresence } from 'motion/react';
+import CreatePostModal from '../posts/components/CreatePostModal';
 
 export default function ProfileTab() {
   const { user: authUser, userData: authUserData } = useAuth();
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [hasActiveStories, setHasActiveStories] = useState(false);
-
-  useEffect(() => {
-    const checkMyStories = async () => {
-      if (!supabase || !authUser?.id) return;
-      try {
-        const { data } = await supabase
-          .from('stories')
-          .select('id')
-          .eq('user_id', authUser.id)
-          .limit(1);
-        
-        if (data && data.length > 0) {
-          setHasActiveStories(true);
-        }
-      } catch (err) {
-        console.error('Error fetching user active stories on ProfileTab:', err);
-      }
-    };
-    checkMyStories();
-  }, [authUser?.id]);
-  
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [friendsCount, setFriendsCount] = useState(0);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const navigate = useNavigate();
 
+  const loadUserPosts = useCallback(async () => {
+    if (!authUser?.id) return;
+    setLoadingPosts(true);
+    try {
+      const allPosts = await PostsService.fetchPosts(authUser.id);
+      // Filter for posts created by the current authenticated user
+      const filtered = allPosts.filter(p => p.user_id === authUser.id || p.user?.uid === authUser.id);
+      setUserPosts(filtered);
+    } catch (e) {
+      console.error("Error loading user posts in ProfileTab:", e);
+    } finally {
+      setLoadingPosts(false);
+    }
+  }, [authUser?.id]);
+
+  const fetchFriendsCount = useCallback(async () => {
+    if (!authUser?.id || !supabase) return;
+    try {
+      // Get following IDs and follower IDs from follows table representing mutual friend links
+      const { data: followRows, error: followError } = await supabase
+        .from('follows')
+        .select('follower_id, following_id')
+        .or(`follower_id.eq.${authUser.id},following_id.eq.${authUser.id}`);
+
+      if (followError) throw followError;
+
+      const IFollow = new Set<string>();
+      const FollowsMe = new Set<string>();
+
+      followRows?.forEach((row: any) => {
+        if (row.follower_id === authUser.id) {
+          IFollow.add(row.following_id);
+        }
+        if (row.following_id === authUser.id) {
+          FollowsMe.add(row.follower_id);
+        }
+      });
+
+      const mutualCount = Array.from(IFollow).filter(id => FollowsMe.has(id)).length;
+      setFriendsCount(mutualCount);
+    } catch (err) {
+      console.error('Error fetching friends count inside ProfileTab:', err);
+    }
+  }, [authUser?.id]);
+
+  useEffect(() => {
+    loadUserPosts();
+    fetchFriendsCount();
+  }, [loadUserPosts, fetchFriendsCount]);
+  
   const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
   const userData = authUserData;
-
-  // Use a highly reliable profile image finder
   const profilePic = userData?.photoURL || (userData as any)?.photo_url || authUser?.user_metadata?.avatar_url || DEFAULT_LOGO;
 
-  const handleCopy = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  const handleLogout = async () => {
+  const handlePublishPost = async (postData: { image_url: string; caption: string }) => {
     try {
-      await authService.logout();
-      navigate('/login');
-    } catch (error) {
-      console.error("Logout error:", error);
+      const currentUserPayload = {
+        uid: authUser?.id || 'offline-me',
+        fullName: userData?.fullName || 'Me',
+        username: userData?.username || 'user',
+        avatarUrl: userData?.photoURL || ''
+      };
+
+      await PostsService.createPost({
+        user_id: currentUserPayload.uid,
+        image_url: postData.image_url,
+        caption: postData.caption
+      }, currentUserPayload);
+
+      setIsCreateModalOpen(false);
+      // Refresh posts and count immediately
+      loadUserPosts();
+    } catch (e) {
+      console.error("Error publishing new post in ProfileTab:", e);
     }
   };
-
-  const settingsOptions = [
-    {
-      title: 'Account & Security',
-      items: [
-        { icon: User, label: 'Account Settings', sub: 'Change email, password, delete account', color: 'bg-emerald-500/10 text-emerald-500', onClick: () => navigate('/account-settings') },
-        { icon: Lock, label: 'Privacy Settings', sub: userData?.isPrivate ? 'Private Account' : 'Public Account', color: 'bg-indigo-500/10 text-indigo-500', onClick: () => navigate('/privacy-settings') },
-        { icon: Shield, label: 'App Lock PIN', sub: 'Enable PIN/Passcode protection', color: 'bg-cyan-500/10 text-cyan-500', onClick: () => navigate('/app-lock') },
-      ]
-    },
-    {
-      title: 'App Preferences & Sounds',
-      items: [
-        { icon: Bell, label: 'Notifications & Sounds', sub: 'Ringtones, Vibrations & Alerts', color: 'bg-amber-500/10 text-amber-500', onClick: () => navigate('/notifications-settings') },
-        { icon: MessageSquare, label: 'Chat Customizer & Wallpaper', sub: 'Bubbles shape, text size, wallpapers', color: 'bg-purple-500/10 text-purple-500', onClick: () => navigate('/chat-settings') },
-        { icon: Sliders, label: 'System Preferences', sub: 'App theme, network download, local database Backups', color: 'bg-rose-500/10 text-rose-500', onClick: () => navigate('/app-preferences') },
-      ]
-    },
-    {
-      title: 'Privacy & Filters',
-      items: [
-        { icon: Star, label: 'Favorites Feed', sub: 'Manage star list curation', color: 'bg-yellow-500/10 text-yellow-500', onClick: () => navigate('/favorites') },
-        { icon: VolumeX, label: 'Muted Accounts', sub: 'Silenced chat channels', color: 'bg-pink-500/10 text-pink-500', onClick: () => navigate('/muted-accounts') },
-        { icon: UserMinus, label: 'Blocked Accounts', sub: 'Banned chat list users', color: 'bg-red-500/10 text-red-500', onClick: () => navigate('/blocked-accounts') },
-      ]
-    },
-    {
-      title: 'Help & Info',
-      items: [
-        { icon: HelpCircle, label: 'Grixvibe FAQ & Support', sub: 'Knowledgebase and system status', color: 'bg-cyan-500/10 text-cyan-500', onClick: () => navigate('/help') },
-        { icon: InfoIcon, label: 'About App', sub: 'Grixvibe V1.2.0 Stable Build', color: 'bg-sky-500/10 text-sky-500', onClick: () => navigate('/app-info') },
-      ]
-    }
-  ];
 
   return (
-    <div className="flex flex-col bg-[var(--bg-main)] font-sans h-full overflow-y-auto no-scrollbar pb-24 animate-fade-in">
-      {/* Beautiful Dynamic Profile Header Section (Centered Telegram Style) */}
-      <div className="px-4 pt-4 mb-4">
+    <div className="flex flex-col bg-[var(--bg-main)] font-sans h-full overflow-y-auto no-scrollbar pb-32 animate-fade-in animate-once touch-pan-y overscroll-contain">
+      {/* Beautiful Profile Header Section */}
+      <div className="px-4 pt-4 mb-3">
         <div 
           onClick={() => navigate('/edit-profile')}
           className="relative bg-[var(--bg-card)] text-[var(--text-primary)] py-5 px-4 border border-[var(--border-color)]/50 rounded-2xl shadow-sm shrink-0 cursor-pointer hover:bg-[var(--bg-card)]/90 transition-colors flex flex-col items-center justify-center text-center"
         >
-          {/* Centered Avatar Wrapper with Edit Pencil icon overlay and custom ring depending on stories */}
+          {/* Centered Avatar Wrapper with Edit Pencil icon overlay */}
           <div className="relative group shrink-0 mb-3">
-            <div className={`w-20 h-20 rounded-full p-[2px] border-2 bg-[var(--bg-main)] flex items-center justify-center shrink-0 ${hasActiveStories ? 'border-[#0494f4]' : 'border-zinc-300 dark:border-zinc-700'}`}>
+            <div className="w-20 h-20 rounded-full p-[2px] border-2 border-zinc-200 dark:border-zinc-800 bg-[var(--bg-main)] flex items-center justify-center shrink-0">
               <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-[var(--bg-main)]">
                 <img 
                   src={profilePic || DEFAULT_LOGO} 
@@ -127,7 +120,6 @@ export default function ProfileTab() {
                 />
               </div>
             </div>
-            {/* Pencil Edit Icon replacing online dot */}
             <span className="absolute bottom-0 right-0 w-6.5 h-6.5 bg-[#0494f4] text-white rounded-full flex items-center justify-center shadow-lg border-2 border-[var(--bg-card)] hover:scale-105 active:scale-95 transition-all">
               <Pencil size={11} strokeWidth={2.5} />
             </span>
@@ -138,7 +130,7 @@ export default function ProfileTab() {
             <h2 className="text-base font-extrabold tracking-tight text-[var(--text-primary)] leading-tight">
               {userData?.fullName || 'GrixChat User'}
             </h2>
-            <span className="text-[10px] text-[#0494f4] font-semibold font-mono tracking-wide mt-1.5 px-2.5 py-0.5 bg-[#0494f4]/10 rounded-full select-none">
+            <span className="text-[10px] text-[#0494f4] font-semibold font-mono tracking-wide mt-1.5 px-2.5 py-0.5 bg-[#0494f4]/15 rounded-full select-none">
               @{userData?.username || 'user'}
             </span>
           </div>
@@ -155,81 +147,110 @@ export default function ProfileTab() {
         </div>
       </div>
 
-      {/* Account Quick-Info Block (Telegram Account section style) */}
-      <div className="px-4 mb-4">
-        <h3 className="px-2 mb-2 text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em]">
-          Account info
-        </h3>
-        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)]/50 divide-y divide-[var(--border-color)]/30 overflow-hidden shadow-sm">
-          {/* Username item */}
+      {/* Stats Block replacing Account Info */}
+      <div className="px-4 mb-3">
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)]/50 overflow-hidden shadow-sm py-2 px-4 flex justify-around items-center">
+          {/* Post Count Stats */}
+          <div className="flex flex-col items-center flex-1 justify-center py-0.5 select-none">
+            <span className="text-sm font-black text-[var(--text-primary)]">
+              {userPosts.length}
+            </span>
+            <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mt-0.5">
+              Posts
+            </span>
+          </div>
+          
+          <div className="w-px h-6 bg-[var(--border-color)]/30" />
+
+          {/* Friends Stats */}
           <div 
-            onClick={() => handleCopy(`@${userData?.username || 'username'}`, 'username')}
-            className="flex items-center gap-4 px-5 py-3.5 hover:bg-[var(--bg-main)]/35 active:bg-[var(--bg-main)]/50 transition-colors cursor-pointer group"
+            onClick={() => navigate('/search/friends')}
+            className="flex flex-col items-center flex-1 cursor-pointer hover:opacity-85 transition-opacity justify-center py-0.5 group select-none"
           >
-            <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center shrink-0">
-              <AtSign size={18} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[14px] font-semibold text-[var(--text-primary)] font-mono">
-                @{userData?.username || 'username'}
-              </div>
-              <div className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-medium">Username</div>
-            </div>
-            <div className="opacity-0 group-hover:opacity-40 transition-opacity">
-              {copiedField === 'username' ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
-            </div>
+            <span className="text-sm font-black text-[#0494f4] group-hover:scale-105 transition-transform flex items-center">
+              {friendsCount}
+            </span>
+            <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mt-0.5 text-center leading-none">
+              Friends
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Settings list dynamically displayed directly */}
-      <div className="px-4 space-y-6">
-        {settingsOptions.map((section) => (
-          <div key={section.title} className="space-y-2">
-            <h3 className="px-2 text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em]">
-              {section.title}
-            </h3>
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl divide-y divide-[var(--border-color)]/30 overflow-hidden shadow-sm">
-              {section.items.map((item) => (
-                <button 
-                  key={item.label}
-                  onClick={item.onClick}
-                  className="w-full flex items-center gap-4 px-5 py-4 hover:bg-[var(--bg-main)]/35 active:bg-[var(--bg-main)]/50 transition-colors group text-left cursor-pointer"
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.color} group-active:scale-95 transition-transform shrink-0`}>
-                    <item.icon size={18} strokeWidth={2.2} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-[13.5px] font-bold text-[var(--text-primary)] tracking-wide">{item.label}</h4>
-                    {item.sub && <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate font-medium">{item.sub}</p>}
-                  </div>
-                  <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-40 transition-opacity" />
-                </button>
-              ))}
+      {/* Share what's on your mind... Box - moved below stats block */}
+      <div className="px-4 mb-4">
+        <div 
+          onClick={() => setIsCreateModalOpen(true)}
+          className="flex items-center gap-3 bg-[var(--bg-card)] p-3 rounded-2xl border border-[var(--border-color)]/60 cursor-pointer active:scale-[0.99] hover:bg-[var(--bg-card)]/95 transition-all shadow-sm"
+        >
+          {profilePic ? (
+            <img src={profilePic} alt="Me" className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-[#0494f4]/15 text-[#0494f4] text-[10px] font-black flex items-center justify-center uppercase">
+              ME
+            </div>
+          )}
+          <span className="text-xs font-semibold text-[var(--text-secondary)]/80 flex-1 text-left">
+            Share what's on your mind...
+          </span>
+          <Image size={18} className="text-[#0494f4] opacity-80" />
+        </div>
+      </div>
+
+      {/* Instagram-style Posts Grid */}
+      <div className="px-4 mb-4">
+        <h3 className="px-2 mb-2 text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em] flex justify-between items-center">
+          <span>My Posts list</span>
+        </h3>
+        
+        {loadingPosts ? (
+          <div className="py-12 bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl flex justify-center items-center">
+            <Loader2 className="animate-spin text-[#0494f4]" size={20} />
+          </div>
+        ) : userPosts.length > 0 ? (
+          <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden border border-[var(--border-color)]/40 p-1 bg-[var(--bg-card)]">
+            {userPosts.map((post) => (
+              <div 
+                key={post.id} 
+                onClick={() => navigate('/posts')}
+                className="relative aspect-square overflow-hidden bg-[var(--bg-main)] cursor-pointer group active:scale-95 transition-transform"
+              >
+                <img 
+                  src={post.image_url} 
+                  alt={post.caption || "Post item"}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  referrerPolicy="no-referrer"
+                />
+                {/* Overlay with Likes count */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white gap-1.5 font-bold text-xs select-none">
+                  <Star size={12} fill="currentColor" />
+                  <span>{post.likes_count}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl p-8 shadow-sm text-center flex flex-col items-center justify-center gap-3">
+            <div className="text-[var(--text-secondary)]/40">
+              <Star size={24} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-[var(--text-primary)]">No posts published yet</p>
+              <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">Click "Share what's on your mind" to publish your first image!</p>
             </div>
           </div>
-        ))}
-
-        {/* Telegram Styled Authentication Section */}
-        <div className="space-y-2">
-          <h3 className="px-2 text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em]">
-            Session
-          </h3>
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl overflow-hidden shadow-sm">
-            <button 
-              onClick={handleLogout}
-              className="w-full flex items-center gap-4 px-5 py-4 hover:bg-red-500/5 transition-colors text-red-500 font-bold text-sm text-left flex justify-between items-center cursor-pointer group"
-            >
-              <div className="flex items-center gap-3">
-                <LogOut size={18} />
-                <span>Log out of GrixChat</span>
-              </div>
-              <ChevronRight size={18} className="text-red-500 opacity-20 group-hover:opacity-60 transition-opacity" />
-            </button>
-          </div>
-        </div>
-
+        )}
       </div>
+
+      {/* Modal Expansion Drawer */}
+      <AnimatePresence>
+        {isCreateModalOpen && (
+          <CreatePostModal 
+            onClose={() => setIsCreateModalOpen(false)} 
+            onPublish={handlePublishPost} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

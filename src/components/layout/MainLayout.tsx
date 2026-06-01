@@ -10,13 +10,13 @@ import { useAuth } from '../../providers/AuthProvider';
 // Lazy loading our 5 tabs for keep-alive container
 const ChatsTab = React.lazy(() => import('../../features/chat/ChatsTab'));
 const CallsTab = React.lazy(() => import('../../features/call/CallsTab'));
-const GroupsTab = React.lazy(() => import('../../features/chat/GroupsTab'));
+const PostsTab = React.lazy(() => import('../../features/posts/PostsTab'));
 const SearchTab = React.lazy(() => import('../../features/search/SearchTab'));
 const ProfileTab = React.lazy(() => import('../../features/profile/ProfileTab'));
 
 // Paths where BottomNav should be visible
-const TAB_PATHS = ['/', '/chats', '/calls', '/reels', '/profile', '/notifications', '/search', '/groups'];
-const MAIN_TABS = ['/', '/groups', '/search', '/calls', '/profile'];
+const TAB_PATHS = ['/', '/chats', '/calls', '/posts', '/profile', '/notifications', '/search', '/reels'];
+const MAIN_TABS = ['/', '/posts', '/search', '/calls', '/profile', '/chats'];
 
 export default function MainLayout() {
   const location = useLocation();
@@ -82,8 +82,8 @@ export default function MainLayout() {
           </div>
         }>
           {/* Keep-Alive Tabs: once loaded, we keep them persistent and mounted */}
-          {visitedTabs['/'] && (
-            <div className={location.pathname === '/' ? 'h-full w-full' : 'hidden'}>
+          {(visitedTabs['/'] || visitedTabs['/chats']) && (
+            <div className={(location.pathname === '/' || location.pathname === '/chats') ? 'h-full w-full' : 'hidden'}>
               <ChatsTab />
             </div>
           )}
@@ -94,9 +94,9 @@ export default function MainLayout() {
             </div>
           )}
           
-          {visitedTabs['/groups'] && (
-            <div className={location.pathname === '/groups' ? 'h-full w-full' : 'hidden'}>
-              <GroupsTab />
+          {visitedTabs['/posts'] && (
+            <div className={location.pathname === '/posts' ? 'h-full w-full' : 'hidden'}>
+              <PostsTab />
             </div>
           )}
           

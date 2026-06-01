@@ -109,7 +109,7 @@ export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: -10 }}
         transition={{ duration: 0.12, ease: 'easeOut' }}
-        className="absolute right-0 top-11 z-[101] w-[190px] bg-[#18232e]/95 border border-white/10 shadow-[0_10px_35px_rgba(0,0,0,0.6)] rounded-2xl p-1.5 flex flex-col gap-[1px] text-zinc-100 overflow-hidden select-none"
+        className="absolute right-0 top-11 z-[101] w-[190px] bg-[var(--bg-card)] border border-[var(--border-color)]/60 shadow-[0_10px_35px_rgba(0,0,0,0.15)] rounded-2xl p-1.5 flex flex-col gap-[1px] text-[var(--text-primary)] overflow-hidden select-none"
       >
         <AnimatePresence mode="wait">
           {page === 1 ? (
@@ -125,9 +125,9 @@ export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
               <button
                 type="button"
                 onClick={handleProfileClick}
-                className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#f5f7fa] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
               >
-                <User size={16} className="text-[#a0aab8]" />
+                <User size={16} className="text-[var(--text-secondary)]" />
                 <span>View Profile</span>
               </button>
 
@@ -135,9 +135,9 @@ export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
               <button
                 type="button"
                 onClick={handleSearchClick}
-                className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#f5f7fa] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
               >
-                <Search size={16} className="text-[#a0aab8]" />
+                <Search size={16} className="text-[var(--text-secondary)]" />
                 <span>Search Chat</span>
               </button>
 
@@ -147,18 +147,18 @@ export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
                   <button
                     type="button"
                     onClick={() => handleCall('voice')}
-                    className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#00a884] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[#0494f4] hover:bg-[#0494f4]/10 active:bg-[#0494f4]/25 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                   >
-                    <Phone size={16} className="text-[#00a884]" />
+                    <Phone size={16} className="text-[#0494f4]" />
                     <span>Voice Call</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleCall('video')}
-                    className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#00a884] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[#0494f4] hover:bg-[#0494f4]/10 active:bg-[#0494f4]/25 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                   >
-                    <Video size={16} className="text-[#00a884]" />
+                    <Video size={16} className="text-[#0494f4]" />
                     <span>Video Call</span>
                   </button>
                 </>
@@ -168,7 +168,7 @@ export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
               <button
                 type="button"
                 onClick={handleDelete}
-                className="w-full px-4 py-2.5 text-left text-[14px] font-bold text-[#ff595a] hover:bg-[#ff595a]/10 active:bg-[#ff595a]/20 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-[#ff595a] hover:bg-[#ff595a]/10 active:bg-[#ff595a]/20 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
               >
                 <Trash2 size={16} className="text-[#ff595a]" />
                 <span>Delete Chat</span>
@@ -178,13 +178,13 @@ export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setPage(2); }}
-                className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#a5c3e6] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center justify-between rounded-xl cursor-pointer border-none bg-transparent border-t border-white/5 mt-1 pt-2"
+                className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[#0494f4] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center justify-between rounded-xl cursor-pointer border-none bg-transparent border-t border-[var(--border-color)]/30 mt-1 pt-2"
               >
                 <span className="flex items-center gap-3">
-                  <ChevronRight size={16} className="text-[#a5c3e6]" />
+                  <ChevronRight size={16} className="text-[#0494f4]" />
                   <span>More Options</span>
                 </span>
-                <ChevronRight size={15} className="text-[#a5c3e6]/80" />
+                <ChevronRight size={15} className="text-[#0494f4]/80" />
               </button>
             </motion.div>
           ) : (
@@ -204,16 +204,16 @@ export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
                     onClose();
                     archiveChat();
                   }}
-                  className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#f5f7fa] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                  className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                 >
                   {isArchived ? (
                     <>
-                      <ArchiveRestore size={16} className="text-[#a0aab8]" />
+                      <ArchiveRestore size={16} className="text-[var(--text-secondary)]" />
                       <span>Unarchive Chat</span>
                     </>
                   ) : (
                     <>
-                      <Archive size={16} className="text-[#a0aab8]" />
+                      <Archive size={16} className="text-[var(--text-secondary)]" />
                       <span>Archive Chat</span>
                     </>
                   )}
@@ -228,16 +228,16 @@ export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
                     onClose();
                     hideChat();
                   }}
-                  className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#f5f7fa] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                  className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                 >
                   {isHidden ? (
                     <>
-                      <Eye size={16} className="text-[#a0aab8]" />
+                      <Eye size={16} className="text-[var(--text-secondary)]" />
                       <span>Unhide Chat</span>
                     </>
                   ) : (
                     <>
-                      <EyeOff size={16} className="text-[#a0aab8]" />
+                      <EyeOff size={16} className="text-[var(--text-secondary)]" />
                       <span>Hide Chat</span>
                     </>
                   )}
@@ -251,16 +251,16 @@ export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
                   onClose();
                   setIsMuted(!isMuted);
                 }}
-                className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#f5f7fa] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
               >
                 {isMuted ? (
                   <>
-                    <Volume2 size={16} className="text-[#a0aab8]" />
+                    <Volume2 size={16} className="text-[var(--text-secondary)]" />
                     <span>Unmute Chat</span>
                   </>
                 ) : (
                   <>
-                    <VolumeX size={16} className="text-[#a0aab8]" />
+                    <VolumeX size={16} className="text-[var(--text-secondary)]" />
                     <span>Mute Chat</span>
                   </>
                 )}
@@ -271,9 +271,9 @@ export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
                 <button
                   type="button"
                   onClick={handleClearHistory}
-                  className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-amber-500 hover:bg-amber-500/10 active:bg-amber-500/20 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                  className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[#ffaf40] hover:bg-[#ffaf40]/10 active:bg-[#ffaf40]/20 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                 >
-                  <Eraser size={16} className="text-amber-500" />
+                  <Eraser size={16} className="text-[#ffaf40]" />
                   <span>Clear History</span>
                 </button>
               )}
@@ -282,13 +282,13 @@ export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setPage(1); }}
-                className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#a5c3e6] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center justify-between rounded-xl cursor-pointer border-none bg-transparent border-t border-white/5 mt-1 pt-2"
+                className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[#0494f4] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center justify-between rounded-xl cursor-pointer border-none bg-transparent border-t border-[var(--border-color)]/30 mt-1 pt-2"
               >
                 <span className="flex items-center gap-3">
-                  <ChevronLeft size={16} className="text-[#a5c3e6]" />
+                  <ChevronLeft size={16} className="text-[#0494f4]" />
                   <span>Back</span>
                 </span>
-                <ChevronLeft size={15} className="text-[#a5c3e6]/80" />
+                <ChevronLeft size={15} className="text-[#0494f4]/80" />
               </button>
             </motion.div>
           )}

@@ -4,12 +4,12 @@ import { useAuth } from '../../../providers/AuthProvider';
 import { CacheService } from '../../../services/CacheService';
 
 export const useCalls = () => {
-  const { user } = useAuth();
+  const { user, isAuthReady } = useAuth();
   const [calls, setCalls] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !supabase) return;
+    if (!user || !supabase || !isAuthReady) return;
 
     const fetchCalls = async () => {
       const { data: docs, error } = await supabase
@@ -67,7 +67,7 @@ export const useCalls = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [user?.id, isAuthReady]);
 
   return { calls, loading };
 };

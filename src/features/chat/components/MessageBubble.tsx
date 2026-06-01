@@ -2,7 +2,9 @@ import React from 'react';
 import { motion, useMotionValue, AnimatePresence } from 'motion/react';
 import { 
   FileIcon, 
-  Download
+  Download,
+  CornerUpRight,
+  ChevronsRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../providers/AuthProvider.tsx';
@@ -97,8 +99,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const mediaType = msg.media_type || msg.type;
 
   const rawTextContent = typeof msg.content === 'string' ? msg.content : (msg.text || '');
-  const isForwarded = rawTextContent.startsWith('\u200B[FWD]\u200B');
-  const cleanRawText = isForwarded ? rawTextContent.replace('\u200B[FWD]\u200B', '') : rawTextContent;
+  const isForwardedMany = rawTextContent.startsWith('\u200B[FWD_MANY]\u200B');
+  const isForwarded = isForwardedMany || rawTextContent.startsWith('\u200B[FWD]\u200B');
+  const cleanRawText = rawTextContent
+    .replace('\u200B[FWD_MANY]\u200B', '')
+    .substring(0) // Safe copy
+    .replace('\u200B[FWD]\u200B', '');
   const isGrixAiMessage = cleanRawText.startsWith('🤖 Grix AI:');
   const actualIsMe = isGrixAiMessage ? false : isMe;
 
@@ -161,11 +167,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               : 'bg-[var(--bubble-other)] text-[var(--bubble-text-other)] mr-auto'
           } ${isSelected ? 'ring-3 ring-[#00a884]/70 bg-[#07362e]/90 animate-pulse' : ''}`}
         >
-          {isForwarded && (
-            <p className="text-[10px] text-zinc-400 font-bold italic mb-0.5 flex items-center gap-1">
+          {isForwardedMany ? (
+            <p className="text-[10px] text-sky-400 font-extrabold italic mb-1 flex items-center gap-1 select-none">
+              <ChevronsRight size={11} className="text-sky-400" />
+              <span>Forwarded many times</span>
+            </p>
+          ) : isForwarded ? (
+            <p className="text-[10px] text-zinc-400 font-bold italic mb-0.5 flex items-center gap-1 select-none">
+              <CornerUpRight size={11} className="text-zinc-400" />
               <span>Forwarded</span>
             </p>
-          )}
+          ) : null}
 
           {isGrixAiMessage && (
             <p className="text-[10px] font-black text-indigo-400 dark:text-indigo-650 mb-1 uppercase tracking-widest leading-none flex items-center gap-1">

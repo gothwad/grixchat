@@ -19,12 +19,16 @@ import {
   Volume2,
   VolumeX,
   Lock,
-  PlaySquare
+  PlaySquare,
+  Radio,
+  MessageCircle
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useSearch } from '../../contexts/SearchContext.tsx';
 import { useAuth } from '../../providers/AuthProvider.tsx';
+import { useLayout } from '../../contexts/LayoutContext.tsx';
+import { ChatTabDropdown } from '../chat-ui/ChatTabDropdown';
 
 export default function TabHeader() {
   const { userData, user: authUser } = useAuth();
@@ -86,8 +90,11 @@ export default function TabHeader() {
     };
   }, [authUser?.id]);
 
+  const { chatListFilter, setChatListFilter } = useLayout();
+
   const menuOptions = [
-    { label: 'New group', icon: Users, path: '/new-group' },
+    { label: 'New group', icon: Users, path: '/new-group?type=group' },
+    { label: 'New channel', icon: Radio, path: '/new-group?type=channel' },
     { label: 'Archived', icon: Archive, path: '/chats/archived' },
     ...(userData?.hiddenChatSettings?.showMenuEntry !== false ? [
       { label: 'Hidden chats', icon: EyeOff, path: '/chats/hidden' }
@@ -95,9 +102,17 @@ export default function TabHeader() {
     { label: 'Settings', icon: Settings, path: '/settings' },
   ];
 
+  const filterOptions = [
+    { label: 'All Chats', filter: 'all', icon: MessageCircle },
+    { label: 'Private Chats', filter: 'direct', icon: Lock },
+    { label: 'Groups Only', filter: 'groups', icon: Users },
+    { label: 'Channels Only', filter: 'channels', icon: Radio },
+  ] as const;
+
   const isChatsPage = location.pathname === '/' || location.pathname === '/chats';
   const isGroupsPage = location.pathname === '/groups';
   const isReelsPage = location.pathname === '/reels';
+  const isPostsPage = location.pathname === '/posts';
   const isSearchPage = location.pathname === '/search';
   const isProfilePage = location.pathname === '/profile';
 
@@ -131,10 +146,36 @@ export default function TabHeader() {
           </Link>
         )}
 
+        {/* 3 Dots Menu - Show on Chats page */}
+        {isChatsPage && (
+          <div className="relative" ref={menuRef}>
+            <button 
+              onClick={() => setShowMenu(prev => !prev)}
+              className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
+              id="header-three-dots"
+            >
+              <MoreVertical size={22} className="text-[var(--header-text)]" />
+            </button>
+            <ChatTabDropdown 
+              isOpen={showMenu}
+              onClose={() => setShowMenu(false)}
+              chatListFilter={chatListFilter}
+              setChatListFilter={setChatListFilter}
+              showHiddenChatsEntry={userData?.hiddenChatSettings?.showMenuEntry !== false}
+            />
+          </div>
+        )}
 
-
-
-
+        {/* Settings Icon - Show on Profile page */}
+        {isProfilePage && (
+          <button 
+            onClick={() => navigate('/settings')}
+            className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer active:scale-95 duration-100"
+            id="header-profile-settings"
+          >
+            <Settings size={22} className="text-[var(--header-text)]" />
+          </button>
+        )}
       </div>
     </div>
   );

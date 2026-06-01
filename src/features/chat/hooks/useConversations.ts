@@ -5,7 +5,7 @@ import { LocalDataCache } from '../../../services/LocalDataCache';
 import { isUserOnline } from '../../../utils/presence';
 
 export const useConversations = (activeFilter: string) => {
-  const { user } = useAuth();
+  const { user, isAuthReady } = useAuth();
   
   // Use cached data instantly if it exists to prevent loader flickering
   const [conversations, setConversations] = useState<any[]>(() => {
@@ -32,7 +32,7 @@ export const useConversations = (activeFilter: string) => {
   });
 
   useEffect(() => {
-    if (!user || activeFilter === 'Calls' || !supabase) return;
+    if (!user || activeFilter === 'Calls' || !supabase || !isAuthReady) return;
 
     const fetchConversations = async () => {
       const myId = user.id;
@@ -148,6 +148,15 @@ export const useConversations = (activeFilter: string) => {
               lastMsgAtVal = latestDbMsg.created_at;
             }
 
+            // Clean any forward tagging indicators for raw display in Chat List
+            if (typeof lastMsgVal === 'string') {
+              if (lastMsgVal.startsWith('\u200B[FWD_MANY]\u200B')) {
+                lastMsgVal = '↪ Forwarded many times: ' + lastMsgVal.replace('\u200B[FWD_MANY]\u200B', '');
+              } else if (lastMsgVal.startsWith('\u200B[FWD]\u200B')) {
+                lastMsgVal = '↪ Forwarded: ' + lastMsgVal.replace('\u200B[FWD]\u200B', '');
+              }
+            }
+
             return {
               id: conv.id,
               type: conv.type,
@@ -245,11 +254,11 @@ export const useConversations = (activeFilter: string) => {
       supabase.removeChannel(channel);
       unsubscribeCache();
     };
-  }, [user, activeFilter]);
+  }, [user, activeFilter, isAuthReady]);
 
   // Suggested users fetch
   useEffect(() => {
-    if (!user || !supabase) return;
+    if (!user || !supabase || !isAuthReady) return;
     const fetchSuggested = async () => {
       const { data } = await supabase
         .from('users')
@@ -268,7 +277,7 @@ export const useConversations = (activeFilter: string) => {
       }
     };
     fetchSuggested();
-  }, [user]);
+  }, [user, isAuthReady]);
 
   const formatTime = (date: Date) => {
     const now = new Date();

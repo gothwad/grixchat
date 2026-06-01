@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearch } from '../../contexts/SearchContext.tsx';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, Phone, Video, ArrowUpRight, ArrowDownLeft, PhoneMissed, Info, Lock, Users, Search, X, Plus, Loader2 } from 'lucide-react';
+import { MessageCircle, Phone, Video, ArrowUpRight, ArrowDownLeft, PhoneMissed, Info, Lock, Users, Search, X, Plus, Loader2, Trash, Archive } from 'lucide-react';
 import { useLayout } from '../../contexts/LayoutContext.tsx';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useConversations } from './hooks/useConversations.ts';
 import { useCalls } from './hooks/useCalls.ts';
 import { useAuth } from '../../providers/AuthProvider.tsx';
@@ -26,87 +26,21 @@ export default function ChatsTab() {
   const navigate = useNavigate();
   const { user: authUser, userData } = useAuth();
   const { searchTerm, setSearchTerm } = useSearch();
-  const { activeFilters } = useLayout();
+  const { 
+    activeFilters, 
+    chatListFilter, 
+    isChatSelectMode, 
+    setChatSelectMode, 
+    selectedChatIds, 
+    setSelectedChatIds 
+  } = useLayout();
   const activeFilter = activeFilters['chats'] || 'Chats';
   
   const { conversations, otherUsers, loading: conversationsLoading } = useConversations(activeFilter);
   const { calls, loading: callsLoading } = useCalls(activeFilter);
   const loading = activeFilter === 'Calls' ? callsLoading : conversationsLoading;
 
-  const [stories, setStories] = useState<StoryGroup[]>([]);
-  const [hasMyActiveStories, setHasMyActiveStories] = useState(false);
-  const [isUploadingStory, setIsUploadingStory] = useState(false);
-  const storyFileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchStories = useCallback(async () => {
-    if (!supabase) return;
-    try {
-      const { data: storiesData } = await supabase
-        .from('stories')
-        .select('*, users:user_id(id, username, full_name, photo_url)')
-        .order('created_at', { ascending: false });
-
-      if (storiesData) {
-        const grouped: Record<string, StoryGroup> = {};
-        storiesData.forEach((s: any) => {
-          if (s.users && s.user_id !== authUser?.id) {
-            grouped[s.user_id] = {
-              userId: s.user_id,
-              username: s.users.username || 'User',
-              fullName: s.users.full_name || 'Grix User',
-              photoURL: s.users.photo_url || '',
-              hasUnseen: true
-            };
-          }
-        });
-        setStories(Object.values(grouped));
-        setHasMyActiveStories(storiesData.some((s: any) => s.user_id === authUser?.id));
-      }
-    } catch (e) {
-      console.error('Error fetching active stories on ChatsTab:', e);
-    }
-  }, [authUser?.id]);
-
-  useEffect(() => {
-    fetchStories();
-  }, [fetchStories]);
-
-  const handleDirectStoryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !authUser || !supabase) return;
-
-    setIsUploadingStory(true);
-    try {
-      const url = await ImageService.uploadImage(file, () => {}, 'stories');
-      
-      try {
-        const { error } = await supabase.from('stories').insert({
-          user_id: authUser.id,
-          media_url: url,
-          type: 'image'
-        } as any);
-
-        if (error) throw error;
-        await fetchStories();
-      } catch (dbErr) {
-        console.warn("Direct story database save failed, queueing offline retry session:", dbErr);
-        await transactionQueue.addTransaction('story_insert', {
-          userId: authUser.id,
-          mediaUrl: url,
-          type: 'image'
-        });
-        alert("Low signal! Story queued in background. It will publish automatically once connection stabilizes.");
-      }
-    } catch (err) {
-      console.error("Error direct story upload:", err);
-      alert("Failed to share story. Please check your network.");
-    } finally {
-      setIsUploadingStory(false);
-      if (storyFileInputRef.current) {
-        storyFileInputRef.current.value = '';
-      }
-    }
-  };
 
   const isSecretCodeEntered = !!(
     searchTerm && 
@@ -123,13 +57,27 @@ export default function ChatsTab() {
   }, [userData?.hiddenChats, conversations]);
 
   const filteredConversations = conversations.filter(c => {
-    if (c.type === 'group') return false; // Move groups to dedicated groups tab
     const isHidden = Array.isArray(userData?.hiddenChats) && userData.hiddenChats.includes(c.id);
     const isArchived = Array.isArray(userData?.archivedChats) && userData.archivedChats.includes(c.id);
     
     // Always hide hidden chats from the main chat lists/matches (they only show in unlocked /chats/hidden screen)
     if (isHidden) return false;
     if (isArchived) return false;
+
+    // Apply the selected three-dot filter
+    if (chatListFilter === 'direct') {
+      if (c.type === 'group') return false;
+    } else if (chatListFilter === 'groups') {
+      if (c.type !== 'group') return false;
+      const isChannel = (c.user || '').toLowerCase().includes('channel') || 
+                        (c.user || '').toLowerCase().includes('broadcast');
+      if (isChannel) return false;
+    } else if (chatListFilter === 'channels') {
+      if (c.type !== 'group') return false;
+      const isChannel = (c.user || '').toLowerCase().includes('channel') || 
+                        (c.user || '').toLowerCase().includes('broadcast');
+      if (!isChannel) return false;
+    }
 
     // Filter out Message Requests (not yet accepted)
     if (conversations.length > 0 && !storage.getItem('grix_accepted_chats_initialized')) {
@@ -155,91 +103,7 @@ export default function ChatsTab() {
   return (
     <div className="h-full flex flex-col bg-[var(--bg-card)] overflow-hidden">
       <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
-        {/* INSTAGRAM STYLE STORIES - HORIZONTAL SCROLL ROW */}
-        {activeFilter === 'Chats' && (
-          <div className="shrink-0 border-b border-[var(--border-color)]/30 bg-[var(--bg-card)] py-3 px-4 flex gap-4 overflow-x-auto no-scrollbar scroll-smooth">
-            {/* Current User Story Circle */}
-            <div className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer min-w-[72px]">
-              <div 
-                className="relative group shrink-0 active:scale-95 transition-transform"
-              >
-                {/* Profile Pic Click: views story if active, else opens gallery */}
-                <div 
-                  onClick={() => {
-                    if (hasMyActiveStories) {
-                      navigate(`/stories/view/${authUser?.id}`);
-                    } else {
-                      storyFileInputRef.current?.click();
-                    }
-                  }}
-                  className={`w-16 h-16 rounded-full p-[2px] border-2 bg-[var(--bg-main)] flex items-center justify-center shrink-0 aspect-square ${hasMyActiveStories ? 'border-[#0494f4]' : 'border-black dark:border-white'}`}
-                >
-                  <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-[var(--bg-main)] relative">
-                    {isUploadingStory ? (
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                        <Loader2 size={20} className="animate-spin text-white" />
-                      </div>
-                    ) : (
-                      <img 
-                        src={userData?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-                        alt="My profile"
-                        className="w-full h-full object-cover shrink-0"
-                        referrerPolicy="no-referrer"
-                      />
-                    )}
-                  </div>
-                </div>
-                {/* Plus Icon Overlay: directly opens system file selector */}
-                <span 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    storyFileInputRef.current?.click();
-                  }}
-                  className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#0494f4] hover:bg-[#0381d6] text-white rounded-full flex items-center justify-center shadow-md border-2 border-[var(--bg-card)] cursor-pointer transition-colors"
-                >
-                  {isUploadingStory ? <Loader2 size={10} className="animate-spin" /> : <Plus size={12} strokeWidth={2.5} />}
-                </span>
-              </div>
-              <span className="text-[10px] font-bold text-[var(--text-secondary)] text-center w-full truncate mt-0.5">
-                Your Story
-              </span>
 
-              {/* Hidden file input for direct photo story upload */}
-              <input 
-                type="file" 
-                ref={storyFileInputRef} 
-                className="hidden" 
-                accept="image/*" 
-                onChange={handleDirectStoryUpload} 
-              />
-            </div>
-
-            {/* Stories from database */}
-            {stories.map((story) => (
-              <div 
-                key={story.userId}
-                onClick={() => navigate(`/stories/view/${story.userId}`)}
-                className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer min-w-[72px]"
-              >
-                <div className="relative active:scale-95 transition-transform">
-                  <div className="w-16 h-16 rounded-full p-[2px] border-2 border-[#0494f4] flex items-center justify-center shrink-0 aspect-square">
-                    <div className="w-full h-full rounded-full overflow-hidden bg-[var(--bg-main)] flex items-center justify-center shrink-0">
-                      <img 
-                        src={story.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-                        alt={story.username}
-                        className="w-full h-full object-cover shrink-0"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold text-[var(--text-primary)] text-center w-full truncate mt-0.5">
-                  {story.username}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* WhatsApp-style Scrollable Search Bar */}
         <div className="px-4 pt-3 pb-2.5">
@@ -353,11 +217,101 @@ export default function ChatsTab() {
               secretCount={userData?.hiddenChats?.length || 0}
               showHiddenChatsEntry={userData?.hiddenChatSettings?.showMenuEntry !== false}
               loading={loading}
-              usersWithStories={stories.map(s => s.userId)}
+              usersWithStories={[]}
             />
           )}
         </div>
       </div>
+
+      {/* Dynamic Multi-Selection Actions Bar (WhatsApp / Telegram Style) */}
+      <AnimatePresence>
+        {isChatSelectMode && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 350, damping: 25 }}
+            className="absolute bottom-16 left-4 right-4 bg-[var(--bg-card)] border border-[var(--border-color)]/60 py-3 px-5 rounded-2xl shadow-xl flex items-center justify-between z-[90] text-sm text-[var(--text-primary)]"
+          >
+            <div className="flex items-center gap-3">
+              <button 
+                type="button"
+                onClick={() => {
+                  setChatSelectMode(false);
+                  setSelectedChatIds([]);
+                }}
+                className="p-1 hover:bg-[var(--bg-main)] rounded-full text-[var(--text-secondary)] transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+              <span className="font-bold text-xs text-[var(--text-primary)]">
+                {selectedChatIds.length} Selected
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={selectedChatIds.length === 0}
+                onClick={async () => {
+                  // Standard delete action for the selected chats
+                  if (userData && authUser) {
+                    try {
+                      // Perform deletion
+                      console.log('Deleting chats:', selectedChatIds);
+                    } catch (err) {
+                      console.error('Failed to delete selected chats:', err);
+                    }
+                  }
+                  setSelectedChatIds([]);
+                  setChatSelectMode(false);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-colors cursor-pointer ${
+                  selectedChatIds.length > 0 
+                    ? 'text-red-500 hover:bg-red-500/10' 
+                    : 'text-[var(--text-secondary)]/30 cursor-not-allowed'
+                }`}
+              >
+                <Trash size={14} />
+                <span>Delete</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={selectedChatIds.length === 0}
+                onClick={async () => {
+                  // Archive selected chats
+                  if (userData && authUser) {
+                    try {
+                      const currentArchived = Array.isArray(userData.archivedChats) ? userData.archivedChats : [];
+                      const updatedArchived = [...new Set([...currentArchived, ...selectedChatIds])];
+                      
+                      if (supabase) {
+                        await supabase
+                          .from('users')
+                          .update({ archived_chats: updatedArchived })
+                          .eq('id', authUser.uid);
+                      }
+                    } catch (err) {
+                      console.error('Failed to archive chats:', err);
+                    }
+                  }
+                  setSelectedChatIds([]);
+                  setChatSelectMode(false);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-colors cursor-pointer ${
+                  selectedChatIds.length > 0 
+                    ? 'text-[#0494f4] hover:bg-[#0494f4]/10' 
+                    : 'text-[var(--text-secondary)]/30 cursor-not-allowed'
+                }`}
+              >
+                <Archive size={14} />
+                <span>Archive</span>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

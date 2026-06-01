@@ -158,12 +158,12 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
           className="z-[9999] flex flex-col items-center gap-1.5 origin-center select-none"
         >
           {/* Reaction shortcut bar: exactly 6 emojis, with perfectly symmetrical padding */}
-          <div className="flex items-center justify-between bg-[#16212b]/95 border border-white/10 shadow-xl rounded-full px-4 py-2 w-full shrink-0">
+          <div className="flex items-center justify-between bg-[var(--bg-card)] border border-[var(--border-color)]/60 shadow-xl rounded-full px-4 py-2 w-full shrink-0">
             {['❤️', '😂', '🥰', '🔥', '👍', '🙏'].map(emoji => (
               <button
                 key={emoji}
                 onClick={() => handleEmojiClick(emoji)}
-                className="w-8 h-8 rounded-full hover:bg-white/10 active:scale-135 transition-all flex items-center justify-center text-[21px] cursor-pointer"
+                className="w-8 h-8 rounded-full hover:bg-[var(--bg-main)] active:scale-135 transition-all flex items-center justify-center text-[21px] cursor-pointer"
               >
                 {emoji}
               </button>
@@ -171,7 +171,7 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
           </div>
 
           {/* Action options container */}
-          <div className="bg-[#18232e]/95 border border-white/10 shadow-[0_10px_35px_rgba(0,0,0,0.6)] rounded-2xl p-1.5 flex flex-col gap-[1px] w-[185px] overflow-hidden">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/60 shadow-[0_10px_35px_rgba(0,0,0,0.15)] rounded-2xl p-1.5 flex flex-col gap-[1px] w-[185px] overflow-hidden text-[var(--text-primary)]">
             <AnimatePresence mode="wait">
               {page === 1 ? (
                 <motion.div 
@@ -186,9 +186,9 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                   <button 
                     type="button"
                     onClick={() => { setReplyingTo(activeMessageMenu); setActiveMessageMenu(null); }}
-                    className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#f5f7fa] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                   >
-                    <Reply size={16} className="text-[#a0aab8]" />
+                    <Reply size={16} className="text-[var(--text-secondary)]" />
                     <span>Reply</span>
                   </button>
 
@@ -197,9 +197,9 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                     <button 
                       type="button"
                       onClick={() => { startEdit(activeMessageMenu); setActiveMessageMenu(null); }}
-                      className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#f5f7fa] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                      className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                     >
-                      <Edit2 size={16} className="text-[#a0aab8]" />
+                      <Edit2 size={16} className="text-[var(--text-secondary)]" />
                       <span>Edit</span>
                     </button>
                   )}
@@ -216,9 +216,9 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                       }
                       setActiveMessageMenu(null);
                     }}
-                    className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#f5f7fa] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                   >
-                    <Forward size={16} className="text-[#a0aab8]" />
+                    <Forward size={16} className="text-[var(--text-secondary)]" />
                     <span>Forward</span>
                   </button>
 
@@ -233,9 +233,9 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                       }
                       setActiveMessageMenu(null);
                     }}
-                    className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#f5f7fa] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                   >
-                    <CheckCircle2 size={16} className="text-[#a0aab8]" />
+                    <CheckCircle2 size={16} className="text-[var(--text-secondary)]" />
                     <span>Select</span>
                   </button>
 
@@ -243,7 +243,7 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                   <button 
                     type="button"
                     onClick={() => { deleteMessage(activeMessageMenu.id); setActiveMessageMenu(null); }}
-                    className="w-full px-4 py-2.5 text-left text-[14px] font-bold text-[#ff595a] hover:bg-[#ff595a]/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-[#ff595a] hover:bg-[#ff595a]/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                   >
                     <Trash size={16} className="text-[#ff595a]" />
                     <span>Delete</span>
@@ -253,13 +253,13 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                   <button 
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setPage(2); }}
-                    className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#a5c3e6] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center justify-between rounded-xl cursor-pointer border-none bg-transparent border-t border-white/5 mt-1 pt-2"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[#0494f4] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center justify-between rounded-xl cursor-pointer border-none bg-transparent border-t border-[var(--border-color)]/30 mt-1 pt-2"
                   >
                     <span className="flex items-center gap-3">
-                      <ChevronRight size={16} className="text-[#a5c3e6]" />
+                      <ChevronRight size={16} className="text-[#0494f4]" />
                       <span>More</span>
                     </span>
-                    <ChevronRight size={15} className="text-[#a5c3e6]/80" />
+                    <ChevronRight size={15} className="text-[#0494f4]/80" />
                   </button>
                 </motion.div>
               ) : (
@@ -275,9 +275,9 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                   <button 
                     type="button"
                     onClick={handleCopyText} 
-                    className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#f5f7fa] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                   >
-                    <Copy size={16} className="text-[#a0aab8]" />
+                    <Copy size={16} className="text-[var(--text-secondary)]" />
                     <span>Copy Text</span>
                   </button>
 
@@ -292,9 +292,9 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                       }
                       setActiveMessageMenu(null);
                     }}
-                    className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#f5f7fa] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                   >
-                    <Pin size={16} className="text-[#a0aab8]" />
+                    <Pin size={16} className="text-[var(--text-secondary)]" />
                     <span>Pin</span>
                   </button>
 
@@ -302,9 +302,9 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                   <button 
                     type="button"
                     onClick={handleDownload}
-                    className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#f5f7fa] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                   >
-                    <Download size={16} className="text-[#a0aab8]" />
+                    <Download size={16} className="text-[var(--text-secondary)]" />
                     <span>Download</span>
                   </button>
 
@@ -315,9 +315,9 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                       setShowReactionPicker(activeMessageMenu);
                       setActiveMessageMenu(null);
                     }}
-                    className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#f5f7fa] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                   >
-                    <Smile size={16} className="text-[#a0aab8]" />
+                    <Smile size={16} className="text-[var(--text-secondary)]" />
                     <span>Reactions...</span>
                   </button>
 
@@ -325,7 +325,7 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                   <button 
                     type="button"
                     onClick={() => { deleteMessage(activeMessageMenu.id); setActiveMessageMenu(null); }}
-                    className="w-full px-4 py-2.5 text-left text-[14px] font-bold text-[#ff595a] hover:bg-[#ff595a]/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-[#ff595a] hover:bg-[#ff595a]/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                   >
                     <Trash size={16} className="text-[#ff595a]" />
                     <span>Delete For Me</span>
@@ -335,13 +335,13 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                   <button 
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setPage(1); }}
-                    className="w-full px-4 py-2.5 text-left text-[14px] font-semibold text-[#a5c3e6] hover:bg-white/5 active:bg-white/10 transition-colors flex items-center justify-between rounded-xl cursor-pointer border-none bg-transparent border-t border-white/5 mt-1 pt-2"
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[#0494f4] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center justify-between rounded-xl cursor-pointer border-none bg-transparent border-t border-[var(--border-color)]/30 mt-1 pt-2"
                   >
                     <span className="flex items-center gap-3">
-                      <ChevronLeft size={16} className="text-[#a5c3e6]" />
+                      <ChevronLeft size={16} className="text-[#0494f4]" />
                       <span>Back</span>
                     </span>
-                    <ChevronLeft size={15} className="text-[#a5c3e6]/80" />
+                    <ChevronLeft size={15} className="text-[#0494f4]/80" />
                   </button>
                 </motion.div>
               )}

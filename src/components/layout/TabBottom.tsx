@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MessageCircle, Users, UserCircle, Home, Search, Phone, Settings } from 'lucide-react';
+import { MessageCircle, Users, UserCircle, Home, Search, Phone, Settings, Grid } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
@@ -143,7 +143,7 @@ export default function TabBottom() {
   
   const navItems = [
     { icon: MessageCircle, path: '/chats', label: 'Chats', badge: unreadChatsCount, activeColor: 'text-[var(--header-text)]' },
-    { icon: Users, path: '/groups', label: 'Groups', badge: unreadGroupsCount, activeColor: 'text-[var(--header-text)]' },
+    { icon: Grid, path: '/posts', label: 'Posts', activeColor: 'text-[var(--header-text)]' },
     { icon: Search, path: '/search', label: 'Search', activeColor: 'text-[var(--header-text)]' },
     { icon: Phone, path: '/calls', label: 'Calls', activeColor: 'text-[var(--header-text)]' },
     { icon: UserCircle, path: '/profile', label: 'Profile', activeColor: 'text-[var(--header-text)]' },
