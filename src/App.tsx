@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { APP_CONFIG } from './config/appConfig';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { LockService } from './services/LockService.ts';
@@ -11,6 +11,8 @@ import { useAuth } from './providers/AuthProvider';
 import { useTheme } from './contexts/ThemeContext';
 import { ErrorBoundary } from 'react-error-boundary';
 import SplashScreen from './components/SplashScreen';
+import DeveloperConsole from './components/DeveloperConsole';
+import FloatingDiagnosticsButton from './components/FloatingDiagnosticsButton';
 
 function ErrorFallback({ error }: { error: any }) {
   return (
@@ -110,7 +112,28 @@ export default function App() {
   const { user, userData, loading: authLoading, isAuthReady } = useAuth();
   const { resolvedTheme } = useTheme();
   const [splashLoading, setSplashLoading] = useState(true);
+  const [isDevConsoleOpen, setDevConsoleOpen] = useState(false);
   const location = useLocation();
+  const initialMountCheckedRef = useRef(false);
+
+  // Handle Event / Key triggers for Dev Console
+  useEffect(() => {
+    const handleToggle = () => setDevConsoleOpen(prev => !prev);
+    window.addEventListener('toggle-dev-console', handleToggle);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        setDevConsoleOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('toggle-dev-console', handleToggle);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   // Centralized Document Title Management
   useEffect(() => {
@@ -263,8 +286,13 @@ export default function App() {
       setInitialLockCheckDone(true);
     };
 
-    // 1. Initial lock evaluation on load
-    performLockCheck('mount');
+    // 1. Initial lock evaluation on load (only run 'mount' check once)
+    if (!initialMountCheckedRef.current) {
+      initialMountCheckedRef.current = true;
+      performLockCheck('mount');
+    } else {
+      performLockCheck('interval');
+    }
 
     // 2. Tab Visibility and Focus State Updates
     const handleStateChange = () => {
@@ -509,6 +537,8 @@ export default function App() {
           </div>
         </LayoutProvider>
       </NavProvider>
+      <DeveloperConsole isOpen={isDevConsoleOpen} onClose={() => setDevConsoleOpen(false)} />
+      <FloatingDiagnosticsButton isOpen={isDevConsoleOpen} onToggle={() => setDevConsoleOpen(prev => !prev)} />
     </ErrorBoundary>
   );
 }

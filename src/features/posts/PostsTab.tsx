@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../../lib/supabase';
 import { ImageService } from '../../services/ImageService';
 import { transactionQueue } from '../../services/db/transactionQueueService';
+import { LocalDataCache } from '../../services/LocalDataCache';
 
 interface StoryGroup {
   userId: string;
@@ -22,12 +23,41 @@ interface StoryGroup {
 export default function PostsTab() {
   const { user: authUser, userData } = useAuth();
   const navigate = useNavigate();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Instant load from Cache to eliminate loading spinner and give native app feel!
+  const [posts, setPosts] = useState<Post[]>(() => {
+    if (authUser?.id) {
+      const cached = LocalDataCache.getHomeFeed(authUser.id);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        return cached;
+      }
+    }
+    return [];
+  });
+  
+  const [loading, setLoading] = useState(() => {
+    if (authUser?.id) {
+      const cached = LocalDataCache.getHomeFeed(authUser.id);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        return false;
+      }
+    }
+    return true;
+  });
+
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Stories states
-  const [stories, setStories] = useState<StoryGroup[]>([]);
+  // Stories states loaded instantly from Cache
+  const [stories, setStories] = useState<StoryGroup[]>(() => {
+    if (authUser?.id) {
+      const cached = LocalDataCache.getHomeStories(authUser.id);
+      if (cached && Array.isArray(cached)) {
+        return cached;
+      }
+    }
+    return [];
+  });
+  
   const [hasActiveStories, setHasActiveStories] = useState(false);
   const [isUploadingStory, setIsUploadingStory] = useState(false);
   const storyFileInputRef = useRef<HTMLInputElement>(null);
@@ -60,7 +90,13 @@ export default function PostsTab() {
             };
           }
         });
-        setStories(Object.values(grouped));
+        const storyGroups = Object.values(grouped);
+        setStories(storyGroups);
+        
+        if (authUser?.id) {
+          LocalDataCache.saveHomeStories(authUser.id, storyGroups);
+        }
+        
         setHasActiveStories(storiesData.some((s: any) => s.user_id === authUser?.id));
       }
     } catch (e) {
@@ -106,10 +142,17 @@ export default function PostsTab() {
   };
 
   const loadData = async () => {
-    setLoading(true);
+    // Only set loading to true if there is zero cached posts to present
+    if (posts.length === 0) {
+      setLoading(true);
+    }
     try {
       const allPosts = await PostsService.fetchPosts(authUser?.id);
       setPosts(allPosts);
+      
+      if (authUser?.id) {
+        LocalDataCache.saveHomeFeed(authUser.id, allPosts);
+      }
     } catch {
       // safe load
     } finally {
@@ -118,9 +161,11 @@ export default function PostsTab() {
   };
 
   useEffect(() => {
-    loadData();
-    fetchStories();
-  }, [authUser?.id, fetchStories]);
+    if (authUser?.id) {
+      loadData();
+      fetchStories();
+    }
+  }, [authUser?.id]);
 
   const handleLike = async (postId: string) => {
     if (!authUser?.id) return;

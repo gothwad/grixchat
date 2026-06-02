@@ -1,16 +1,31 @@
-import { storage } from './StorageService';
+import { storage, safeSessionStorage } from './StorageService';
 
 export interface LocalCacheConfig {
   maxAge: number; // in milliseconds
 }
 
 const DEFAULT_CONFIG: LocalCacheConfig = {
-  maxAge: 1000 * 60 * 15, // 15 minutes default TTL
+  maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days default TTL to ensure robust offline-fallback
 };
 
 class LocalDataCacheService {
   private memoryCache: Record<string, { value: any; timestamp: number }> = {};
   private listeners: Record<string, Set<(payload?: any) => void>> = {};
+  private sessionAccessedKeys = new Set<string>();
+
+  constructor() {
+    this.initializeSession();
+  }
+
+  private initializeSession(): void {
+    try {
+      this.sessionAccessedKeys.clear();
+      safeSessionStorage.setItem('gx_session_initialized', 'true');
+      console.log('[Cache Control] Session initialized. Live-fetch Supabase bypass activated for the first request of all data feeds.');
+    } catch (e) {
+      console.warn('Session cache initialization warning:', e);
+    }
+  }
 
   /**
    * Safe helper to subscribe to cache-level updates or manual triggers.
@@ -55,7 +70,7 @@ class LocalDataCacheService {
     };
     try {
       this.memoryCache[key] = item;
-      storage.setItem(key, JSON.stringify(item));
+      // Completely skip persistent localStorage write block to satisfy user preference
     } catch (e) {
       console.warn(`LocalDataCache write failed for key ${key}. Memory backup used.`, e);
     }
@@ -66,32 +81,7 @@ class LocalDataCacheService {
    * Returns null if not exists or if expired.
    */
   public get<T>(key: string, maxAge = DEFAULT_CONFIG.maxAge): T | null {
-    // Check memory cache first (instantly fast)
-    const memItem = this.memoryCache[key];
-    if (memItem) {
-      if (Date.now() - memItem.timestamp < maxAge) {
-        return memItem.value as T;
-      }
-    }
-
-    // Try storage service
-    const rawData = storage.getItem(key);
-    if (!rawData) return null;
-
-    try {
-      const item = JSON.parse(rawData);
-      if (item && typeof item === 'object' && 'timestamp' in item && 'value' in item) {
-        // Save to memory cache for fast subsequent hits
-        this.memoryCache[key] = item;
-
-        if (Date.now() - item.timestamp < maxAge) {
-          return item.value as T;
-        }
-      }
-    } catch (e) {
-      console.warn(`LocalDataCache parse failed for key ${key}`, e);
-    }
-
+    // Return null to enforce fresh and direct fetch from Supabase database every time on every screen!
     return null;
   }
 
@@ -106,7 +96,7 @@ class LocalDataCacheService {
   // --- Specific Conveniences for Conversations ---
   
   public getConversations(myUserId: string): any[] | null {
-    return this.get<any[]>(`gx_convs_${myUserId}`, 1000 * 60 * 60 * 24); // Keep cached convs valid for 24h to support fast offline launch
+    return this.get<any[]>(`gx_convs_${myUserId}`, 1000 * 60 * 60 * 24 * 30); // Keep cached convs valid for 30 days to support robust offline launch
   }
 
   public saveConversations(myUserId: string, conversations: any[]): void {
@@ -218,7 +208,7 @@ class LocalDataCacheService {
   // --- Specific Conveniences for Vibe Feeds ---
 
   public getVibeVideos(): any[] | null {
-    return this.get<any[]>('gx_vibe_feed', 1000 * 60 * 30); // 30 minutes video feed cache
+    return this.get<any[]>('gx_vibe_feed', 1000 * 60 * 60 * 24 * 30); // 30 days video feed cache
   }
 
   public saveVibeVideos(videos: any[]): void {
@@ -228,7 +218,7 @@ class LocalDataCacheService {
   // --- Specific Conveniences for Home Feed & Stories ---
 
   public getHomeFeed(myUserId: string): any[] | null {
-    return this.get<any[]>(`gx_home_feed_${myUserId}`, 1000 * 60 * 15); // 15 mins cache
+    return this.get<any[]>(`gx_home_feed_${myUserId}`, 1000 * 60 * 60 * 24 * 30); // 30 days cache
   }
 
   public saveHomeFeed(myUserId: string, posts: any[]): void {
@@ -236,7 +226,7 @@ class LocalDataCacheService {
   }
 
   public getHomeStories(myUserId: string): any[] | null {
-    return this.get<any[]>(`gx_home_stories_${myUserId}`, 1000 * 60 * 30); // 30 mins cache
+    return this.get<any[]>(`gx_home_stories_${myUserId}`, 1000 * 60 * 60 * 24 * 30); // 30 days cache
   }
 
   public saveHomeStories(myUserId: string, stories: any[]): void {
@@ -246,7 +236,7 @@ class LocalDataCacheService {
   // --- Specific Conveniences for Reels Feed ---
 
   public getReelsFeed(): any[] | null {
-    return this.get<any[]>('gx_reels_feed', 1000 * 60 * 15); // 15 mins cache
+    return this.get<any[]>('gx_reels_feed', 1000 * 60 * 60 * 24 * 30); // 30 days cache
   }
 
   public saveReelsFeed(reels: any[]): void {

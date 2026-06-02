@@ -29,20 +29,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (_) { return null; }
   });
 
-  const [userData, setUserData] = useState<UserProfile | null>(() => {
-    try {
-      const cached = storage.getItem('grix_cached_userdata');
-      return cached ? JSON.parse(cached) : null;
-    } catch (_) { return null; }
-  });
+  const [userData, setUserData] = useState<UserProfile | null>(null);
 
-  const [loading, setLoading] = useState(() => !storage.getItem('grix_cached_user'));
-  const [isAuthReady, setIsAuthReady] = useState(() => !!storage.getItem('grix_cached_user'));
+  const [loading, setLoading] = useState(true);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [followingIds, setFollowingIds] = useState<string[]>([]);
 
   const profileChannelRef = useRef<RealtimeChannel | null>(null);
   const presenceChannelRef = useRef<RealtimeChannel | null>(null);
   const sessionRegisteredRef = useRef<boolean>(false);
+  const userRef = useRef<CustomUser | null>(user);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   const fetchProfileData = async (currentUserId: string, email: string, meta: any) => {
     const { profileData, following } = await userProfileService.fetchFullProfileData(currentUserId, email, meta);
@@ -72,8 +72,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const currentUser = supabaseUser ? { ...supabaseUser, uid: supabaseUser.id } as CustomUser : null;
         
         if (event === 'SIGNED_OUT') {
-          if (user?.id) {
-            await userProfileService.throttledSetStatus(user.id, false, true);
+          const currentUserId = userRef.current?.id;
+          if (currentUserId) {
+            userProfileService.throttledSetStatus(currentUserId, false, true).catch(() => {});
           }
           setUserData(null);
           setUser(null);
@@ -81,19 +82,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsAuthReady(true);
         } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || (event as string) === 'USER_UPDATED') {
           if (supabaseUser) {
-            await userProfileService.throttledSetStatus(supabaseUser.id, true, true);
+            userProfileService.throttledSetStatus(supabaseUser.id, true, true).catch(() => {});
+            // Fetch profile data in the background
+            fetchProfileData(supabaseUser.id, supabaseUser.email || '', supabaseUser.user_metadata).catch(console.error);
           }
           setUser(currentUser);
-          if (!supabaseUser) {
-            setLoading(false);
-            setIsAuthReady(true);
-          }
+          setLoading(false);
+          setIsAuthReady(true);
         } else {
-          setUser(currentUser);
-          if (!supabaseUser) {
-            setLoading(false);
-            setIsAuthReady(true);
+          if (supabaseUser) {
+            fetchProfileData(supabaseUser.id, supabaseUser.email || '', supabaseUser.user_metadata).catch(console.error);
           }
+          setUser(currentUser);
+          setLoading(false);
+          setIsAuthReady(true);
         }
       } catch (err) {
         console.error('onAuthStateChange execution error:', err);
@@ -103,16 +105,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     const initAuth = async () => {
+      let resolved = false;
+      const timeoutTimer = setTimeout(() => {
+        if (!resolved) {
+          console.warn('initAuth timed out. Forcing ready state.');
+          setLoading(false);
+          setIsAuthReady(true);
+        }
+      }, 4000);
+
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const currentUser = session?.user ? { ...session.user, uid: session.user.id } as CustomUser : null;
         setUser(currentUser);
-        if (!currentUser) {
-          setLoading(false);
-          setIsAuthReady(true);
+        if (currentUser) {
+          // Fetch profile data with timeout race protection
+          const fetchPromise = fetchProfileData(currentUser.id, currentUser.email || '', currentUser.user_metadata);
+          await Promise.race([fetchPromise, new Promise((res) => setTimeout(res, 2500))]);
+        } else {
+          setUserData(null);
         }
       } catch (err) {
         console.error('Initial session fetch error:', err);
+      } finally {
+        resolved = true;
+        clearTimeout(timeoutTimer);
         setLoading(false);
         setIsAuthReady(true);
       }
@@ -120,7 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initAuth();
     return () => subscription.unsubscribe();
-  }, [user?.id]);
+  }, []);
 
   // 2. Profile and Realtime Presence Subscriptions
   useEffect(() => {
@@ -130,20 +147,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let isSubscribed = true;
 
     const setupProfileAndPresence = async () => {
-      setLoading(true);
-      setIsAuthReady(false);
-
       try {
         if (profileChannelRef.current) supabase.removeChannel(profileChannelRef.current);
         if (presenceChannelRef.current) supabase.removeChannel(presenceChannelRef.current);
 
-        // Fetch primary profile data with timeout race protection
-        const fetchPromise = fetchProfileData(currentUserId, user.email || '', user.user_metadata);
-        await Promise.race([fetchPromise, new Promise((res) => setTimeout(res, 2500))]);
+        // Fetch primary profile data updates
+        fetchProfileData(currentUserId, user.email || '', user.user_metadata);
 
         // Setup realtime profile change listener
+        const profileUniqueId = `profile-${currentUserId}-${Math.random().toString(36).substring(2, 7)}`;
         const profileChannel = supabase
-          .channel(`profile-${currentUserId}`)
+          .channel(profileUniqueId)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `id=eq.${currentUserId}` }, () => {
             if (isSubscribed) fetchProfileData(currentUserId, user.email || '', user.user_metadata);
           })
@@ -176,11 +190,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         presenceChannelRef.current = presenceChannel;
       } catch (err) {
         console.error('Presence setup error:', err);
-      } finally {
-        if (isSubscribed) {
-          setLoading(false);
-          setIsAuthReady(true);
-        }
       }
     };
 
@@ -235,15 +244,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       storage.setItem('grix_cached_user', JSON.stringify(user));
     } else {
       storage.removeItem('grix_cached_user');
-      storage.removeItem('grix_cached_userdata');
     }
   }, [user]);
-
-  useEffect(() => {
-    if (userData) {
-      storage.setItem('grix_cached_userdata', JSON.stringify(userData));
-    }
-  }, [userData]);
 
   // Sync Device Login Session Metadata
   useEffect(() => {
@@ -268,7 +270,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         supabase.auth.signOut().then(() => {
           safeSessionStorage.removeItem('grix_current_session_id');
           storage.removeItem('grix_cached_user');
-          storage.removeItem('grix_cached_userdata');
           window.location.reload();
         });
       }

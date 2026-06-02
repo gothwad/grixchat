@@ -48,8 +48,9 @@ export const useCalls = () => {
 
     fetchCalls();
 
+    const uniqueChannelId = `calls-history:${user.id}-${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
-      .channel(`calls-history:${user.id}`)
+      .channel(uniqueChannelId)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

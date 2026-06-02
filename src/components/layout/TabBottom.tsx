@@ -118,8 +118,9 @@ export default function TabBottom() {
 
     fetchUnread();
 
+    const unreadChannelId = `tab-bottom-unread:${authUser.id}-${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
-      .channel(`tab-bottom-unread:${authUser.id}`)
+      .channel(unreadChannelId)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

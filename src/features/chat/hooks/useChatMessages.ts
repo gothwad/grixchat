@@ -273,11 +273,18 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
         // Merge real-time updates directly to preserve metadata and render instantly
-        setMessages(prev => prev.map(m => m.id === payload.new.id ? {
-          ...m,
-          ...payload.new,
-          content: payload.new.text || payload.new.content || m.content || ''
-        } : m));
+        setMessages(prev => prev.map(m => {
+          if (m.id === payload.new.id) {
+            const preservedReplyTo = m.reply_to && typeof m.reply_to === 'object' ? m.reply_to : payload.new.reply_to;
+            return {
+              ...m,
+              ...payload.new,
+              reply_to: preservedReplyTo,
+              content: payload.new.text || payload.new.content || m.content || ''
+            };
+          }
+          return m;
+        }));
       })
       .on('postgres_changes', {
         event: 'DELETE',

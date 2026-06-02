@@ -172,9 +172,14 @@ export class PostsService {
           };
         }));
 
+        let finalPosts = formattedPosts;
+        if (!finalPosts || finalPosts.length === 0) {
+          finalPosts = SEED_POSTS;
+        }
+
         // Cache a copy in storage as offline backup
-        storage.setItem(STORAGE_POSTS_KEY, JSON.stringify(formattedPosts));
-        return formattedPosts;
+        storage.setItem(STORAGE_POSTS_KEY, JSON.stringify(finalPosts));
+        return finalPosts;
       } catch (e: any) {
         console.warn('Surgical catch of fetchPosts error, proceeding to local caching:', e);
         return this.getLocalCachedPosts(currentUserId);

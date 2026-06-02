@@ -21,7 +21,8 @@ import {
   Lock,
   PlaySquare,
   Radio,
-  MessageCircle
+  MessageCircle,
+  Info
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -73,8 +74,9 @@ export default function TabHeader() {
 
     fetchUnread();
 
+    const headerChannelId = `tab-header-notifs:${authUser.id}-${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
-      .channel(`tab-header-notifs:${authUser.id}`)
+      .channel(headerChannelId)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

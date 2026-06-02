@@ -141,6 +141,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                 isHighlighted={highlightedMessageId === msg.id}
                 isLatestMessage={index === currentMessages.length - 1}
                 isSelected={selectedMsgIds.includes(msg.id)}
+                allMessages={uniqueMessages}
               />
             );
           });

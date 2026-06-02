@@ -35,6 +35,7 @@ interface MessageBubbleProps {
   isHighlighted?: boolean;
   isLatestMessage?: boolean;
   isSelected?: boolean;
+  allMessages?: any[];
 }
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   msg,
@@ -54,7 +55,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onJumpToMessage,
   isHighlighted,
   isLatestMessage,
-  isSelected
+  isSelected,
+  allMessages
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -82,6 +84,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }, 10000); // update every 10 seconds to auto-update relative status text
     return () => clearInterval(timer);
   }, []);
+
+  let resolvedReplyTo = msg.reply_to;
+  if (resolvedReplyTo) {
+    if (typeof resolvedReplyTo === 'string' || typeof resolvedReplyTo === 'number') {
+      const parentMsg = allMessages?.find((m: any) => m.id === resolvedReplyTo);
+      if (parentMsg) {
+        resolvedReplyTo = {
+          id: parentMsg.id,
+          sender_id: parentMsg.sender_id,
+          content: parentMsg.content || parentMsg.text || '',
+          text: parentMsg.text || parentMsg.content || '',
+          sender: parentMsg.sender
+        };
+      }
+    }
+  }
   
   if (msg.type === 'system') {
     return (
@@ -199,21 +217,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             />
           )}
 
-          {msg.reply_to && typeof msg.reply_to === 'object' && !Array.isArray(msg.reply_to) && msg.reply_to.id && (
+          {resolvedReplyTo && typeof resolvedReplyTo === 'object' && !Array.isArray(resolvedReplyTo) && resolvedReplyTo.id && (
             <motion.div 
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
-                if (msg.reply_to.id && onJumpToMessage) {
-                  onJumpToMessage(msg.reply_to.id);
+                if (resolvedReplyTo.id && onJumpToMessage) {
+                  onJumpToMessage(resolvedReplyTo.id);
                 }
               }}
               className="mb-1 p-1.5 rounded bg-black/5 border-l-4 border-[var(--primary)] text-[12px] cursor-pointer hover:bg-black/10 transition-colors"
             >
               <p className="font-bold text-[var(--primary)] text-[10px]">
-                {msg.reply_to.sender_id === user?.id ? 'You' : receiver?.fullName}
+                {resolvedReplyTo.sender_id === user?.id ? 'You' : receiver?.fullName}
               </p>
-              <p className="truncate text-zinc-600 italic">{msg.reply_to.content || msg.reply_to.text}</p>
+              <p className="truncate text-zinc-600 italic">{resolvedReplyTo.content || resolvedReplyTo.text}</p>
             </motion.div>
           )}
 

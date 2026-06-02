@@ -121,8 +121,9 @@ export default function SearchTab() {
     fetchInitialData();
 
     if (!supabase || !authUser?.id) return;
+    const channelId = `search-tab-follows-realtime-${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
-      .channel('search-tab-follows-realtime')
+      .channel(channelId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'follows' }, () => {
         fetchInitialData();
       })

@@ -9,21 +9,55 @@ import { useAuth } from '../../providers/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import { CallsHistoryList } from './components/CallsHistoryList';
 import { CallsContactsList } from './components/CallsContactsList';
+import { LocalDataCache } from '../../services/LocalDataCache';
 
 export default function CallsTab() {
   const { user: authUser } = useAuth();
   const navigate = useNavigate();
-  const [calls, setCalls] = useState<any[]>([]);
-  const [callsLoading, setCallsLoading] = useState(true);
-  const [contacts, setContacts] = useState<any[]>([]);
-  const [contactsLoading, setContactsLoading] = useState(false);
+  
+  // Instant load calls history from Cache
+  const [calls, setCalls] = useState<any[]>(() => {
+    if (authUser?.id) {
+      const cached = LocalDataCache.get<any[]>(`gx_calls_history_${authUser.id}`);
+      if (cached && Array.isArray(cached)) return cached;
+    }
+    return [];
+  });
+  
+  const [callsLoading, setCallsLoading] = useState(() => {
+    if (authUser?.id) {
+      const cached = LocalDataCache.get<any[]>(`gx_calls_history_${authUser.id}`);
+      if (cached && Array.isArray(cached) && cached.length > 0) return false;
+    }
+    return true;
+  });
+
+  // Instant load contacts from Cache
+  const [contacts, setContacts] = useState<any[]>(() => {
+    if (authUser?.id) {
+      const cached = LocalDataCache.get<any[]>(`gx_calls_contacts_${authUser.id}`);
+      if (cached && Array.isArray(cached)) return cached;
+    }
+    return [];
+  });
+
+  const [contactsLoading, setContactsLoading] = useState(() => {
+    if (authUser?.id) {
+      const cached = LocalDataCache.get<any[]>(`gx_calls_contacts_${authUser.id}`);
+      if (cached && Array.isArray(cached) && cached.length > 0) return false;
+    }
+    return true;
+  });
+
   const [linkCopied, setLinkCopied] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'calls' | 'contacts'>('calls');
 
   const fetchCalls = async () => {
     if (!authUser || !supabase) return;
     try {
-      setCallsLoading(true);
+      if (calls.length === 0) {
+        setCallsLoading(true);
+      }
       const { data, error } = await supabase
         .from('calls')
         .select(`
@@ -52,6 +86,7 @@ export default function CallsTab() {
           };
         });
         setCalls(callList);
+        LocalDataCache.set(`gx_calls_history_${authUser.id}`, callList);
       }
     } catch (e) {
       console.error("Error fetching calls:", e);
@@ -63,7 +98,9 @@ export default function CallsTab() {
   const fetchContacts = async () => {
     if (!authUserZone() || !supabase) return;
     try {
-      setContactsLoading(true);
+      if (contacts.length === 0) {
+        setContactsLoading(true);
+      }
       
       // Get following/follower IDs directly representing mutual friend links
       const { data: followRows, error: followError } = await supabase
@@ -109,9 +146,11 @@ export default function CallsTab() {
             };
           });
           setContacts(formatted);
+          LocalDataCache.set(`gx_calls_contacts_${authUser?.id}`, formatted);
         }
       } else {
         setContacts([]);
+        LocalDataCache.set(`gx_calls_contacts_${authUser?.id}`, []);
       }
     } catch (err) {
       console.error('Error fetching friends contacts:', err);
