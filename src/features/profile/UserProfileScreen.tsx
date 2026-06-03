@@ -32,6 +32,7 @@ import { truncateToChars } from '../../utils/bioHelper';
 import { chatService } from '../chat/services/chatService';
 import { acceptChat } from '../../utils/acceptedChats';
 import { isUserOnline, formatLastSeen } from '../../utils/presence';
+import { LocalDataCache } from '../../services/LocalDataCache';
 
 export default function UserProfileScreen() {
   const { id: userId } = useParams();
@@ -286,6 +287,8 @@ export default function UserProfileScreen() {
                         acceptChat(convId);
                       }
 
+                      LocalDataCache.invalidateConversations(authUser.id);
+
                       setIsFriend(true);
                       setIsIncoming(false);
                     } catch (err) {
@@ -325,6 +328,8 @@ export default function UserProfileScreen() {
                         following_id: userId
                       });
                       if (error) throw error;
+
+                      LocalDataCache.invalidateConversations(authUser.id);
                     } catch (err) {
                       console.error("Error creating request:", err);
                     } finally {

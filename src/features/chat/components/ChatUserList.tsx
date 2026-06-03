@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, Lock, Archive } from 'lucide-react';
+import { MessageCircle, Lock, Archive, Check } from 'lucide-react';
 import { motion } from 'motion/react';
 import { aiService } from '../../../services/AIService';
 import { useLayout } from '../../../contexts/LayoutContext';
@@ -95,7 +95,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
                 : 'border-[var(--text-secondary)]/30 hover:border-[#0494f4]'
             }`}>
               {isSelected && (
-                <div className="w-[8px] h-[8px] bg-white rounded-full" />
+                <Check className="text-white animate-scaleIn" size={13} strokeWidth={3} />
               )}
             </div>
           </div>

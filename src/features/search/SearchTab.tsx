@@ -16,6 +16,7 @@ import { supabase } from '../../lib/supabase';
 import { isUserOnline } from '../../utils/presence';
 import { chatService } from '../chat/services/chatService';
 import { acceptChat } from '../../utils/acceptedChats';
+import { LocalDataCache } from '../../services/LocalDataCache';
 
 interface UserProfile {
   uid: string;
@@ -194,6 +195,8 @@ export default function SearchTab() {
       });
       if (error) throw error;
 
+      LocalDataCache.invalidateConversations(authUser.id);
+
       setFollowingIds(prev => [...prev, receiverId]);
     } catch (err) {
       console.error("Error creating request in search tab:", err);
@@ -218,6 +221,8 @@ export default function SearchTab() {
         acceptChat(convId);
       }
 
+      LocalDataCache.invalidateConversations(authUser.id);
+
       setFollowingIds(prev => [...prev, receiverId]);
     } catch (err) {
       console.error("Error accepting request in search tab:", err);
@@ -238,6 +243,8 @@ export default function SearchTab() {
         .eq('following_id', receiverId);
       
       if (error) throw error;
+
+      LocalDataCache.invalidateConversations(authUser.id);
 
       setFollowingIds(prev => prev.filter(id => id !== receiverId));
       setLocalRequestedUids(prev => prev.filter(id => id !== receiverId));

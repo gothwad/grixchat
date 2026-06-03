@@ -211,18 +211,29 @@ export function useChatFormHandler({
     }
   }, []);
 
+  const handleSetReplyingTo = useCallback((msg: any) => {
+    setReplyingTo(msg);
+    if (msg) {
+      setEditingMessage(null);
+      setNewMessage('');
+    }
+  }, [setEditingMessage, setNewMessage]);
+
   const startEdit = useCallback((msg: any) => {
     setEditingMessage(msg);
+    setReplyingTo(null);
     setNewMessage(msg.content || msg.text || '');
     setActiveMessageMenu(null);
     setTimeout(() => {
       if (textareaRef.current) {
+        const val = msg.content || msg.text || '';
         textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(val.length, val.length);
         textareaRef.current.style.height = 'auto';
         textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
       }
     }, 100);
-  }, [textareaRef]);
+  }, [textareaRef, setNewMessage, setEditingMessage, setActiveMessageMenu, setReplyingTo]);
 
   return {
     showOptions,
@@ -232,7 +243,7 @@ export function useChatFormHandler({
     isMuted,
     setIsMuted,
     replyingTo,
-    setReplyingTo,
+    setReplyingTo: handleSetReplyingTo,
     editingMessage,
     setEditingMessage,
     activeMessageMenu,

@@ -27,7 +27,7 @@ export default function ChatScreen() {
   const { id: receiverId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, userData: currentUserData } = useAuth();
+  const { user, userData: currentUserData, refreshUserData } = useAuth();
   
   const { chatId, convType } = useChatId(receiverId);
 
@@ -280,6 +280,7 @@ export default function ChatScreen() {
     const isHidden = currentUserData?.hiddenChats?.includes(chatId);
     const newHidden = isHidden ? currentUserData.hiddenChats.filter((id: any) => id !== chatId) : [...(currentUserData.hiddenChats || []), chatId];
     await supabase.from('users').update({ hidden_chats: newHidden }).eq('id', user.id);
+    await refreshUserData();
     if (!isHidden) navigate('/chats');
   };
 
@@ -288,6 +289,7 @@ export default function ChatScreen() {
     const isArchived = currentUserData?.archivedChats?.includes(chatId);
     const newArchived = isArchived ? currentUserData.archivedChats.filter((id: any) => id !== chatId) : [...(currentUserData.archivedChats || []), chatId];
     await supabase.from('users').update({ archived_chats: newArchived }).eq('id', user.id);
+    await refreshUserData();
     if (!isArchived) navigate('/chats');
   };
 

@@ -24,7 +24,7 @@ interface StoryGroup {
 
 export default function ChatsTab() {
   const navigate = useNavigate();
-  const { user: authUser, userData } = useAuth();
+  const { user: authUser, userData, refreshUserData } = useAuth();
   const { searchTerm, setSearchTerm } = useSearch();
   const { 
     activeFilters, 
@@ -341,7 +341,7 @@ export default function ChatsTab() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 350, damping: 25 }}
-            className="absolute bottom-16 left-4 right-4 bg-[var(--bg-card)] border border-[var(--border-color)]/60 py-3 px-5 rounded-2xl shadow-xl flex items-center justify-between z-[90] text-sm text-[var(--text-primary)]"
+            className="absolute bottom-3 left-4 right-4 bg-[var(--bg-card)] border border-[var(--border-color)]/60 py-3 px-5 rounded-2xl shadow-xl flex items-center justify-between z-[90] text-sm text-[var(--text-primary)]"
           >
             <div className="flex items-center gap-3">
               <button 
@@ -397,10 +397,13 @@ export default function ChatsTab() {
                       const updatedArchived = [...new Set([...currentArchived, ...selectedChatIds])];
                       
                       if (supabase) {
+                        const targetId = authUser.id || authUser.uid;
                         await supabase
                           .from('users')
                           .update({ archived_chats: updatedArchived })
-                          .eq('id', authUser.uid);
+                          .eq('id', targetId);
+                        
+                        await refreshUserData();
                       }
                     } catch (err) {
                       console.error('Failed to archive chats:', err);

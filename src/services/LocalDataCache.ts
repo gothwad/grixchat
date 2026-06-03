@@ -109,6 +109,11 @@ class LocalDataCacheService {
     return this.get<any[]>(`gx_convs_${myUserId}`, 1000 * 60 * 60 * 24 * 30); // Keep cached convs valid for 30 days to support robust offline launch
   }
 
+  public invalidateConversations(myUserId: string): void {
+    this.remove(`gx_convs_${myUserId}`);
+    this.notify('conversations');
+  }
+
   public saveConversations(myUserId: string, conversations: any[]): void {
     this.set(`gx_convs_${myUserId}`, conversations);
   }

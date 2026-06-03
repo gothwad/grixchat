@@ -237,6 +237,8 @@ export const useConversations = (activeFilter: string) => {
     const unsubscribeCache = LocalDataCache.subscribe('conversations', (updatedList) => {
       if (updatedList && Array.isArray(updatedList)) {
         setConversations(updatedList);
+      } else {
+        fetchConversations();
       }
     });
 

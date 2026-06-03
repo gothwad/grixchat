@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { getAcceptedChats, acceptChat, declineChat } from '../../utils/acceptedChats';
 import { chatService } from './services/chatService';
+import { LocalDataCache } from '../../services/LocalDataCache';
 
 export default function MessageRequestsScreen() {
   const navigate = useNavigate();
@@ -117,6 +118,9 @@ export default function MessageRequestsScreen() {
         acceptChat(convId);
       }
 
+      // Explicitly invalidate conversations cache to update chat screen instantly
+      LocalDataCache.invalidateConversations(authUser.id);
+
       // Remove from list
       setIncoming(prev => prev.filter(req => req.id !== otherId));
     } catch (e) {
@@ -140,6 +144,9 @@ export default function MessageRequestsScreen() {
 
       if (error) throw error;
 
+      // Explicitly invalidate conversations cache to update chat screen instantly
+      LocalDataCache.invalidateConversations(authUser.id);
+
       setIncoming(prev => prev.filter(req => req.id !== otherId));
     } catch (e) {
       console.error('Error declining request:', e);
@@ -161,6 +168,9 @@ export default function MessageRequestsScreen() {
         .eq('following_id', otherId);
 
       if (error) throw error;
+
+      // Explicitly invalidate conversations cache to update chat screen instantly
+      LocalDataCache.invalidateConversations(authUser.id);
 
       setOutgoing(prev => prev.filter(req => req.id !== otherId));
     } catch (e) {
