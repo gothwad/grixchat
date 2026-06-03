@@ -139,7 +139,7 @@ export default function FriendsScreen() {
 
       {/* Styled Search Bar */}
       <div className="px-5 py-3.5 shrink-0 bg-[var(--bg-card)] border-b border-[var(--border-color)]/10 z-10">
-        <div className="flex items-center bg-[var(--bg-main)] hover:bg-[var(--bg-main)]/90 focus-within:bg-[var(--bg-main)] rounded-2xl px-4 h-11 border border-[var(--border-color)]/30 focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/10 shadow-sm transition-all duration-250">
+        <div className="flex items-center bg-[var(--bg-main)] hover:bg-[var(--bg-main)]/90 focus-within:bg-[var(--bg-main)] rounded-2xl px-4 h-11 border border-[var(--border-color)]/30 focus-within:border-[#0494f4]/55 focus-within:ring-2 focus-within:ring-[#0494f4]/5 shadow-sm transition-all duration-250">
           <Search size={16} className="text-[var(--text-secondary)] mr-2.5 opacity-60" />
           <input 
             type="text" 
@@ -163,7 +163,7 @@ export default function FriendsScreen() {
       <div className="flex-1 overflow-y-auto no-scrollbar pb-16 bg-[var(--bg-card)]">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="animate-spin text-indigo-500" size={28} />
+            <Loader2 className="animate-spin text-[#0494f4]" size={28} />
             <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em]">Loading friends list...</p>
           </div>
         ) : error ? (
@@ -210,7 +210,7 @@ export default function FriendsScreen() {
                 </div>
                 
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-[13.5px] font-extrabold text-[var(--text-primary)] truncate group-hover:text-indigo-500 transition-colors">
+                  <h4 className="text-[13.5px] font-extrabold text-[var(--text-primary)] truncate group-hover:text-[#0494f4] transition-colors">
                     {friend.fullName || friend.username}
                   </h4>
                   <p className="text-[11px] text-[var(--text-secondary)]/80 font-bold truncate">@{friend.username}</p>

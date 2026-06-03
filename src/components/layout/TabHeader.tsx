@@ -148,8 +148,8 @@ export default function TabHeader() {
           </Link>
         )}
 
-        {/* 3 Dots Menu - Show on Chats page */}
-        {isChatsPage && (
+        {/* 3 Dots Menu - Show on Chats, Groups, and Search pages */}
+        {(isChatsPage || isGroupsPage || isSearchPage) && (
           <div className="relative" ref={menuRef}>
             <button 
               onClick={() => setShowMenu(prev => !prev)}
@@ -168,16 +168,7 @@ export default function TabHeader() {
           </div>
         )}
 
-        {/* Settings Icon - Show on Profile page */}
-        {isProfilePage && (
-          <button 
-            onClick={() => navigate('/settings')}
-            className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer active:scale-95 duration-100"
-            id="header-profile-settings"
-          >
-            <Settings size={22} className="text-[var(--header-text)]" />
-          </button>
-        )}
+        {/* Settings button is removed from header since it is mixed into the profile tab */}
       </div>
     </div>
   );

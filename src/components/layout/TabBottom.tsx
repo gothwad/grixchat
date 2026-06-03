@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MessageCircle, Users, UserCircle, Home, Search, Phone, Settings, Grid } from 'lucide-react';
+import { MessageCircle, Users, UserCircle, Phone, Search } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
@@ -10,6 +10,9 @@ export default function TabBottom() {
   const location = useLocation();
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   const [unreadGroupsCount, setUnreadGroupsCount] = useState(0);
+
+  const [conversationsList, setConversationsList] = useState<string[]>([]);
+  const [triggerFetch, setTriggerFetch] = useState(0);
 
   useEffect(() => {
     if (!authUser || !supabase) return;
@@ -76,7 +79,12 @@ export default function TabBottom() {
         });
 
         // Fetch unread messages
-        const myConvIds = Object.keys(convTypeMap);
+        const myConvIds = Object.keys(convTypeMap).sort();
+        setConversationsList(prev => {
+          const isIdentical = prev.length === myConvIds.length && prev.every((id, idx) => id === myConvIds[idx]);
+          return isIdentical ? prev : myConvIds;
+        });
+
         if (myConvIds.length === 0) {
           setUnreadChatsCount(0);
           setUnreadGroupsCount(0);
@@ -124,7 +132,8 @@ export default function TabBottom() {
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'messages',
+        table: 'conversation_participants',
+        filter: `user_id=eq.${authUser.id}`
       }, () => {
         fetchUnread();
       })
@@ -140,11 +149,50 @@ export default function TabBottom() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [authUser?.id]);
+  }, [authUser?.id, triggerFetch]);
+
+  useEffect(() => {
+    if (!authUser || !supabase || conversationsList.length === 0) return;
+
+    // Subscribing dynamically to active conversations' messages for instant real-time updates
+    const channels = conversationsList.map(convId => {
+      const channelName = `tab-bottom-msg-${convId}-${Math.random().toString(36).substring(2, 7)}`;
+      const ch = supabase
+        .channel(channelName)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${convId}`
+        }, () => {
+          setTriggerFetch(t => t + 1);
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${convId}`
+        }, () => {
+          setTriggerFetch(t => t + 1);
+        })
+        .subscribe();
+      return ch;
+    });
+
+    return () => {
+      channels.forEach(ch => {
+        try {
+          supabase.removeChannel(ch);
+        } catch (e) {
+          console.warn("Error removing tab-bottom channel:", e);
+        }
+      });
+    };
+  }, [conversationsList, authUser?.id]);
   
   const navItems = [
     { icon: MessageCircle, path: '/chats', label: 'Chats', badge: unreadChatsCount, activeColor: 'text-[var(--header-text)]' },
-    { icon: Grid, path: '/posts', label: 'Posts', activeColor: 'text-[var(--header-text)]' },
+    { icon: Users, path: '/groups', label: 'Groups', badge: unreadGroupsCount, activeColor: 'text-[var(--header-text)]' },
     { icon: Search, path: '/search', label: 'Search', activeColor: 'text-[var(--header-text)]' },
     { icon: Phone, path: '/calls', label: 'Calls', activeColor: 'text-[var(--header-text)]' },
     { icon: UserCircle, path: '/profile', label: 'Profile', activeColor: 'text-[var(--header-text)]' },

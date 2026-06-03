@@ -32,8 +32,6 @@ import { truncateToChars } from '../../utils/bioHelper';
 import { chatService } from '../chat/services/chatService';
 import { acceptChat } from '../../utils/acceptedChats';
 import { isUserOnline, formatLastSeen } from '../../utils/presence';
-import { PostsService } from '../posts/services/postsSupabase';
-import { Post } from '../posts/types';
 
 export default function UserProfileScreen() {
   const { id: userId } = useParams();
@@ -50,27 +48,12 @@ export default function UserProfileScreen() {
   const [requestProgress, setRequestProgress] = useState(false);
   const [hasActiveStories, setHasActiveStories] = useState(false);
 
-  const [userPosts, setUserPosts] = useState<Post[]>([]);
-  const [loadingPosts, setLoadingPosts] = useState(true);
   const [friendsCount, setFriendsCount] = useState(0);
 
   const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
   useEffect(() => {
     if (!userId) return;
-
-    const loadSearchedUserPosts = async () => {
-      setLoadingPosts(true);
-      try {
-        const allPosts = await PostsService.fetchPosts(userId);
-        const filtered = allPosts.filter(p => p.user_id === userId || p.user?.uid === userId);
-        setUserPosts(filtered);
-      } catch (e) {
-        console.error("Error loading searched user's posts:", e);
-      } finally {
-        setLoadingPosts(false);
-      }
-    };
 
     const fetchSearchedUserFriendsCount = async () => {
       if (!supabase) return;
@@ -101,7 +84,6 @@ export default function UserProfileScreen() {
       }
     };
 
-    loadSearchedUserPosts();
     fetchSearchedUserFriendsCount();
   }, [userId]);
 
@@ -382,73 +364,22 @@ export default function UserProfileScreen() {
 
           {/* Stats Block - matches ProfileTab design */}
           <div className="mb-4">
-            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)]/50 overflow-hidden shadow-sm py-2 px-4 flex justify-around items-center">
-              {/* Post Count Stats */}
-              <div className="flex flex-col items-center flex-1 justify-center py-0.5 select-none">
-                <span className="text-sm font-black text-[var(--text-primary)]">
-                  {userPosts.length}
-                </span>
-                <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mt-0.5">
-                  Posts
-                </span>
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)]/50 overflow-hidden shadow-sm py-3 px-4 flex justify-between items-center select-none">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#0494f4]/10 rounded-xl text-[#0494f4]">
+                  <CheckCircle2 size={18} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-[var(--text-primary)]">Contact Stats</h4>
+                  <p className="text-[10px] text-[var(--text-secondary)]">Total mutual contacts on GrixChat</p>
+                </div>
               </div>
-              
-              <div className="w-px h-6 bg-[var(--border-color)]/30" />
-
-              {/* Friends Stats */}
-              <div className="flex flex-col items-center flex-1 justify-center py-0.5 select-none">
-                <span className="text-sm font-black text-[#0494f4]">
-                  {friendsCount}
-                </span>
-                <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mt-0.5 text-center leading-none">
-                  Friends
+              <div className="flex items-center gap-2">
+                <span className="text-base font-black text-[#0494f4] bg-[#0494f4]/10 px-3 py-1 rounded-xl">
+                  {friendsCount} Friends
                 </span>
               </div>
             </div>
-          </div>
-
-          {/* Instagram-style Posts Grid - matches ProfileTab design */}
-          <div className="mb-4">
-            <h3 className="px-2 mb-2 text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em] flex justify-between items-center">
-              <span>Posts list</span>
-            </h3>
-            
-            {loadingPosts ? (
-              <div className="py-12 bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl flex justify-center items-center">
-                <Loader2 className="animate-spin text-[#0494f4]" size={20} />
-              </div>
-            ) : userPosts.length > 0 ? (
-              <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden border border-[var(--border-color)]/40 p-1 bg-[var(--bg-card)]">
-                {userPosts.map((post) => (
-                  <div 
-                    key={post.id} 
-                    onClick={() => navigate('/posts')}
-                    className="relative aspect-square overflow-hidden bg-[var(--bg-main)] cursor-pointer group active:scale-95 transition-transform"
-                  >
-                    <img 
-                      src={post.image_url} 
-                      alt={post.caption || "Post item"}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      referrerPolicy="no-referrer"
-                    />
-                    {/* Overlay with Likes count */}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white gap-1.5 font-bold text-xs select-none">
-                      <Star size={12} fill="currentColor" />
-                      <span>{post.likes_count}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl p-8 shadow-sm text-center flex flex-col items-center justify-center gap-3">
-                <div className="text-[var(--text-secondary)]/40">
-                  <Star size={24} />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-[var(--text-primary)]">No posts published yet</p>
-                </div>
-              </div>
-            )}
           </div>
 
         </div>

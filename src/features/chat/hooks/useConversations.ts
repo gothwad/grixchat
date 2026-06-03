@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../providers/AuthProvider.tsx';
 import { LocalDataCache } from '../../../services/LocalDataCache';
@@ -31,194 +31,207 @@ export const useConversations = (activeFilter: string) => {
     return true;
   });
 
+  const chatChannelsRef = useRef<any[]>([]);
+  const subscribedIdsRef = useRef<string[]>([]);
+
+  const formatTime = useCallback((date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days === 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (days === 1) return 'Yesterday';
+    return date.toLocaleDateString();
+  }, []);
+
+  const fetchConversations = useCallback(async () => {
+    if (!user || activeFilter === 'Calls' || !supabase || !isAuthReady) return;
+    const myId = user.id;
+    const cached = LocalDataCache.getConversations(myId);
+    if (!cached || cached.length === 0) {
+      setLoading(true);
+    }
+
+    try {
+      // 1. Fetch conversations I'm part of
+      const { data, error } = await supabase
+        .from('conversation_participants')
+        .select(`
+          conversation:conversations (
+            *,
+            participants:conversation_participants (
+              user:users (*)
+            )
+          )
+        `)
+        .eq('user_id', myId)
+        .order('joined_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching conversations:', error);
+        return;
+      }
+
+      // Fetch mutual follows to filter out non-friends from direct chats
+      const { data: followRows } = await supabase
+        .from('follows')
+        .select('follower_id, following_id')
+        .or(`follower_id.eq.${myId},following_id.eq.${myId}`);
+
+      const IFollow = new Set<string>();
+      const FollowsMe = new Set<string>();
+
+      followRows?.forEach((row: any) => {
+        if (row.follower_id === myId) {
+          IFollow.add(row.following_id);
+        }
+        if (row.following_id === myId) {
+          FollowsMe.add(row.follower_id);
+        }
+      });
+
+      const mutualFriendsSet = new Set<string>();
+      IFollow.forEach(id => {
+        if (FollowsMe.has(id)) {
+          mutualFriendsSet.add(id);
+        }
+      });
+
+      const conversationIds = data?.map((item: any) => item.conversation?.id).filter(Boolean) || [];
+
+      // Fetch unread messages count for all my conversations at once
+      let unreadData: any[] = [];
+      if (conversationIds.length > 0) {
+        const { data: res } = await supabase
+          .from('messages')
+          .select('conversation_id')
+          .eq('is_read', false)
+          .neq('sender_id', myId)
+          .in('conversation_id', conversationIds);
+        unreadData = res || [];
+      }
+
+      const unreadMap: Record<string, number> = {};
+      unreadData.forEach(m => {
+        unreadMap[m.conversation_id] = (unreadMap[m.conversation_id] || 0) + 1;
+      });
+
+      // Fetch the actual newest message from messages table for each conversation to prevent race conditions
+      const latestMessagesMap: Record<string, any> = {};
+
+      if (conversationIds.length > 0) {
+        const { data: latestMsgs } = await supabase
+          .from('messages')
+          .select('conversation_id, text, media_type, created_at')
+          .in('conversation_id', conversationIds)
+          .order('created_at', { ascending: false });
+
+        latestMsgs?.forEach((m: any) => {
+          if (!latestMessagesMap[m.conversation_id]) {
+            latestMessagesMap[m.conversation_id] = m;
+          }
+        });
+      }
+
+      const rawList = data
+        .map((item: any) => {
+          const conv = item.conversation;
+          if (!conv) return null;
+          const isGroup = conv.type === 'group';
+          const otherParticipants = conv.participants.filter((p: any) => p?.user?.id !== myId);
+          const firstOther = otherParticipants[0]?.user;
+
+          if (!isGroup && !firstOther) return null;
+
+          // CRITICAL: direct messaging is only allowed and shown for mutual GrixChat Friends
+          if (!isGroup && firstOther && !mutualFriendsSet.has(firstOther.id)) {
+            return null;
+          }
+
+          const unreadCount = unreadMap[conv.id] || 0;
+          const latestDbMsg = latestMessagesMap[conv.id];
+
+          let lastMsgVal = conv.last_message || 'New Conversation';
+          let lastMsgAtVal = conv.last_message_at || conv.created_at;
+
+          if (latestDbMsg) {
+            lastMsgVal = latestDbMsg.text || (latestDbMsg.media_type ? `Sent a ${latestDbMsg.media_type}` : 'Sent a file');
+            lastMsgAtVal = latestDbMsg.created_at;
+          }
+
+          // Clean any forward tagging indicators for raw display in Chat List
+          if (typeof lastMsgVal === 'string') {
+            if (lastMsgVal.startsWith('\u200B[FWD_MANY]\u200B')) {
+              lastMsgVal = '↪ Forwarded many times: ' + lastMsgVal.replace('\u200B[FWD_MANY]\u200B', '');
+            } else if (lastMsgVal.startsWith('\u200B[FWD]\u200B')) {
+              lastMsgVal = '↪ Forwarded: ' + lastMsgVal.replace('\u200B[FWD]\u200B', '');
+            }
+          }
+
+          return {
+            id: conv.id,
+            type: conv.type,
+            otherUserId: isGroup ? conv.id : firstOther.id,
+            user: isGroup ? (conv.name || 'Group') : (firstOther.full_name || firstOther.username || 'Unknown'),
+            username: isGroup ? 'group' : firstOther?.username,
+            fullName: isGroup ? conv.name : firstOther?.full_name,
+            lastMsg: lastMsgVal,
+            lastMsgAt: lastMsgAtVal,
+            time: formatTime(new Date(lastMsgAtVal)),
+            avatar: isGroup 
+              ? (conv.photo_url || `https://cdn-icons-png.flaticon.com/512/166/166258.png`)
+              : (firstOther?.photo_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`),
+            unread: unreadCount > 0,
+            unreadCount: unreadCount,
+            isOnline: isGroup ? false : isUserOnline(firstOther?.is_online, firstOther?.last_seen)
+          };
+        })
+        .filter(Boolean);
+
+      // De-duplicate direct conversations: Keep only the one with the most recent activity / actual messages
+      const seenDict: Record<string, any> = {};
+      rawList.forEach((conv: any) => {
+        if (conv.type !== 'direct') return;
+        const existing = seenDict[conv.otherUserId];
+        if (!existing) {
+          seenDict[conv.otherUserId] = conv;
+        } else {
+          // If one has real messages and the other is empty ('New Conversation'), keep the real one
+          const currentHasMsg = conv.lastMsg && conv.lastMsg !== 'New Conversation';
+          const existingHasMsg = existing.lastMsg && existing.lastMsg !== 'New Conversation';
+
+          if (currentHasMsg && !existingHasMsg) {
+            seenDict[conv.otherUserId] = conv;
+          } else if (!currentHasMsg && existingHasMsg) {
+            // keep existing, do nothing
+          } else {
+            // both have messages or both are empty, keep the one with the more recent lastMsgAt
+            if (new Date(conv.lastMsgAt).getTime() > new Date(existing.lastMsgAt).getTime()) {
+              seenDict[conv.otherUserId] = conv;
+            }
+          }
+        }
+      });
+
+      const formattedList = rawList
+        .filter((conv: any) => {
+          if (conv.type !== 'direct') return true;
+          return seenDict[conv.otherUserId]?.id === conv.id;
+        })
+        .sort((a, b) => {
+          return new Date(b.lastMsgAt).getTime() - new Date(a.lastMsgAt).getTime();
+        });
+
+      LocalDataCache.saveConversations(myId, formattedList);
+      setConversations(formattedList);
+    } catch (err) {
+      console.error('Crash in fetchConversations execution details:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, activeFilter, isAuthReady, formatTime]);
+
   useEffect(() => {
     if (!user || activeFilter === 'Calls' || !supabase || !isAuthReady) return;
-
-    const fetchConversations = async () => {
-      const myId = user.id;
-      const cached = LocalDataCache.getConversations(myId);
-      if (!cached || cached.length === 0) {
-        setLoading(true);
-      }
-
-      try {
-        // 1. Fetch conversations I'm part of
-        const { data, error } = await supabase
-          .from('conversation_participants')
-          .select(`
-            conversation:conversations (
-              *,
-              participants:conversation_participants (
-                user:users (*)
-              )
-            )
-          `)
-          .eq('user_id', myId)
-          .order('joined_at', { ascending: false });
-
-        if (error) {
-          console.error('Error fetching conversations:', error);
-          return;
-        }
-
-        // Fetch mutual follows to filter out non-friends from direct chats
-        const { data: followRows } = await supabase
-          .from('follows')
-          .select('follower_id, following_id')
-          .or(`follower_id.eq.${myId},following_id.eq.${myId}`);
-
-        const IFollow = new Set<string>();
-        const FollowsMe = new Set<string>();
-
-        followRows?.forEach((row: any) => {
-          if (row.follower_id === myId) {
-            IFollow.add(row.following_id);
-          }
-          if (row.following_id === myId) {
-            FollowsMe.add(row.follower_id);
-          }
-        });
-
-        const mutualFriendsSet = new Set<string>();
-        IFollow.forEach(id => {
-          if (FollowsMe.has(id)) {
-            mutualFriendsSet.add(id);
-          }
-        });
-
-        const conversationIds = data?.map((item: any) => item.conversation?.id).filter(Boolean) || [];
-
-        // Fetch unread messages count for all my conversations at once
-        let unreadData: any[] = [];
-        if (conversationIds.length > 0) {
-          const { data: res } = await supabase
-            .from('messages')
-            .select('conversation_id')
-            .eq('is_read', false)
-            .neq('sender_id', myId)
-            .in('conversation_id', conversationIds);
-          unreadData = res || [];
-        }
-
-        const unreadMap: Record<string, number> = {};
-        unreadData.forEach(m => {
-          unreadMap[m.conversation_id] = (unreadMap[m.conversation_id] || 0) + 1;
-        });
-
-        // Fetch the actual newest message from messages table for each conversation to prevent race conditions
-        const latestMessagesMap: Record<string, any> = {};
-
-        if (conversationIds.length > 0) {
-          const { data: latestMsgs } = await supabase
-            .from('messages')
-            .select('conversation_id, text, media_type, created_at')
-            .in('conversation_id', conversationIds)
-            .order('created_at', { ascending: false });
-
-          latestMsgs?.forEach((m: any) => {
-            if (!latestMessagesMap[m.conversation_id]) {
-              latestMessagesMap[m.conversation_id] = m;
-            }
-          });
-        }
-
-        const rawList = data
-          .map((item: any) => {
-            const conv = item.conversation;
-            if (!conv) return null;
-            const isGroup = conv.type === 'group';
-            const otherParticipants = conv.participants.filter((p: any) => p?.user?.id !== myId);
-            const firstOther = otherParticipants[0]?.user;
-
-            if (!isGroup && !firstOther) return null;
-
-            // CRITICAL: direct messaging is only allowed and shown for mutual GrixChat Friends
-            if (!isGroup && firstOther && !mutualFriendsSet.has(firstOther.id)) {
-              return null;
-            }
-
-            const unreadCount = unreadMap[conv.id] || 0;
-            const latestDbMsg = latestMessagesMap[conv.id];
-
-            let lastMsgVal = conv.last_message || 'New Conversation';
-            let lastMsgAtVal = conv.last_message_at || conv.created_at;
-
-            if (latestDbMsg) {
-              lastMsgVal = latestDbMsg.text || (latestDbMsg.media_type ? `Sent a ${latestDbMsg.media_type}` : 'Sent a file');
-              lastMsgAtVal = latestDbMsg.created_at;
-            }
-
-            // Clean any forward tagging indicators for raw display in Chat List
-            if (typeof lastMsgVal === 'string') {
-              if (lastMsgVal.startsWith('\u200B[FWD_MANY]\u200B')) {
-                lastMsgVal = '↪ Forwarded many times: ' + lastMsgVal.replace('\u200B[FWD_MANY]\u200B', '');
-              } else if (lastMsgVal.startsWith('\u200B[FWD]\u200B')) {
-                lastMsgVal = '↪ Forwarded: ' + lastMsgVal.replace('\u200B[FWD]\u200B', '');
-              }
-            }
-
-            return {
-              id: conv.id,
-              type: conv.type,
-              otherUserId: isGroup ? conv.id : firstOther.id,
-              user: isGroup ? (conv.name || 'Group') : (firstOther.full_name || firstOther.username || 'Unknown'),
-              username: isGroup ? 'group' : firstOther?.username,
-              fullName: isGroup ? conv.name : firstOther?.full_name,
-              lastMsg: lastMsgVal,
-              lastMsgAt: lastMsgAtVal,
-              time: formatTime(new Date(lastMsgAtVal)),
-              avatar: isGroup 
-                ? (conv.photo_url || `https://cdn-icons-png.flaticon.com/512/166/166258.png`)
-                : (firstOther?.photo_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`),
-              unread: unreadCount > 0,
-              unreadCount: unreadCount,
-              isOnline: isGroup ? false : isUserOnline(firstOther?.is_online, firstOther?.last_seen)
-            };
-          })
-          .filter(Boolean);
-
-        // De-duplicate direct conversations: Keep only the one with the most recent activity / actual messages
-        const seenDict: Record<string, any> = {};
-        rawList.forEach((conv: any) => {
-          if (conv.type !== 'direct') return;
-          const existing = seenDict[conv.otherUserId];
-          if (!existing) {
-            seenDict[conv.otherUserId] = conv;
-          } else {
-            // If one has real messages and the other is empty ('New Conversation'), keep the real one
-            const currentHasMsg = conv.lastMsg && conv.lastMsg !== 'New Conversation';
-            const existingHasMsg = existing.lastMsg && existing.lastMsg !== 'New Conversation';
-
-            if (currentHasMsg && !existingHasMsg) {
-              seenDict[conv.otherUserId] = conv;
-            } else if (!currentHasMsg && existingHasMsg) {
-              // keep existing, do nothing
-            } else {
-              // both have messages or both are empty, keep the one with the more recent lastMsgAt
-              if (new Date(conv.lastMsgAt).getTime() > new Date(existing.lastMsgAt).getTime()) {
-                seenDict[conv.otherUserId] = conv;
-              }
-            }
-          }
-        });
-
-        const formattedList = rawList
-          .filter((conv: any) => {
-            if (conv.type !== 'direct') return true;
-            return seenDict[conv.otherUserId]?.id === conv.id;
-          })
-          .sort((a, b) => {
-            return new Date(b.lastMsgAt).getTime() - new Date(a.lastMsgAt).getTime();
-          });
-
-        LocalDataCache.saveConversations(myId, formattedList);
-        setConversations(formattedList);
-      } catch (err) {
-        console.error('Crash in fetchConversations execution details:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
 
     // Subscribe to Cache Updates for instant off-line updates
     const unsubscribeCache = LocalDataCache.subscribe('conversations', (updatedList) => {
@@ -242,9 +255,6 @@ export const useConversations = (activeFilter: string) => {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, () => {
         fetchConversations();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-        fetchConversations();
-      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'follows' }, () => {
         fetchConversations();
       })
@@ -254,7 +264,71 @@ export const useConversations = (activeFilter: string) => {
       supabase.removeChannel(channel);
       unsubscribeCache();
     };
-  }, [user, activeFilter, isAuthReady]);
+  }, [user, activeFilter, isAuthReady, fetchConversations]);
+
+  // Subscribe dynamically to new messages/conversations for all of the user's active conversations
+  useEffect(() => {
+    if (!supabase || !user || conversations.length === 0) return;
+
+    const currentIds = conversations.map(c => c.id).sort();
+    const prevIds = [...subscribedIdsRef.current].sort();
+
+    const isIdentical = currentIds.length === prevIds.length && 
+                        currentIds.every((id, idx) => id === prevIds[idx]);
+
+    if (isIdentical) {
+      return; // Save resources by not re-subscribing if conversation list hasn't structurally changed
+    }
+
+    // Unsubscribe from existing chat channels
+    chatChannelsRef.current.forEach(ch => {
+      try {
+        supabase.removeChannel(ch);
+      } catch (err) {
+        console.warn('Error removing channel:', err);
+      }
+    });
+    chatChannelsRef.current = [];
+
+    const newChannels = conversations.map(c => c.id).map(convId => {
+      const channelName = `sub-chat-${convId}-${Math.random().toString(36).substring(2, 7)}`;
+      const ch = supabase
+        .channel(channelName)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${convId}`
+        }, () => {
+          fetchConversations();
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${convId}`
+        }, () => {
+          fetchConversations();
+        })
+        .subscribe();
+      return ch;
+    });
+
+    chatChannelsRef.current = newChannels;
+    subscribedIdsRef.current = conversations.map(c => c.id);
+
+    return () => {
+      chatChannelsRef.current.forEach(ch => {
+        try {
+          supabase.removeChannel(ch);
+        } catch (err) {
+          console.warn('Error removing channel on cleanup:', err);
+        }
+      });
+      chatChannelsRef.current = [];
+      subscribedIdsRef.current = [];
+    };
+  }, [conversations, user?.id, supabase, fetchConversations]);
 
   // Suggested users fetch
   useEffect(() => {
@@ -278,15 +352,6 @@ export const useConversations = (activeFilter: string) => {
     };
     fetchSuggested();
   }, [user, isAuthReady]);
-
-  const formatTime = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    if (days === 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (days === 1) return 'Yesterday';
-    return date.toLocaleDateString();
-  };
 
   return { conversations, otherUsers, loading };
 };

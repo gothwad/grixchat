@@ -68,70 +68,78 @@ export const CallsHistoryList: React.FC<CallsHistoryListProps> = ({
   }
 
   return (
-    <div className="px-4 space-y-2">
+    <div className="px-4 space-y-2.5">
       {calls.map((call) => (
         <div 
           key={call.id}
-          className="flex items-center gap-3.5 bg-[var(--bg-card)] border border-[var(--border-color)]/30 px-4 py-3.5 rounded-2xl shadow-sm hover:bg-[var(--bg-card)]/80 transition-all select-none group"
+          className="flex items-center gap-4 bg-[var(--bg-card)] border border-[var(--border-color)]/25 px-4 py-3.5 rounded-2xl shadow-sm hover:translate-y-[-1px] hover:shadow-md hover:border-[var(--border-color)]/60 transition-all duration-200 select-none group"
         >
-          <img 
-            src={call.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-            alt={call.user} 
-            className="w-11 h-11 rounded-full object-cover border border-[var(--border-color)]/50 shrink-0"
-            referrerPolicy="no-referrer"
-          />
+          {/* Avatar Container with scale-up on card hover */}
+          <div className="relative shrink-0">
+            <img 
+              src={call.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
+              alt={call.user} 
+              className="w-[50px] h-[50px] rounded-full object-cover border border-[var(--border-color)]/40 shrink-0 group-hover:scale-105 transition-transform duration-300"
+              referrerPolicy="no-referrer"
+            />
+          </div>
           
           <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-baseline mb-0.5">
-              <h4 className={`text-sm truncate font-black ${call.isMissed ? 'text-rose-500' : 'text-[var(--text-primary)]'}`}>
+            <div className="flex justify-between items-baseline mb-1">
+              <h4 className={`text-[14.5px] truncate font-black tracking-tight ${call.isMissed ? 'text-rose-500' : 'text-[var(--text-primary)]'}`}>
                 {call.user}
               </h4>
-              <span className="text-[9px] font-mono text-[var(--text-secondary)]">
+              <span className="text-[9.5px] font-mono font-bold text-[var(--text-secondary)]/70">
                 {call.time}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-[10px]">
+            
+            <div className="flex items-center gap-2 flex-wrap">
               {call.isMissed ? (
                 call.isIncoming ? (
-                  <>
-                    <ArrowDownLeft size={11} className="text-rose-500 shrink-0" />
-                    <span className="font-bold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded">Missed Incoming</span>
-                  </>
+                  <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md">
+                    <ArrowDownLeft size={10} strokeWidth={3} className="shrink-0" />
+                    <span>Missed Incoming</span>
+                  </span>
                 ) : (
-                  <>
-                    <ArrowUpRight size={11} className="text-rose-400 shrink-0" />
-                    <span className="font-semibold text-rose-400 bg-rose-400/5 px-1.5 py-0.5 rounded">Missed Outgoing</span>
-                  </>
+                  <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md">
+                    <ArrowUpRight size={10} strokeWidth={3} className="shrink-0" />
+                    <span>Missed Outgoing</span>
+                  </span>
                 )
               ) : call.isIncoming ? (
-                <>
-                  <ArrowDownLeft size={11} className="text-emerald-500 shrink-0" />
-                  <span className="font-medium text-emerald-500 bg-emerald-500/5 px-1.5 py-0.5 rounded">Incoming</span>
-                </>
+                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                  <ArrowDownLeft size={10} strokeWidth={3} className="shrink-0" />
+                  <span>Incoming</span>
+                </span>
               ) : (
-                <>
-                  <ArrowUpRight size={11} className="text-[#0494f4] shrink-0" />
-                  <span className="font-medium text-[#0494f4] bg-[#0494f4]/5 px-1.5 py-0.5 rounded">Outgoing</span>
-                </>
+                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-[#0494f4] bg-[#0494f4]/15 px-2 py-0.5 rounded-md">
+                  <ArrowUpRight size={10} strokeWidth={3} className="shrink-0" />
+                  <span>Outgoing</span>
+                </span>
               )}
-              <span className="opacity-60 text-[9px] font-mono shrink-0 ml-1">
-                • {call.type === 'video' ? 'Video' : 'Voice'}
+              
+              <span className="inline-flex items-center text-[9px] font-bold text-[var(--text-secondary)]/80 bg-[var(--bg-main)] px-2 py-0.5 rounded-md border border-[var(--border-color)]/20 uppercase tracking-widest">
+                {call.type === 'video' ? 'Video' : 'Voice'}
               </span>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
+          
+          {/* Enhanced Action Buttons on Hover */}
+          <div className="flex items-center gap-2.5 shrink-0 ml-1">
             <button 
               onClick={() => onCall(call.otherUserId, 'voice')}
-              className="w-9 h-9 rounded-xl bg-[#0494f4]/10 text-[#0494f4] hover:bg-[#0494f4] hover:text-white transition-colors flex items-center justify-center cursor-pointer"
+              className="w-10 h-10 rounded-xl bg-[#0494f4]/10 text-[#0494f4] hover:bg-[#0494f4] hover:text-white active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer shadow-sm"
+              title="Voice Call"
             >
-              <Phone size={14} />
+              <Phone size={15} strokeWidth={2.5} />
             </button>
             <button 
               onClick={() => onCall(call.otherUserId, 'video')}
-              className="w-9 h-9 rounded-xl bg-[#0494f4]/10 text-[#0494f4] hover:bg-[#0494f4] hover:text-white transition-colors flex items-center justify-center cursor-pointer"
+              className="w-10 h-10 rounded-xl bg-[#0494f4]/10 text-[#0494f4] hover:bg-[#0494f4] hover:text-white active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer shadow-sm"
+              title="Video Call"
             >
-              <Video size={14} />
+              <Video size={15} strokeWidth={2.5} />
             </button>
           </div>
         </div>

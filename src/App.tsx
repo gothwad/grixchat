@@ -12,7 +12,6 @@ import { useTheme } from './contexts/ThemeContext';
 import { ErrorBoundary } from 'react-error-boundary';
 import SplashScreen from './components/SplashScreen';
 import DeveloperConsole from './components/DeveloperConsole';
-import FloatingDiagnosticsButton from './components/FloatingDiagnosticsButton';
 
 function ErrorFallback({ error }: { error: any }) {
   return (
@@ -38,6 +37,8 @@ import ProfileTab from './features/profile/ProfileTab';
 
 // Lazy Loading Features & Screens
 const ChatsTab = React.lazy(() => import('./features/chat/ChatsTab'));
+const GroupsTab = React.lazy(() => import('./features/chat/GroupsTab'));
+const SearchTab = React.lazy(() => import('./features/search/SearchTab'));
 const ChatLayout = React.lazy(() => import('./features/chat/ChatLayout'));
 const ChatScreen = React.lazy(() => import('./features/chat/ChatScreen'));
 const MessagesListScreen = React.lazy(() => import('./features/chat/MessagesListScreen'));
@@ -49,10 +50,10 @@ const SearchUserScreen = React.lazy(() => import('./features/chat/SearchUserScre
 const GrixAIScreen = React.lazy(() => import('./features/grixai/GrixAIScreen'));
 const ChatSettingsScreen = React.lazy(() => import('./features/chat/ChatSettingsScreen'));
 
-const SearchTab = React.lazy(() => import('./features/search/SearchTab'));
 const FriendsScreen = React.lazy(() => import('./features/search/FriendsScreen'));
 
 const StoryWatcherScreen = React.lazy(() => import('./features/stories/StoryWatcherScreen'));
+const StoryCreationScreen = React.lazy(() => import('./features/stories/StoryCreationScreen'));
 const NotificationsScreen = React.lazy(() => import('./features/notifications/NotificationsScreen.tsx'));
 const LikeNotificationsScreen = React.lazy(() => import('./features/notifications/LikeNotificationsScreen.tsx'));
 
@@ -63,7 +64,6 @@ const GrixAIProfile = React.lazy(() => import('./features/grixai/GrixAIProfile')
 
 
 const CallsTab = React.lazy(() => import('./features/call/CallsTab'));
-const PostsTab = React.lazy(() => import('./features/posts/PostsTab'));
 
 const PrivacySettingsScreen = React.lazy(() => import('./features/settings/PrivacySettingsScreen'));
 const SettingsMainScreen = React.lazy(() => import('./features/settings/SettingsMainScreen'));
@@ -172,7 +172,6 @@ export default function App() {
       if (path.startsWith('/user/')) pageTitle = 'User Profile';
       else if (path.startsWith('/chat/')) pageTitle = 'Chat';
       else if (path.startsWith('/stories/view/')) pageTitle = 'Story';
-      else if (path.startsWith('/posts/')) pageTitle = 'Post';
     }
     
     const suffix = 'GrixChat';
@@ -473,10 +472,11 @@ export default function App() {
                       <Route path="/chats/requests" element={user ? <MessageRequestsScreen /> : <Navigate to="/login" />} />
                       <Route path="/chats/hidden" element={user ? <HideChatScreen /> : <Navigate to="/login" />} />
                       <Route path="/chats/hidden/settings" element={user ? <HideChatSettings /> : <Navigate to="/login" />} />
-                      <Route path="/posts" element={user ? <PostsTab /> : <Navigate to="/login" />} />
-                      <Route path="/groups" element={<Navigate to="/chats" replace />} />
+                      <Route path="/groups" element={user ? <GroupsTab /> : <Navigate to="/login" />} />
                       <Route path="/search" element={user ? <SearchTab /> : <Navigate to="/login" />} />
-                      <Route path="/search/friends" element={user ? <FriendsScreen /> : <Navigate to="/login" />} />
+                      <Route path="/updates" element={<Navigate to="/search" replace />} />
+                      <Route path="/channels" element={<Navigate to="/search" replace />} />
+                      <Route path="/profile/friends" element={user ? <FriendsScreen /> : <Navigate to="/login" />} />
                       <Route element={<ChatLayout />}>
                         <Route path="/chat/grix-ai" element={user ? <GrixAIScreen /> : <Navigate to="/login" />} />
                         <Route path="/chat/:id" element={user ? <ChatScreen /> : <Navigate to="/login" />} />
@@ -497,6 +497,7 @@ export default function App() {
                     <Route path="/notifications" element={user ? <NotificationsScreen /> : <Navigate to="/login" />} />
                     <Route path="/notifications/likes" element={user ? <LikeNotificationsScreen /> : <Navigate to="/login" />} />
                     <Route path="/stories/view/:userId" element={user ? <StoryWatcherScreen /> : <Navigate to="/login" />} />
+                    <Route path="/stories/create" element={user ? <StoryCreationScreen /> : <Navigate to="/login" />} />
                     <Route path="/settings" element={user ? <SettingsMainScreen /> : <Navigate to="/login" />} />
                     <Route path="/edit-profile" element={user ? <EditProfileScreen /> : <Navigate to="/login" />} />
                     <Route path="/privacy-settings" element={user ? <PrivacySettingsScreen /> : <Navigate to="/login" />} />
@@ -525,7 +526,7 @@ export default function App() {
                     <Route path="/privacy-policy" element={<PrivacyPolicyScreen />} />
                     <Route path="/terms" element={<TermsAndConditionsScreen />} />
                     <Route path="/messages" element={user ? <MessagesListScreen /> : <Navigate to="/login" />} />
-                    <Route path="/search-user" element={<Navigate to="/search" replace />} />
+                    <Route path="/search-user" element={<Navigate to="/profile" replace />} />
                     <Route path="/user/:id" element={user ? <UserProfileScreen /> : <Navigate to="/login" />} />
                     <Route path="/chat/preview" element={user ? <ImagePreviewScreen /> : <Navigate to="/login" />} />
                     <Route path="/profile/grix-ai" element={user ? <GrixAIProfile /> : <Navigate to="/login" />} />
@@ -538,7 +539,6 @@ export default function App() {
         </LayoutProvider>
       </NavProvider>
       <DeveloperConsole isOpen={isDevConsoleOpen} onClose={() => setDevConsoleOpen(false)} />
-      <FloatingDiagnosticsButton isOpen={isDevConsoleOpen} onToggle={() => setDevConsoleOpen(prev => !prev)} />
     </ErrorBoundary>
   );
 }

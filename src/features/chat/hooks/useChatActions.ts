@@ -50,16 +50,6 @@ export const useChatActions = (conversationId: string, receiverId: string) => {
       if (dbMessage) {
         dbMessage.content = dbMessage.text || dbMessage.content || '';
         
-        // Immediately replace the optimistic sending block with the confirmed message in cache
-        const cached = LocalDataCache.getMessages(conversationId) || [];
-        const filtered = cached.filter((m: any) => {
-          if (m.status !== 'sending') return true;
-          // Match text or media content from this sender
-          const contentMatch = m.content === dbMessage.content;
-          const mediaMatch = (!m.media_url && !dbMessage.media_url) || (m.media_url && dbMessage.media_url);
-          return !(contentMatch && mediaMatch && m.sender_id === user.id);
-        });
-
         const stableMessage = {
           ...dbMessage,
           sender: {
@@ -69,10 +59,6 @@ export const useChatActions = (conversationId: string, receiverId: string) => {
             photo_url: userData?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'
           }
         };
-
-        const finalMsgs = [...filtered, stableMessage].sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        LocalDataCache.saveMessages(conversationId, finalMsgs);
-        LocalDataCache.notify(`messages:${conversationId}`, finalMsgs);
 
         // Dispatch background push alert logic
         pushNotificationService.sendNotificationForMessage(

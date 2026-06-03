@@ -220,10 +220,13 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`
       }, async (payload) => {
-        // If it's a new message from OTHER user, mark it as read since we are in the chat
-        if (payload.new.sender_id !== user.id) {
-          markAsReadRef.current();
+        // Skip inserts from the current user as they are handled optimistically and confirmed inside the component
+        if (payload.new.sender_id === user.id) {
+          return;
         }
+
+        // If it's a new message from OTHER user, mark it as read since we are in the chat
+        markAsReadRef.current();
         
         try {
           const { data, error } = await supabase

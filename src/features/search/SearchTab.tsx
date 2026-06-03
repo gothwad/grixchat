@@ -1,13 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useSearch } from '../../contexts/SearchContext.tsx';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { 
+  Search, 
+  X, 
+  Loader2, 
+  Users, 
+  Check, 
+  Clock, 
+  MessageSquare,
+  Plus
+} from 'lucide-react';
 import { useAuth } from '../../providers/AuthProvider.tsx';
-import { Search, X, Loader2, MessageSquare, Plus, Check, Users, Clock } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { useConversations } from '../chat/hooks/useConversations';
-import { getAcceptedChats, acceptChat } from '../../utils/acceptedChats';
-import { chatService } from '../chat/services/chatService';
+import { supabase } from '../../lib/supabase';
 import { isUserOnline } from '../../utils/presence';
+import { chatService } from '../chat/services/chatService';
+import { acceptChat } from '../../utils/acceptedChats';
 
 interface UserProfile {
   uid: string;
@@ -20,8 +28,10 @@ interface UserProfile {
 export default function SearchTab() {
   const navigate = useNavigate();
   const { user: authUser, userData } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
+  
+  // Tab-specific search state (rather than global search context sync to avoid typing conflict)
+  const [discoverSearchTerm, setDiscoverSearchTerm] = useState('');
+  const [discoverLoading, setDiscoverLoading] = useState(false);
   const [userResults, setUserResults] = useState<UserProfile[]>([]);
   const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
   const [localRequestedUids, setLocalRequestedUids] = useState<string[]>([]);
@@ -31,6 +41,7 @@ export default function SearchTab() {
   const [followerIds, setFollowerIds] = useState<string[]>([]);
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>([]);
 
+  // Fetch hidden user IDs
   useEffect(() => {
     if (!supabase || !authUser?.id || !userData?.hiddenChats || userData.hiddenChats.length === 0) {
       setHiddenUserIds([]);
@@ -48,20 +59,18 @@ export default function SearchTab() {
           setHiddenUserIds(data.map(d => d.user_id));
         }
       } catch (e) {
-        console.warn("Failed to fetch hidden user ids inside search:", e);
+        console.warn("Failed to fetch hidden user ids inside search tab:", e);
       }
     };
     fetchHiddenUserIds();
   }, [userData?.hiddenChats, authUser?.id]);
 
-  const fetchInitialData = async (showLoading = false) => {
+  // Fetch initial data (Mutuals, Suggested, etc.)
+  const fetchInitialData = useCallback(async (showLoading = false) => {
     if (!supabase || !authUser?.id) return;
     try {
-      if (showLoading || (suggestedUsers.length === 0 && userResults.length === 0)) {
-        setLoading(true);
-      }
+      if (showLoading) setDiscoverLoading(true);
       
-      // Find following IDs and follower IDs to compute requests & suggested excludes
       const { data: followRows } = await supabase
         .from('follows')
         .select('follower_id, following_id')
@@ -86,17 +95,15 @@ export default function SearchTab() {
       const incomingIds = Array.from(FollowsMe).filter(id => !IFollow.has(id));
       setRequestCount(incomingIds.length);
 
-      // Fetch Suggested Users
       const { data: usersData } = await supabase
         .from('users')
         .select('id, username, full_name, photo_url, is_online, last_seen')
         .neq('id', authUser?.id)
-        .limit(60);
+        .limit(40);
       
       const mappedSuggested: UserProfile[] = [];
       if (usersData) {
         usersData.forEach(u => {
-          // EXCLUDE existing friends/requests from the suggestion list
           if (!IFollow.has(u.id) && !FollowsMe.has(u.id)) {
             mappedSuggested.push({
               uid: u.id,
@@ -109,19 +116,18 @@ export default function SearchTab() {
         });
         setSuggestedUsers(mappedSuggested.slice(0, 20));
       }
-
-    } catch (error) {
-      console.error('Error fetching discovery data:', error);
+    } catch (e) {
+      console.error('Error fetching discovery in search tab:', e);
     } finally {
-      setLoading(false);
+      setDiscoverLoading(false);
     }
-  };
+  }, [authUser?.id]);
 
   useEffect(() => {
-    fetchInitialData();
+    fetchInitialData(true);
 
     if (!supabase || !authUser?.id) return;
-    const channelId = `search-tab-follows-realtime-${Math.random().toString(36).substring(2, 9)}`;
+    const channelId = `search-tab-follows-${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
       .channel(channelId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'follows' }, () => {
@@ -132,54 +138,54 @@ export default function SearchTab() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [authUser?.id]);
+  }, [authUser?.id, fetchInitialData]);
 
+  // Handle Discover User Search
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      if (searchTerm.trim()) {
+      if (discoverSearchTerm.trim()) {
+        const handleSearch = async () => {
+          const term = discoverSearchTerm.toLowerCase().trim();
+          if (!supabase || !authUser?.id) return;
+          setDiscoverLoading(true);
+          try {
+            const { data } = await supabase
+              .from('users')
+              .select('id, username, full_name, photo_url, is_online, last_seen')
+              .or(`username.ilike.%${term}%,full_name.ilike.%${term}%`)
+              .neq('id', authUser?.id)
+              .limit(40);
+            
+            if (data) {
+              setUserResults(
+                data.map(u => ({
+                  uid: u.id,
+                  username: u.username,
+                  fullName: u.full_name,
+                  photoURL: u.photo_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+                  isOnline: isUserOnline(u.is_online, u.last_seen)
+                }))
+              );
+            }
+          } catch (error) {
+            console.error('Error searching in search tab:', error);
+          } finally {
+            setDiscoverLoading(false);
+          }
+        };
+
         handleSearch();
       } else {
         setUserResults([]);
       }
     }, 300);
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
-
-  const handleSearch = async () => {
-    const term = searchTerm.toLowerCase().trim();
-    if (!supabase || !authUser?.id) return;
-    setLoading(true);
-    try {
-      const { data } = await supabase
-        .from('users')
-        .select('id, username, full_name, photo_url, is_online, last_seen')
-        .or(`username.ilike.%${term}%,full_name.ilike.%${term}%`)
-        .neq('id', authUser?.id)
-        .limit(50);
-      
-      if (data) {
-        setUserResults(
-          data.map(u => ({
-            uid: u.id,
-            username: u.username,
-            fullName: u.full_name,
-            photoURL: u.photo_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
-            isOnline: isUserOnline(u.is_online, u.last_seen)
-          }))
-        );
-      }
-    } catch (error) {
-      console.error('Error searching:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [discoverSearchTerm, authUser?.id]);
 
   const handleSendRequest = async (receiverId: string) => {
     if (!supabase || !authUser?.id || actionInProgressUid) return;
     try {
       setActionInProgressUid(receiverId);
-      // Optimistic UI updates to Requested!
       setLocalRequestedUids(prev => [...prev, receiverId]);
 
       const { error } = await supabase.from('follows').insert({
@@ -190,7 +196,7 @@ export default function SearchTab() {
 
       setFollowingIds(prev => [...prev, receiverId]);
     } catch (err) {
-      console.error("Error creating DM request:", err);
+      console.error("Error creating request in search tab:", err);
     } finally {
       setActionInProgressUid(null);
     }
@@ -207,7 +213,6 @@ export default function SearchTab() {
       });
       if (error) throw error;
 
-      // Pre-create direct chat conversation so it's fully ready
       const convId = await chatService.getOrCreateDirectConversation(authUser.id, receiverId);
       if (convId) {
         acceptChat(convId);
@@ -237,254 +242,216 @@ export default function SearchTab() {
       setFollowingIds(prev => prev.filter(id => id !== receiverId));
       setLocalRequestedUids(prev => prev.filter(id => id !== receiverId));
     } catch (err) {
-      console.error("Error canceling request:", err);
+      console.error("Error canceling request inside search tab:", err);
     } finally {
       setActionInProgressUid(null);
     }
   };
 
-  // Trending & Discovery Explore categories
-  const trendingTags = [
-    { name: 'Grix AI', query: 'grix-ai', icon: '🤖' },
-    { name: 'Reels Maker', query: 'reel', icon: '🍿' },
-    { name: 'Trending Users', query: 'a', icon: '✨' },
-    { name: 'Active Now', query: 'grix', icon: '📱' },
-    { name: 'Support', query: 'support', icon: '💬' },
-  ];
-
   return (
-    <div className="h-full flex flex-col bg-[var(--bg-card)] overflow-hidden font-sans">
+    <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden animate-fade-in touch-pan-y">
       
-      {/* 2. BEAUTIFIED SEARCH BAR (Fixed at Top) */}
-      <div className="px-5 py-3.5 shrink-0 bg-[var(--bg-card)] z-40 border-b border-[var(--border-color)]/20">
-        <div className="flex items-center bg-[var(--bg-main)] hover:bg-[var(--bg-main)]/90 focus-within:bg-[var(--bg-main)] rounded-2xl px-4 h-11 border border-[var(--border-color)]/30 focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/10 shadow-sm transition-all duration-250">
-          <Search size={16} className="text-[var(--text-secondary)] mr-2.5 opacity-60" />
-          <input 
-            type="text" 
-            placeholder="Search username or name..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50"
-          />
-          {searchTerm && (
-            <button 
-              onClick={() => setSearchTerm('')}
-              className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors"
-            >
-              <X size={14} className="text-[var(--text-secondary)]" />
-            </button>
-          )}
+      {/* Search Header Banner */}
+      <div className="px-5 py-4 bg-[var(--bg-card)] border-b border-[var(--border-color)]/20 shadow-sm shrink-0 flex items-center justify-between">
+        <div>
+          <h2 className="text-[17px] font-bold text-[var(--text-primary)] tracking-tight">Discover People</h2>
+          <p className="text-[11px] text-[var(--text-secondary)] font-medium leading-none mt-1">Find friends and build real-time chats</p>
         </div>
       </div>
 
-      {/* 3. SCROLLABLE CONTAINER FOR ALL ELEMENTS */}
-      <div className="flex-1 overflow-y-auto no-scrollbar pb-32 bg-[var(--bg-card)]">
-        
-        {/* 2.5 MESSAGE REQUESTS SHORTCUT (Now Inside Scrollable Container) */}
-        {!searchTerm && (
-          <div 
-            onClick={() => navigate('/chats/requests')}
-            className="flex items-center gap-[15px] px-5 py-4 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer border-b border-[var(--border-color)]/20 bg-[var(--bg-card)] select-none"
-          >
-            <div className="relative shrink-0 z-10">
-              {/* Custom rounded profile icon style matching Chat List items / Archived Chats */}
-              <div className="w-[52px] h-[52px] rounded-full bg-indigo-500/10 dark:bg-zinc-800 flex items-center justify-center text-indigo-500 group-hover:scale-105 transition-transform border border-[var(--border-color)]/30">
-                <Users size={21} strokeWidth={2.5} />
-              </div>
-              {requestCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#0494f4] text-[10px] font-black font-mono text-white rounded-full flex items-center justify-center border border-white dark:border-[var(--bg-card)]">
-                  {requestCount}
-                </span>
+      <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
+        <div className="p-4 space-y-4">
+
+          {/* BEAUTIFIED SEARCH INPUT */}
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl shadow-sm p-3.5">
+            <div className="flex items-center bg-[var(--bg-main)] hover:bg-[var(--bg-main)]/90 focus-within:bg-[var(--bg-main)] rounded-2xl px-4 h-11.5 border border-[var(--border-color)]/25 focus-within:border-[#0494f4]/45 focus-within:ring-2 focus-within:ring-[#0494f4]/5 transition-all duration-200">
+              <Search size={16} className="text-[var(--text-secondary)] mr-2.5 opacity-65 shrink-0" />
+              <input 
+                type="text" 
+                placeholder="Find human profiles by username or name..." 
+                value={discoverSearchTerm}
+                onChange={(e) => setDiscoverSearchTerm(e.target.value)}
+                className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/40"
+              />
+              {discoverSearchTerm && (
+                <button 
+                  onClick={() => setDiscoverSearchTerm('')}
+                  className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors shrink-0"
+                >
+                  <X size={14} className="text-[var(--text-secondary)]" />
+                </button>
               )}
             </div>
-            <div className="flex-1 min-w-0 pb-1 relative">
-              <div className="flex justify-between items-baseline mb-0.5">
-                <h3 className="text-[15px] truncate font-black text-[var(--text-primary)]">
-                  Friend Requests
-                </h3>
-                <span className="text-[11px] whitespace-nowrap text-[#0494f4] font-bold tracking-tight">
-                  View
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
-                  {requestCount > 0 
-                    ? `You have ${requestCount} pending friend request${requestCount > 1 ? 's' : ''}` 
-                    : "No new friend requests from people on GrixChat"
-                  }
-                </p>
-              </div>
-            </div>
           </div>
-        )}
 
-        {/* 2.6 FRIENDS SUB-MENU (Direct, native-inspired entries) */}
-        {!searchTerm && (
-          <div className="bg-[var(--bg-card)] border-b border-[var(--border-color)]/20 select-none">
-            {/* Friends Option */}
+          {/* Incoming Message Request shortcut */}
+          {!discoverSearchTerm && (
             <div 
-              onClick={() => navigate('/search/friends')}
-              className="flex items-center gap-[15px] px-5 py-4 hover:bg-[var(--bg-main)] dark:hover:bg-zinc-800/30 transition-all active:scale-[0.98] group cursor-pointer"
+              onClick={() => navigate('/chats/requests')}
+              className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl shadow-sm p-4 flex items-center justify-between cursor-pointer group hover:bg-[var(--bg-card)]/90 transition-all select-none"
             >
-              <div className="w-[52px] h-[52px] rounded-full bg-[#0494f4]/10 dark:bg-zinc-800 flex items-center justify-center text-[#0494f4] group-hover:scale-105 transition-transform border border-[var(--border-color)]/35">
-                <Users size={21} strokeWidth={2.5} />
-              </div>
-              <div className="flex-1 min-w-0 pb-1">
-                <div className="flex justify-between items-baseline mb-0.5">
-                  <h3 className="text-[15px] truncate font-black text-[var(--text-primary)]">
-                    GrixChat Friends
-                  </h3>
-                  <span className="text-[11px] whitespace-nowrap text-[#0494f4] font-bold tracking-tight">
-                    Open
-                  </span>
+              <div className="flex items-center gap-3">
+                <div className="relative shrink-0">
+                  <div className="w-[38px] h-[38px] rounded-xl bg-[#0494f4]/15 flex items-center justify-center text-[#0494f4] border border-[#0494f4]/10 shadow-inner">
+                    <Users size={16} strokeWidth={2.5} />
+                  </div>
+                  {requestCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-[#0494f4] text-[9px] font-black font-mono text-white rounded-full flex items-center justify-center border border-white dark:border-[var(--bg-card)]">
+                      {requestCount}
+                    </span>
+                  )}
                 </div>
-                <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
-                  Connect with people you chat with on Grix
-                </p>
+                <div>
+                  <h4 className="text-[11.5px] font-bold text-[var(--text-primary)]">Pending Requests</h4>
+                  <p className="text-[10px] text-[var(--text-secondary)]">
+                    {requestCount > 0 ? `${requestCount} incoming request letters waiting` : 'No inbound requests pending'}
+                  </p>
+                </div>
               </div>
+              <span className="text-[10px] bg-[#0494f4]/10 hover:bg-[#0494f4]/20 text-[#0494f4] font-black px-3.5 py-1.5 rounded-xl border border-[#0494f4]/10 transition-colors uppercase tracking-wider">
+                Manage
+              </span>
             </div>
-          </div>
-        )}
+          )}
 
-        {loading && searchTerm ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <Loader2 className="animate-spin text-indigo-600" size={28} />
-            <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em]">Searching users...</p>
-          </div>
-        ) : (
-          <div className="flex flex-col">
-            {searchTerm ? (
-              <div className="px-5 pt-5 pb-2">
-                <h3 className="text-[11px] font-black text-[var(--text-secondary)] tracking-wide opacity-80 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#0494f4]"></span>
-                  Search Results
-                </h3>
+          {/* Dynamic Users Hub List */}
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl shadow-sm p-4 overflow-hidden">
+            <div className="flex items-center justify-between mb-3.5">
+              <h3 className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1.5 leading-none select-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#0494f4]"></span>
+                {discoverSearchTerm ? 'Global Results' : 'Suggested Connections'}
+              </h3>
+              <span className="text-[10px] bg-[#0494f4]/10 text-[#0494f4] font-black px-2 py-0.5 rounded-full uppercase tracking-wider select-none shrink-0 text-right">
+                Join World
+              </span>
+            </div>
+
+            {discoverLoading && discoverSearchTerm ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2">
+                <Loader2 className="animate-spin text-[#0494f4]" size={22} />
+                <p className="text-[9px] font-black text-[var(--text-secondary)] uppercase tracking-wider">Browsing matches...</p>
               </div>
             ) : (
-              suggestedUsers.length > 0 && (
-                <div className="px-5 pt-5 pb-2">
-                  <h3 className="text-[11px] font-black text-[var(--text-secondary)] tracking-wide opacity-85 flex items-center gap-1.5 uppercase">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#0494f4]"></span>
-                    Suggested users for you
-                  </h3>
-                </div>
-              )
-            )}
+              <div className="space-y-2.5 max-h-[480px] overflow-y-auto no-scrollbar pr-0.5">
+                {((discoverSearchTerm ? userResults : suggestedUsers)
+                  .filter(profile => !hiddenUserIds.includes(profile.uid))
+                  .length === 0) ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-center select-none bg-[var(--bg-main)]/30 border border-[var(--border-color)]/20 rounded-2xl gap-2">
+                      <Users size={22} className="text-[var(--text-secondary)] opacity-50 shrink-0" />
+                      <div>
+                        <h4 className="text-[11px] font-bold text-[var(--text-primary)]">No matching users</h4>
+                        <p className="text-[9px] text-[var(--text-secondary)] px-4 leading-tight">Checking search spelling, or wait until more users register on Grixvibe.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    (discoverSearchTerm ? userResults : suggestedUsers)
+                      .filter(profile => !hiddenUserIds.includes(profile.uid))
+                      .map((profile) => {
+                        const isFollowing = followingIds.includes(profile.uid) || localRequestedUids.includes(profile.uid);
+                        const isFollower = followerIds.includes(profile.uid);
+                        const isMutual = isFollowing && isFollower;
+                        const isOutgoingRequest = isFollowing && !isFollower;
+                        const isIncomingRequest = isFollower && !isFollowing;
+                        
+                        return (
+                          <div 
+                            key={profile.uid}
+                            onClick={() => navigate(`/user/${profile.uid}`)}
+                            className="flex items-center justify-between p-2.5 hover:bg-[var(--bg-main)] rounded-xl transition-all duration-150 cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="relative shrink-0">
+                                <img 
+                                  src={profile.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
+                                  alt={profile.username}
+                                  className="w-9.5 h-9.5 rounded-full object-cover border border-[var(--border-color)]/40"
+                                  referrerPolicy="no-referrer"
+                                />
+                                {profile.isOnline && (
+                                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-[var(--bg-card)] rounded-full"></div>
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <h5 className="text-xs font-black text-[var(--text-primary)] truncate group-hover:text-[#0494f4] transition-colors">
+                                  {profile.fullName || profile.username}
+                                </h5>
+                                <p className="text-[9px] text-[var(--text-secondary)] font-mono">@{profile.username}</p>
+                              </div>
+                            </div>
 
-            <div className="mt-1">
-              {(searchTerm ? userResults : suggestedUsers).filter(profile => !hiddenUserIds.includes(profile.uid)).map((profile) => {
-                const isFollowing = followingIds.includes(profile.uid) || localRequestedUids.includes(profile.uid);
-                const isFollower = followerIds.includes(profile.uid);
-                const isMutual = isFollowing && isFollower;
-                const isOutgoingRequest = isFollowing && !isFollower;
-                const isIncomingRequest = isFollower && !isFollowing;
-                
-                return (
-                  <div 
-                    key={profile.uid}
-                    onClick={() => navigate(`/user/${profile.uid}`)}
-                    className="flex items-center gap-3.5 px-5 py-3 hover:bg-[var(--bg-main)] transition-all duration-200 cursor-pointer group active:bg-[var(--bg-main)] border-b border-[var(--border-color)]/10"
-                  >
-                    <div className="relative">
-                      <img 
-                        src={profile.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-                        alt={profile.username}
-                        className="w-12 h-12 rounded-full object-cover border border-[var(--border-color)] group-hover:scale-102 transition-transform shadow-sm"
-                        referrerPolicy="no-referrer"
-                      />
-                      {profile.isOnline && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[var(--bg-card)] rounded-full"></div>
-                      )}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-[13.5px] font-extrabold text-[var(--text-primary)] truncate group-hover:text-[#0494f4] transition-colors">
-                        {profile.fullName || profile.username}
-                      </h4>
-                      <p className="text-[11px] text-[var(--text-secondary)]/80 font-bold truncate">@{profile.username}</p>
-                    </div>
-                    
-                    <div className="shrink-0 flex items-center pr-1">
-                      {isMutual ? (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/chat/${profile.uid}`);
-                          }}
-                          className="px-3.5 py-1.5 bg-[#0494f4] hover:bg-[#0381d6] active:scale-95 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md shrink-0 cursor-pointer border border-[#0494f4]/10"
-                        >
-                          <MessageSquare size={11} strokeWidth={3} />
-                          <span>Message</span>
-                        </button>
-                      ) : isIncomingRequest ? (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAcceptRequest(profile.uid);
-                          }}
-                          disabled={actionInProgressUid === profile.uid}
-                          className="px-3.5 py-1.5 bg-[#0494f4] hover:bg-[#0381d6] active:scale-95 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md shrink-0 cursor-pointer border border-[#0494f4]/10"
-                        >
-                          {actionInProgressUid === profile.uid ? (
-                            <Loader2 size={11} className="animate-spin" />
-                          ) : (
-                            <Check size={11} strokeWidth={3} />
-                          )}
-                          <span>Accept</span>
-                        </button>
-                      ) : isOutgoingRequest ? (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCancelRequest(profile.uid);
-                          }}
-                          disabled={actionInProgressUid === profile.uid}
-                          className="px-3 py-1.5 bg-[#0494f4]/10 hover:bg-rose-500/10 hover:text-rose-600 hover:border-rose-400/30 text-[#0494f4] border border-[#0494f4]/20 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 shrink-0 cursor-pointer duration-200"
-                          title="Click to cancel request"
-                        >
-                          {actionInProgressUid === profile.uid ? (
-                            <Loader2 size={11} className="animate-spin" />
-                          ) : (
-                            <Clock size={11} strokeWidth={3} />
-                          )}
-                          <span>Requested</span>
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSendRequest(profile.uid);
-                          }}
-                          disabled={actionInProgressUid === profile.uid}
-                          className="px-3.5 py-1.5 bg-[#0494f4] hover:bg-[#0381d6] active:scale-95 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 shrink-0 cursor-pointer border border-[#0494f4]/10 shadow-md"
-                        >
-                          {actionInProgressUid === profile.uid ? (
-                            <Loader2 size={11} className="animate-spin" />
-                          ) : (
-                            <Plus size={11} strokeWidth={3} />
-                          )}
-                          <span>Request</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {!loading && searchTerm && userResults.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-                <div className="w-16 h-16 bg-[var(--bg-main)] rounded-full flex items-center justify-center mb-4 border border-[var(--border-color)]/30">
-                  <Search size={22} className="text-[var(--text-secondary)] opacity-30" />
-                </div>
-                <h4 className="text-sm font-bold text-[var(--text-primary)] mb-1">No matches found</h4>
-                <p className="text-xs text-[var(--text-secondary)]">We couldn't find any users under that exact name or handle.</p>
+                            <div className="shrink-0 flex items-center pr-1">
+                              {isMutual ? (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/chat/${profile.uid}`);
+                                  }}
+                                  className="px-2.5 py-1.5 bg-[#0494f4] text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                                >
+                                  <MessageSquare size={10} />
+                                  <span>Chat</span>
+                                </button>
+                              ) : isIncomingRequest ? (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAcceptRequest(profile.uid);
+                                  }}
+                                  disabled={actionInProgressUid === profile.uid}
+                                  className="px-2.5 py-1.5 bg-[#0494f4] text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                                >
+                                  {actionInProgressUid === profile.uid ? (
+                                    <Loader2 size={10} className="animate-spin" />
+                                  ) : (
+                                    <Check size={10} />
+                                  )}
+                                  <span>Accept</span>
+                                </button>
+                              ) : isOutgoingRequest ? (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCancelRequest(profile.uid);
+                                  }}
+                                  disabled={actionInProgressUid === profile.uid}
+                                  className="px-2 py-1.5 bg-[var(--border-color)]/25 text-[var(--text-secondary)] rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                                >
+                                  {actionInProgressUid === profile.uid ? (
+                                    <Loader2 size={10} className="animate-spin" />
+                                  ) : (
+                                    <Clock size={10} />
+                                  )}
+                                  <span>Sent</span>
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSendRequest(profile.uid);
+                                  }}
+                                  disabled={actionInProgressUid === profile.uid}
+                                  className="px-2.5 py-1.5 bg-[#0494f4]/10 text-[#0494f4] rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer hover:bg-[#0494f4] hover:text-white transition-colors"
+                                >
+                                  {actionInProgressUid === profile.uid ? (
+                                    <Loader2 size={10} className="animate-spin" />
+                                  ) : (
+                                    <Plus size={10} />
+                                  )}
+                                  <span>Add</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
               </div>
             )}
           </div>
-        )}
-      </div>
 
+        </div>
+      </div>
+      
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { APP_CONFIG } from '../../config/appConfig';
 import { ArrowLeft, Info, ShieldCheck, Globe, Code, Github } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
+import TermuxConsoleButton from '../../components/TermuxConsoleButton';
 
 export default function AppInfoScreen() {
   const navigate = useNavigate();
@@ -12,13 +13,16 @@ export default function AppInfoScreen() {
       <SettingHeader 
         title="App Info" 
         rightElement={
-          <button 
-            onClick={() => navigate('/github')} 
-            className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group"
-            title="GitHub Integration"
-          >
-            <Github size={21} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
-          </button>
+          <div className="flex items-center gap-1.5 md:gap-2">
+            <TermuxConsoleButton />
+            <button 
+              onClick={() => navigate('/github')} 
+              className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group flex items-center justify-center"
+              title="GitHub Integration"
+            >
+              <Github size={21} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
+            </button>
+          </div>
         }
       />
 

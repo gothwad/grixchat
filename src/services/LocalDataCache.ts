@@ -81,7 +81,17 @@ class LocalDataCacheService {
    * Returns null if not exists or if expired.
    */
   public get<T>(key: string, maxAge = DEFAULT_CONFIG.maxAge): T | null {
-    // Return null to enforce fresh and direct fetch from Supabase database every time on every screen!
+    try {
+      const item = this.memoryCache[key];
+      if (item) {
+        const age = Date.now() - item.timestamp;
+        if (age < maxAge) {
+          return item.value as T;
+        }
+      }
+    } catch (e) {
+      console.warn(`LocalDataCache read failed for key ${key}`, e);
+    }
     return null;
   }
 

@@ -9,14 +9,14 @@ import { useAuth } from '../../providers/AuthProvider';
 
 // Lazy loading our 5 tabs for keep-alive container
 const ChatsTab = React.lazy(() => import('../../features/chat/ChatsTab'));
-const CallsTab = React.lazy(() => import('../../features/call/CallsTab'));
-const PostsTab = React.lazy(() => import('../../features/posts/PostsTab'));
+const GroupsTab = React.lazy(() => import('../../features/chat/GroupsTab'));
 const SearchTab = React.lazy(() => import('../../features/search/SearchTab'));
+const CallsTab = React.lazy(() => import('../../features/call/CallsTab'));
 const ProfileTab = React.lazy(() => import('../../features/profile/ProfileTab'));
 
 // Paths where BottomNav should be visible
-const TAB_PATHS = ['/', '/chats', '/calls', '/posts', '/profile', '/notifications', '/search', '/reels'];
-const MAIN_TABS = ['/', '/posts', '/search', '/calls', '/profile', '/chats'];
+const TAB_PATHS = ['/', '/chats', '/groups', '/search', '/calls', '/profile', '/notifications', '/reels'];
+const MAIN_TABS = ['/', '/chats', '/groups', '/search', '/calls', '/profile'];
 
 export default function MainLayout() {
   const location = useLocation();
@@ -78,7 +78,7 @@ export default function MainLayout() {
       >
         <Suspense fallback={
           <div className="h-full flex items-center justify-center bg-[var(--bg-main)]">
-            <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-8 h-8 border-4 border-[#0494f4] border-t-transparent rounded-full animate-spin"></div>
           </div>
         }>
           {/* Keep-Alive Tabs: once loaded, we keep them persistent and mounted */}
@@ -87,22 +87,22 @@ export default function MainLayout() {
               <ChatsTab />
             </div>
           )}
+
+          {visitedTabs['/groups'] && (
+            <div className={location.pathname === '/groups' ? 'h-full w-full' : 'hidden'}>
+              <GroupsTab />
+            </div>
+          )}
+
+          {visitedTabs['/search'] && (
+            <div className={location.pathname === '/search' ? 'h-full w-full' : 'hidden'}>
+              <SearchTab />
+            </div>
+          )}
           
           {visitedTabs['/calls'] && (
             <div className={location.pathname === '/calls' ? 'h-full w-full' : 'hidden'}>
               <CallsTab />
-            </div>
-          )}
-          
-          {visitedTabs['/posts'] && (
-            <div className={location.pathname === '/posts' ? 'h-full w-full' : 'hidden'}>
-              <PostsTab />
-            </div>
-          )}
-          
-          {visitedTabs['/search'] && (
-            <div className={location.pathname === '/search' ? 'h-full w-full' : 'hidden'}>
-              <SearchTab />
             </div>
           )}
           

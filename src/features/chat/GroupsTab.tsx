@@ -1,91 +1,67 @@
 import React, { useState } from 'react';
 import { useSearch } from '../../contexts/SearchContext.tsx';
-import { Link, useNavigate } from 'react-router-dom';
-import { Users, Plus, MessageCircle, Search, X, Radio } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Users, Plus, Search, X, Loader2, ArrowRight } from 'lucide-react';
 import { useLayout } from '../../contexts/LayoutContext.tsx';
 import { motion } from 'motion/react';
 import { useConversations } from './hooks/useConversations.ts';
-import { useAuth } from '../../providers/AuthProvider.tsx';
 import { ChatUserList } from './components/ChatUserList.tsx';
 
 export default function GroupsTab() {
   const navigate = useNavigate();
-  const { userData } = useAuth();
   const { searchTerm, setSearchTerm } = useSearch();
-  const { activeFilters } = useLayout();
-  const activeFilter = activeFilters['chats'] || 'Chats';
+  const { isChatSelectMode } = useLayout();
   
-  const { conversations, loading } = useConversations(activeFilter);
-  const [subTab, setSubTab] = useState<'groups' | 'channels'>('groups');
+  // Load conversation lists
+  const { conversations, loading } = useConversations('Chats');
 
-  // Filter conversations: Keep only those that match selected sub-tab and search
-  const filteredItems = conversations.filter(c => {
+  // Filter conversations specifically for Group Chats (excluding channels/broadcasts)
+  const filteredGroups = conversations.filter(c => {
     if (c.type !== 'group') return false;
     
-    const isHidden = Array.isArray(userData?.hiddenChats) && userData.hiddenChats.includes(c.id);
-    const isArchived = Array.isArray(userData?.archivedChats) && userData.archivedChats.includes(c.id);
-    
-    if (isHidden || isArchived) return false;
-
-    // Smart categorization: If name has 'channel' or 'broadcast', sort as channel, else group
     const isChannel = (c.user || '').toLowerCase().includes('channel') || 
                       (c.user || '').toLowerCase().includes('broadcast');
-                      
-    if (subTab === 'groups' && isChannel) return false;
-    if (subTab === 'channels' && !isChannel) return false;
+    if (isChannel) return false;
 
-    const matchesSearch = (c.user || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (c.username || "").toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesSearch;
+    if (!searchTerm) return true;
+    return (c.user || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+           (c.username || "").toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   return (
-    <div className="h-full flex flex-col bg-[var(--bg-card)] overflow-hidden">
+    <div className="h-full flex flex-col bg-[var(--bg-card)] overflow-hidden animate-fade-in touch-pan-y">
       <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
-        
-        {/* Toggle Selector Segment ABOVE Search Bar */}
-        <div className="px-4 pt-3 pb-1.5 shrink-0">
-          <div className="flex bg-[var(--bg-main)] rounded-xl p-1 border border-[var(--border-color)]/25">
-            <button
-              onClick={() => {
-                setSubTab('groups');
-                setSearchTerm('');
-              }}
-              className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
-                subTab === 'groups'
-                  ? 'bg-[#0494f4] text-white shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              Groups
-            </button>
-            <button
-              onClick={() => {
-                setSubTab('channels');
-                setSearchTerm('');
-              }}
-              className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
-                subTab === 'channels'
-                  ? 'bg-[#0494f4] text-white shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              Channels
-            </button>
+        {/* Quick Create Group Action Card */}
+        <div className="px-4 pt-4 pb-2">
+          <div 
+            onClick={() => navigate('/new-group?type=group')}
+            className="flex items-center justify-between p-3.5 bg-[#0494f4]/5 border border-[#0494f4]/20 rounded-2xl cursor-pointer hover:bg-[#0494f4]/10 transition-all group shadow-sm select-none"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#0494f4]/10 text-[#0494f4] flex items-center justify-center shadow-inner">
+                <Users size={18} strokeWidth={2.5} />
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-[var(--text-primary)]">Coordinate Group</h4>
+                <p className="text-[10px] text-[var(--text-secondary)]">Create a secure chat room with multiple friends</p>
+              </div>
+            </div>
+            <span className="w-7 h-7 rounded-lg bg-[#0494f4]/15 text-[#0494f4] flex items-center justify-center group-hover:translate-x-1 duration-200">
+              <Plus size={14} strokeWidth={3} />
+            </span>
           </div>
         </div>
 
-        {/* WhatsApp-style Scrollable Search Bar */}
-        <div className="px-4 py-1.5">
-          <div className="flex items-center bg-[var(--bg-main)] rounded-xl px-3.5 h-10 border border-[var(--border-color)]/25 transition-all">
+        {/* WhatsApp-style Search Bar */}
+        <div className="px-4 py-2">
+          <div className="flex items-center bg-[var(--bg-main)] rounded-2xl px-4 h-11 border border-[var(--border-color)]/25 transition-all focus-within:border-[#0494f4]/40">
             <Search size={15} className="text-[var(--text-secondary)] mr-2.5 opacity-60 shrink-0" />
             <input 
               type="text" 
-              placeholder={subTab === 'groups' ? "Search groups..." : "Search channels..."} 
+              placeholder="Search active groups..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 bg-transparent border-none outline-none text-[13px] font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/45"
+              className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/45"
             />
             {searchTerm && (
               <button 
@@ -98,52 +74,44 @@ export default function GroupsTab() {
           </div>
         </div>
 
-        <div className="flex flex-col h-full mt-1.5">
-          {/* Top Option: Create New Group / Channel */}
-          <Link 
-            to={subTab === 'groups' ? "/new-group?type=group" : "/new-group?type=channel"}
-            className="flex items-center gap-[15px] px-4 py-3.5 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] border-b border-[var(--border-color)]/30 group cursor-pointer shrink-0"
-          >
-            <div className={`w-[52px] h-[52px] rounded-full flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform bg-[#0494f4]/10 text-[#0494f4]`}>
-              {subTab === 'groups' ? <Users size={24} /> : <Radio size={24} />}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className={`text-[15px] font-bold transition-colors text-[var(--text-primary)] group-hover:text-[#0494f4]`}>
-                {subTab === 'groups' ? 'New Group' : 'New Broadcast Channel'}
-              </h3>
-              <p className="text-xs text-[var(--text-secondary)] truncate">
-                {subTab === 'groups' 
-                  ? 'Start a conversation with multiple followers' 
-                  : 'Broadcast updates to unlimited subscribers instantly'
-                }
-              </p>
-            </div>
-            <div className={`mr-2 text-[#0494f4]`}>
-              <Plus size={20} />
-            </div>
-          </Link>
-
-          {/* Group / Channel Chats List */}
+        {/* Groups List */}
+        <div className="flex flex-col h-full mt-1">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <div className="w-8 h-8 border-4 border-[var(--primary)]/20 border-t-[var(--primary)] rounded-full animate-spin" />
-              <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">
-                {subTab === 'groups' ? 'Loading Groups...' : 'Loading Channels...'}
-              </p>
+              <Loader2 className="animate-spin text-[#0494f4]" size={24} />
+              <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">Loading Groups...</p>
+            </div>
+          ) : filteredGroups.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-8 text-center gap-4">
+              <div className="p-4 bg-[var(--bg-main)] rounded-2xl text-[var(--text-secondary)] shadow-sm border border-[var(--border-color)]/10">
+                <Users size={36} className="opacity-80" />
+              </div>
+              <div className="max-w-xs">
+                <h3 className="text-xs font-black text-[var(--text-primary)] mb-1 uppercase tracking-wider">No Groups Joined</h3>
+                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                  Start or coordinate a new group chat with your contact list to see active rooms here.
+                </p>
+                <button 
+                  onClick={() => navigate('/new-group?type=group')}
+                  className="mt-4 px-4 py-2 bg-[#0494f4]/10 hover:bg-[#0494f4]/20 text-[#0494f4] font-extrabold text-[10px] uppercase tracking-wider rounded-xl inline-flex items-center gap-1.5 transition-all active:scale-95"
+                >
+                  <span>Build Group Chat</span>
+                  <ArrowRight size={10} strokeWidth={2.5} />
+                </button>
+              </div>
             </div>
           ) : (
             <ChatUserList 
-              conversations={filteredItems}
-              otherUsers={[]} 
-              showGrixAI={false} 
+              conversations={filteredGroups}
+              otherUsers={[]}
+              showGrixAI={false}
+              archivedCount={0}
               showSecretHeader={false}
-              emptyMessage={subTab === 'groups' ? "No groups yet" : "No channels yet"}
-              emptySubMessage={
-                subTab === 'groups' 
-                  ? "Tap New Group above to create a group chat with your circle."
-                  : "Tap New Broadcast Channel to start sharing updates with your followers."
-              }
+              emptyMessage="No active groups"
+              emptySubMessage="Coordinate a group chat."
               loading={loading}
+              usersWithStories={[]}
+              showHiddenChatsEntry={false}
             />
           )}
         </div>

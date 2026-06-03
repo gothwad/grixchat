@@ -40,7 +40,32 @@ export default function ChatsTab() {
   const { calls, loading: callsLoading } = useCalls(activeFilter);
   const loading = activeFilter === 'Calls' ? callsLoading : conversationsLoading;
 
+  // Stories integration
+  const [stories, setStories] = useState<any[]>([]);
+  const [storiesLoading, setStoriesLoading] = useState(false);
 
+  const fetchStories = useCallback(async () => {
+    if (!supabase || !authUser?.id) return;
+    setStoriesLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('stories')
+        .select('*, users:user_id(username, full_name, photo_url)')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setStories(data);
+      }
+    } catch (err) {
+      console.error('Error fetching stories for tab:', err);
+    } finally {
+      setStoriesLoading(false);
+    }
+  }, [authUser?.id]);
+
+  useEffect(() => {
+    fetchStories();
+  }, [fetchStories]);
 
   const isSecretCodeEntered = !!(
     searchTerm && 
@@ -56,6 +81,36 @@ export default function ChatsTab() {
       .map(c => c.otherUserId);
   }, [userData?.hiddenChats, conversations]);
 
+  const storiesGroupedByUser = React.useMemo(() => {
+    const groups: { [key: string]: { userId: string; username: string; fullName: string; photoURL: string; stories: any[] } } = {};
+    
+    stories.forEach((story: any) => {
+      if (hiddenUserIds.includes(story.user_id)) return;
+
+      const uid = story.user_id;
+      const userObj = story.users;
+      const username = userObj?.username || 'User';
+      const fullName = userObj?.full_name || username;
+      const photoURL = userObj?.photo_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+      
+      if (!groups[uid]) {
+        groups[uid] = {
+          userId: uid,
+          username,
+          fullName,
+          photoURL,
+          stories: []
+        };
+      }
+      groups[uid].stories.push(story);
+    });
+
+    return Object.values(groups);
+  }, [stories, hiddenUserIds]);
+
+  const myStoriesGroup = storiesGroupedByUser.find(g => g.userId === authUser?.id);
+  const otherStoriesGroups = storiesGroupedByUser.filter(g => g.userId !== authUser?.id);
+
   const filteredConversations = conversations.filter(c => {
     const isHidden = Array.isArray(userData?.hiddenChats) && userData.hiddenChats.includes(c.id);
     const isArchived = Array.isArray(userData?.archivedChats) && userData.archivedChats.includes(c.id);
@@ -64,20 +119,8 @@ export default function ChatsTab() {
     if (isHidden) return false;
     if (isArchived) return false;
 
-    // Apply the selected three-dot filter
-    if (chatListFilter === 'direct') {
-      if (c.type === 'group') return false;
-    } else if (chatListFilter === 'groups') {
-      if (c.type !== 'group') return false;
-      const isChannel = (c.user || '').toLowerCase().includes('channel') || 
-                        (c.user || '').toLowerCase().includes('broadcast');
-      if (isChannel) return false;
-    } else if (chatListFilter === 'channels') {
-      if (c.type !== 'group') return false;
-      const isChannel = (c.user || '').toLowerCase().includes('channel') || 
-                        (c.user || '').toLowerCase().includes('broadcast');
-      if (!isChannel) return false;
-    }
+    // Apply strict direct-only filter
+    if (c.type === 'group') return false;
 
     // Filter out Message Requests (not yet accepted)
     if (conversations.length > 0 && !storage.getItem('grix_accepted_chats_initialized')) {
@@ -102,24 +145,91 @@ export default function ChatsTab() {
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-card)] overflow-hidden">
+      
       <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
 
+        {/* Horizontal Stories - Embedded within scrollable view */}
+        {activeFilter === 'Chats' && (
+          <div className="px-4 pt-1 pb-1 bg-[var(--bg-card)] border-b border-[var(--border-color)]/10 z-10 shrink-0">
+            <div className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-1">
+              
+              {/* My Story Item */}
+              <div className="flex flex-col items-center shrink-0">
+                <div className="relative">
+                  <div 
+                    onClick={() => {
+                      if (myStoriesGroup) {
+                        navigate(`/stories/view/${authUser?.id}`);
+                      } else {
+                        navigate('/stories/create');
+                      }
+                    }}
+                    className={`w-14 h-14 rounded-full p-[2.5px] transition-all cursor-pointer active:scale-95 ${
+                      myStoriesGroup 
+                        ? 'border-2 border-[#0494f4]' 
+                        : 'border border-[var(--border-color)]/30'
+                    } bg-[var(--bg-card)] flex items-center justify-center`}
+                  >
+                    <img 
+                      src={userData?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
+                      alt="My Profile" 
+                      className="w-full h-full rounded-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => navigate('/stories/create')}
+                    className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#0494f4] text-white rounded-full flex items-center justify-center shadow-md hover:bg-[#037cc9] active:scale-90 transition-all cursor-pointer border-2 border-[var(--bg-card)]"
+                  >
+                    <Plus size={11} strokeWidth={3} />
+                  </button>
+                </div>
+                <span className="text-[10px] font-extrabold text-[var(--text-secondary)] mt-1.5 max-w-[65px] truncate">
+                  {myStoriesGroup ? 'My Story' : 'New Story'}
+                </span>
+              </div>
 
-        {/* WhatsApp-style Scrollable Search Bar */}
-        <div className="px-4 pt-3 pb-2.5">
-          <div className="flex items-center bg-[var(--bg-main)] rounded-xl px-3.5 h-10 border border-[var(--border-color)]/25 transition-all">
-            <Search size={15} className="text-[var(--text-secondary)] mr-2.5 opacity-60 shrink-0" />
+              {/* Friends' Stories */}
+              {otherStoriesGroups.map(group => (
+                <div 
+                  key={group.userId} 
+                  onClick={() => navigate(`/stories/view/${group.userId}`)}
+                  className="flex flex-col items-center shrink-0 cursor-pointer group active:scale-95 transition-all"
+                >
+                  <div className="relative">
+                    <div className="w-14 h-14 rounded-full p-[2.5px] border-2 border-[#0494f4] bg-[var(--bg-card)] flex items-center justify-center shadow-sm">
+                      <img 
+                        src={group.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
+                        alt={group.username} 
+                        className="w-full h-full rounded-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-extrabold text-[var(--text-primary)] mt-1.5 max-w-[65px] truncate group-hover:text-[#0494f4] transition-colors">
+                    {group.fullName || group.username}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Highly Visible and Aesthetically Premium Search Bar */}
+        <div className="px-4 pt-2 pb-1.5">
+          <div className="flex items-center bg-[var(--bg-main)] hover:bg-[var(--bg-main)]/90 focus-within:bg-[var(--bg-main)] rounded-xl px-3.5 h-10 border border-[var(--border-color)]/45 focus-within:border-[#0494f4]/80 focus-within:ring-2 focus-within:ring-[#0494f4]/15 shadow-sm transition-all duration-200">
+            <Search size={15} className="text-[var(--text-secondary)] mr-2.5 opacity-75 shrink-0 transition-opacity focus-within:text-[#0494f4]" />
             <input 
               type="text" 
               placeholder="Search chats or messages..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 bg-transparent border-none outline-none text-[13px] font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/45"
+              className="flex-1 bg-transparent border-none outline-none text-[13px] font-extrabold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 shrink-0"
             />
             {searchTerm && (
               <button 
                 onClick={() => setSearchTerm('')}
-                className="p-1 hover:bg-black/5 rounded-full transition-colors cursor-pointer shrink-0"
+                className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors cursor-pointer shrink-0"
               >
                 <X size={13} className="text-[var(--text-secondary)]" />
               </button>
