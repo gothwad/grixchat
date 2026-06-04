@@ -15,8 +15,6 @@ import { GrixAIThinking } from './components/GrixAIThinking';
 import { MessageQualityBadge } from './components/MessageQualityBadge';
 import { getActiveChatsContext } from './utils/grixaiHelpers';
 import { GrixAISettingsSheet } from './components/GrixAISettingsSheet';
-import { GrixAICallSelector } from './components/GrixAICallSelector';
-import { GrixAICallOverlay } from './components/GrixAICallOverlay';
 import { GrixAITelemetryOverlay } from './components/GrixAITelemetryOverlay';
 
 export default function GrixAIScreen() {
@@ -30,10 +28,6 @@ export default function GrixAIScreen() {
   const [currentModel, setCurrentModel] = useState<AIModelType>(aiService.getCurrentModel());
   const [isSending, setIsSending] = useState(false);
   
-  // Call Feature states
-  const [showCallSelector, setShowCallSelector] = useState(false);
-  const [activeCallRecipient, setActiveCallRecipient] = useState<any | null>(null);
-
   const [activeMessageMenu, setActiveMessageMenu] = useState<any | null>(null);
   const [showReactionPicker, setShowReactionPicker] = useState<any | null>(null);
   const [replyingTo, setReplyingTo] = useState<any>(null);
@@ -104,33 +98,11 @@ export default function GrixAIScreen() {
     }
   };
 
-  const handlePillClick = (action: 'analyze' | 'important' | 'call') => {
-    if (action === 'call') {
-      setShowCallSelector(true);
-      return;
-    }
+  const handlePillClick = (action: 'analyze' | 'important') => {
     const query = action === 'analyze' 
       ? 'Analyse my chats and state who I talked to today on GrixChat.' 
       : 'Are there any updates, locked records, or important message events I need to pay attention to?';
     handleSendMessage(undefined, query);
-  };
-
-  const handleEndCall = (durationString: string) => {
-    if (!activeCallRecipient) return;
-    const recipientName = activeCallRecipient.fullName;
-    setActiveCallRecipient(null);
-
-    const logText = `🎙️ Grix AI Call Log: Secure audio channel link with @${activeCallRecipient.username || 'recipient'} completed. Duration: ${durationString}. Connection signature: UHD Opus P2P (Lossless 480Kbps). Integrity verification: 100% OK.`;
-    
-    const callLog: AIMessage = {
-      id: Date.now().toString(),
-      text: logText,
-      senderId: 'ai',
-      timestamp: Date.now()
-    };
-    const finalMessages = [...messages, callLog];
-    setMessages(finalMessages);
-    aiService.saveMessages(finalMessages);
   };
 
   const clearChat = () => {
@@ -277,9 +249,7 @@ export default function GrixAIScreen() {
         }}
         performReactToMessage={() => {}}
         isOtherTyping={false}
-      />
-
-      {/* Suggestion Chips Panel directly above Typing bar */}
+      />      {/* Suggestion Chips Panel directly above Typing bar */}
       <div className="px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth shrink-0 border-t border-[var(--border-color)]/30 bg-[var(--bg-card)]/50 backdrop-blur-md">
         <button 
           onClick={() => handlePillClick('analyze')}
@@ -292,12 +262,6 @@ export default function GrixAIScreen() {
           className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[var(--border-color)] bg-[var(--bg-main)] text-xs text-[var(--text-primary)] font-bold hover:border-indigo-500 hover:text-indigo-400 active:scale-95 transition-all text-left cursor-pointer"
         >
           <span>⚠️</span> Important messages?
-        </button>
-        <button 
-          onClick={() => handlePillClick('call')}
-          className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[var(--border-color)] bg-[var(--bg-main)] text-xs text-[var(--text-primary)] font-bold hover:border-indigo-500 hover:text-indigo-400 active:scale-95 transition-all text-left cursor-pointer"
-        >
-          <span>📞</span> Call someone...
         </button>
       </div>
 
@@ -339,28 +303,6 @@ export default function GrixAIScreen() {
       />
 
       {/* Popups & Full-screen Overlays */}
-      <AnimatePresence>
-        {showCallSelector && (
-          <GrixAICallSelector 
-            currentUserId={user?.id || ''}
-            onClose={() => setShowCallSelector(false)}
-            onSelectRecipient={(recipient) => {
-              setShowCallSelector(false);
-              setActiveCallRecipient(recipient);
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {activeCallRecipient && (
-          <GrixAICallOverlay 
-            recipient={activeCallRecipient}
-            onEndCall={handleEndCall}
-          />
-        )}
-      </AnimatePresence>
-
       <AnimatePresence>
         {selectedTelemetryMsg && (
           <GrixAITelemetryOverlay 

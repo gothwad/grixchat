@@ -68,82 +68,72 @@ export const CallsHistoryList: React.FC<CallsHistoryListProps> = ({
   }
 
   return (
-    <div className="px-4 space-y-2.5">
-      {calls.map((call) => (
-        <div 
-          key={call.id}
-          className="flex items-center gap-4 bg-[var(--bg-card)] border border-[var(--border-color)]/25 px-4 py-3.5 rounded-2xl shadow-sm hover:translate-y-[-1px] hover:shadow-md hover:border-[var(--border-color)]/60 transition-all duration-200 select-none group"
-        >
-          {/* Avatar Container with scale-up on card hover */}
-          <div className="relative shrink-0">
-            <img 
-              src={call.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-              alt={call.user} 
-              className="w-[50px] h-[50px] rounded-full object-cover border border-[var(--border-color)]/40 shrink-0 group-hover:scale-105 transition-transform duration-300"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-baseline mb-1">
-              <h4 className={`text-[14.5px] truncate font-black tracking-tight ${call.isMissed ? 'text-rose-500' : 'text-[var(--text-primary)]'}`}>
-                {call.user}
-              </h4>
-              <span className="text-[9.5px] font-mono font-bold text-[var(--text-secondary)]/70">
-                {call.time}
-              </span>
+    <div className="flex flex-col bg-[var(--bg-card)]">
+      {calls.map((call, index) => {
+        const isMissed = call.isMissed;
+        return (
+          <div 
+            key={call.id}
+            className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer select-none"
+          >
+            {/* Avatar Container resembling ChatUserList */}
+            <div className="relative shrink-0 select-none">
+              <img 
+                src={call.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
+                alt={call.user} 
+                className="w-[52px] h-[52px] rounded-full object-cover border border-[var(--border-color)]/30 shadow-sm group-hover:scale-105 transition-transform"
+                referrerPolicy="no-referrer"
+              />
             </div>
             
-            <div className="flex items-center gap-2 flex-wrap">
-              {call.isMissed ? (
-                call.isIncoming ? (
-                  <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md">
-                    <ArrowDownLeft size={10} strokeWidth={3} className="shrink-0" />
-                    <span>Missed Incoming</span>
+            {/* Detailed Row matching ChatUserList divider lines perfectly */}
+            <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 flex items-center justify-between">
+              <div className="min-w-0 pr-2">
+                <h4 className={`text-[15px] truncate font-bold ${isMissed ? 'text-rose-500' : 'text-[var(--text-primary)]'}`}>
+                  {call.user}
+                </h4>
+                
+                <div className="flex items-center gap-1.5 mt-1 select-none">
+                  {call.isMissed ? (
+                    call.isIncoming ? (
+                      <ArrowDownLeft size={14} strokeWidth={3} className="text-rose-500 shrink-0" />
+                    ) : (
+                      <ArrowUpRight size={14} strokeWidth={3} className="text-amber-500 shrink-0" />
+                    )
+                  ) : call.isIncoming ? (
+                    <ArrowDownLeft size={14} strokeWidth={3} className="text-emerald-500 shrink-0" />
+                  ) : (
+                    <ArrowUpRight size={14} strokeWidth={3} className="text-[#0494f4] shrink-0" />
+                  )}
+                  
+                  <span className="text-xs font-semibold text-[var(--text-secondary)]/80">
+                    {call.type === 'video' ? 'Video' : 'Voice'} Call · {call.time}
                   </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md">
-                    <ArrowUpRight size={10} strokeWidth={3} className="shrink-0" />
-                    <span>Missed Outgoing</span>
-                  </span>
-                )
-              ) : call.isIncoming ? (
-                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                  <ArrowDownLeft size={10} strokeWidth={3} className="shrink-0" />
-                  <span>Incoming</span>
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-[#0494f4] bg-[#0494f4]/15 px-2 py-0.5 rounded-md">
-                  <ArrowUpRight size={10} strokeWidth={3} className="shrink-0" />
-                  <span>Outgoing</span>
-                </span>
-              )}
-              
-              <span className="inline-flex items-center text-[9px] font-bold text-[var(--text-secondary)]/80 bg-[var(--bg-main)] px-2 py-0.5 rounded-md border border-[var(--border-color)]/20 uppercase tracking-widest">
-                {call.type === 'video' ? 'Video' : 'Voice'}
-              </span>
+                </div>
+              </div>
+
+              {/* Action Button styled cleanly on the right */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button 
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCall(call.otherUserId, call.type === 'video' ? 'video' : 'voice');
+                  }}
+                  className="w-10 h-10 rounded-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 text-[#0494f4] active:scale-95 transition-all flex items-center justify-center cursor-pointer border-none"
+                  title={call.type === 'video' ? "Video Call" : "Voice Call"}
+                >
+                  {call.type === 'video' ? (
+                    <Video size={20} className="stroke-[2.2]" />
+                  ) : (
+                    <Phone size={19} className="stroke-[2.2]" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-          
-          {/* Enhanced Action Buttons on Hover */}
-          <div className="flex items-center gap-2.5 shrink-0 ml-1">
-            <button 
-              onClick={() => onCall(call.otherUserId, 'voice')}
-              className="w-10 h-10 rounded-xl bg-[#0494f4]/10 text-[#0494f4] hover:bg-[#0494f4] hover:text-white active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer shadow-sm"
-              title="Voice Call"
-            >
-              <Phone size={15} strokeWidth={2.5} />
-            </button>
-            <button 
-              onClick={() => onCall(call.otherUserId, 'video')}
-              className="w-10 h-10 rounded-xl bg-[#0494f4]/10 text-[#0494f4] hover:bg-[#0494f4] hover:text-white active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer shadow-sm"
-              title="Video Call"
-            >
-              <Video size={15} strokeWidth={2.5} />
-            </button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

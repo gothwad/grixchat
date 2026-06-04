@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send, Loader2, Mic, MicOff, StopCircle, Trash2, Camera as CameraIcon, Paperclip, Image as ImageIcon } from 'lucide-react';
+import { X, SendHorizontal, Loader2, Mic, MicOff, StopCircle, Trash2, Camera as CameraIcon, Paperclip, Image as ImageIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -363,33 +363,18 @@ export default function ChatBottom({
 
                 <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 pr-1 mb-1 self-end">
                   {!newMessage.trim() && selectedFiles.length === 0 && (
-                    <>
-                      <button 
-                        type="button"
-                        onClick={() => setShowCameraModal(true)}
-                        className={`p-2 transition-colors flex items-center justify-center rounded-full ${
-                          isDark 
-                            ? 'text-[#a0aab8] hover:text-white hover:bg-white/5' 
-                            : 'text-[#64748b] hover:text-black hover:bg-black/5'
-                        }`}
-                        title="Camera"
-                      >
-                        <CameraIcon size={22} />
-                      </button>
-
-                      <button 
-                        type="button"
-                        onClick={() => actualImageInputRef.current?.click()}
-                        className={`p-2 transition-colors flex items-center justify-center rounded-full ${
-                          isDark 
-                            ? 'text-[#a0aab8] hover:text-white hover:bg-white/5' 
-                            : 'text-[#64748b] hover:text-black hover:bg-black/5'
-                        }`}
-                        title="Gallery"
-                      >
-                        <ImageIcon size={22} />
-                      </button>
-                    </>
+                    <button 
+                      type="button"
+                      onClick={() => setShowCameraModal(true)}
+                      className={`p-2 transition-colors flex items-center justify-center rounded-full ${
+                        isDark 
+                          ? 'text-[#a0aab8] hover:text-white hover:bg-white/5' 
+                          : 'text-[#64748b] hover:text-black hover:bg-black/5'
+                      }`}
+                      title="Camera"
+                    >
+                      <CameraIcon size={22} />
+                    </button>
                   )}
 
                   <input 
@@ -451,7 +436,7 @@ export default function ChatBottom({
           ) : isMicMode ? (
             <Mic size={24} />
           ) : (
-            <Send size={24} className="ml-1 text-white" />
+            <SendHorizontal size={24} className="text-white" />
           )}
         </button>
       </div>

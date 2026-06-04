@@ -150,8 +150,8 @@ export const useConversations = (activeFilter: string) => {
           const unreadCount = unreadMap[conv.id] || 0;
           const latestDbMsg = latestMessagesMap[conv.id];
 
-          let lastMsgVal = conv.last_message || 'New Conversation';
-          let lastMsgAtVal = conv.last_message_at || conv.created_at;
+          let lastMsgVal = (conv as any).last_message || 'New Conversation';
+          let lastMsgAtVal = (conv as any).last_message_at || conv.updated_at || conv.created_at;
 
           if (latestDbMsg) {
             lastMsgVal = latestDbMsg.text || (latestDbMsg.media_type ? `Sent a ${latestDbMsg.media_type}` : 'Sent a file');

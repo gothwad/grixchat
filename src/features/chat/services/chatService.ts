@@ -37,13 +37,12 @@ export const chatService = {
       }
     }
 
-    // Update last message in conversation
+    // Update updated_at of conversation to trigger realtime updates and sort by activity
     await supabase
       .from('conversations')
       .update({
-        last_message: content || `Sent a ${mediaData?.type || 'file'}`,
-        last_message_at: new Date().toISOString()
-      } as any)
+        updated_at: new Date().toISOString()
+      })
       .eq('id', conversationId);
 
     return data;

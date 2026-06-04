@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Camera, RefreshCw, Trash2, Send, CameraOff } from 'lucide-react';
+import { X, Camera, RefreshCw, Trash2, Send, CameraOff, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -38,6 +38,25 @@ export default function CameraCaptureModal({
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleGallerySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setCapturedImg(reader.result);
+          // Stop stream if active when choosing from gallery too
+          if (stream) {
+            stream.getTracks().forEach((track) => track.stop());
+            setStream(null);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Initialize and update webcam stream
   const startCamera = useCallback(async () => {
@@ -258,8 +277,24 @@ export default function CameraCaptureModal({
             /* Live Camera viewfinder controls */
             !errorMsg && (
               <div className="flex justify-between items-center w-full max-w-sm mx-auto px-6 py-2">
-                {/* Spacer / Left option slot */}
-                <div className="w-10 h-10" />
+                {/* Gallery option slot on the left */}
+                <div>
+                  <input
+                    type="file"
+                    ref={galleryInputRef}
+                    className="hidden"
+                    onChange={handleGallerySelect}
+                    accept="image/*,video/*"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800 text-white border border-white/10 active:scale-95 transition-all shadow-md cursor-pointer"
+                    title="Choose from Gallery"
+                  >
+                    <ImageIcon size={20} />
+                  </button>
+                </div>
 
                 {/* Snapper button */}
                 <button

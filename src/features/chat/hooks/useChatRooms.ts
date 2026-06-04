@@ -39,7 +39,7 @@ export const useChatRooms = () => {
             )
           `)
           .in('id', convIds)
-          .order('last_message_at', { ascending: false });
+          .order('updated_at', { ascending: false });
 
         if (cError) throw cError;
 

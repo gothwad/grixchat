@@ -153,9 +153,7 @@ export default function NewGroupScreen() {
           name: finalName,
           photo_url: iconUrl,
           type: 'group',
-          created_by: authUser.id,
-          last_message: groupType === 'channel' ? `Channel "${finalName}" created` : `Group "${groupName}" created`,
-          last_message_at: new Date().toISOString()
+          admins: [authUser.id]
         });
 
       if (convError) throw convError;

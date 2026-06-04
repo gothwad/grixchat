@@ -93,5 +93,11 @@ AFTER INSERT ON public.messages
 FOR EACH ROW
 EXECUTE FUNCTION prune_past_messages();
 
+-- 7. CONVERSATIONS LAST MESSAGE COLUMN RETRIEVAL CACHE
+-- Appends the missing columns in case they are missing from some environments to prevent PGRST204 errors
+ALTER TABLE public.conversations 
+ADD COLUMN IF NOT EXISTS last_message TEXT,
+ADD COLUMN IF NOT EXISTS last_message_at TIMESTAMPTZ;
+
 -- Clear any potential stale schema caches
 NOTIFY pgrst, 'reload schema';

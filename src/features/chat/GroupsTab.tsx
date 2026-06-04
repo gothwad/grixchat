@@ -15,13 +15,9 @@ export default function GroupsTab() {
   // Load conversation lists
   const { conversations, loading } = useConversations('Chats');
 
-  // Filter conversations specifically for Group Chats (excluding channels/broadcasts)
+  // Filter conversations for both Group Chats and Channels (all conversations of type 'group')
   const filteredGroups = conversations.filter(c => {
     if (c.type !== 'group') return false;
-    
-    const isChannel = (c.user || '').toLowerCase().includes('channel') || 
-                      (c.user || '').toLowerCase().includes('broadcast');
-    if (isChannel) return false;
 
     if (!searchTerm) return true;
     return (c.user || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -58,7 +54,7 @@ export default function GroupsTab() {
             <Search size={15} className="text-[var(--text-secondary)] mr-2.5 opacity-60 shrink-0" />
             <input 
               type="text" 
-              placeholder="Search active groups..." 
+              placeholder="Search active groups or channels..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/45"
@@ -74,12 +70,12 @@ export default function GroupsTab() {
           </div>
         </div>
 
-        {/* Groups List */}
+        {/* Groups & Channels List */}
         <div className="flex flex-col h-full mt-1">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <Loader2 className="animate-spin text-[#0494f4]" size={24} />
-              <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">Loading Groups...</p>
+              <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">Loading Groups & Channels...</p>
             </div>
           ) : filteredGroups.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-8 text-center gap-4">
@@ -87,15 +83,15 @@ export default function GroupsTab() {
                 <Users size={36} className="opacity-80" />
               </div>
               <div className="max-w-xs">
-                <h3 className="text-xs font-black text-[var(--text-primary)] mb-1 uppercase tracking-wider">No Groups Joined</h3>
+                <h3 className="text-xs font-black text-[var(--text-primary)] mb-1 uppercase tracking-wider">No Groups or Channels Joined</h3>
                 <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                  Start or coordinate a new group chat with your contact list to see active rooms here.
+                  Start or coordinate a new group or channel with your contact list to see active rooms here.
                 </p>
                 <button 
                   onClick={() => navigate('/new-group?type=group')}
                   className="mt-4 px-4 py-2 bg-[#0494f4]/10 hover:bg-[#0494f4]/20 text-[#0494f4] font-extrabold text-[10px] uppercase tracking-wider rounded-xl inline-flex items-center gap-1.5 transition-all active:scale-95"
                 >
-                  <span>Build Group Chat</span>
+                  <span>Build Group or Channel</span>
                   <ArrowRight size={10} strokeWidth={2.5} />
                 </button>
               </div>
@@ -107,8 +103,8 @@ export default function GroupsTab() {
               showGrixAI={false}
               archivedCount={0}
               showSecretHeader={false}
-              emptyMessage="No active groups"
-              emptySubMessage="Coordinate a group chat."
+              emptyMessage="No active groups or channels"
+              emptySubMessage="Coordinate a group chat or broadcast channel."
               loading={loading}
               usersWithStories={[]}
               showHiddenChatsEntry={false}

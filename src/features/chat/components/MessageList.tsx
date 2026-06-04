@@ -1,8 +1,24 @@
 import React, { useState, useCallback } from 'react';
-import { Loader2, MessageCircle } from 'lucide-react';
+import { Loader2, MessageCircle, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageBubble } from './MessageBubble';
 import { useAuth } from '../../../providers/AuthProvider.tsx';
+
+const getGroupDateLabel = (dateStr: string) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) {
+    return 'Today';
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday';
+  } else {
+    return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+};
 
 interface MessageListProps {
   scrollContainerRef: React.RefObject<HTMLDivElement>;
@@ -115,12 +131,42 @@ export const MessageList: React.FC<MessageListProps> = ({
             return true;
           });
 
-          return uniqueMessages.map((msg, index) => {
+          let lastDateLabel = '';
+          const items: React.ReactNode[] = [];
+
+          // Add encryption banner at the very beginning of messages list
+          items.push(
+            <div key="e2ee-banner" className="mx-auto my-4 max-w-[300px] bg-amber-500/[0.04] dark:bg-amber-500/[0.02] border border-amber-500/15 dark:border-amber-500/10 rounded-2xl p-3 text-center text-[10.5px] text-amber-800/90 dark:text-amber-200/80 shadow-sm flex flex-col items-center gap-1 select-none animate-fadeIn">
+              <div className="flex items-center gap-1.5 font-semibold tracking-wide text-amber-700 dark:text-amber-300/90">
+                <Lock size={12} className="text-amber-600/90 dark:text-amber-400/80" />
+                <span>Messages are end-to-end encrypted</span>
+              </div>
+              <p className="text-[9.5px] leading-relaxed text-amber-700/75 dark:text-amber-400/60 font-medium">
+                No one outside of this chat, not even Grixchat, can read or listen to them.
+              </p>
+            </div>
+          );
+
+          uniqueMessages.forEach((msg, index) => {
             const isMe = msg.sender_id === user?.id;
             const prevMsg = index > 0 ? uniqueMessages[index - 1] : null;
             const isSameSender = prevMsg?.sender_id === msg.sender_id;
-            
-            return (
+
+            const dateLabel = getGroupDateLabel(msg.created_at);
+            const showDateSeparator = dateLabel !== lastDateLabel;
+            lastDateLabel = dateLabel;
+
+            if (showDateSeparator && dateLabel) {
+              items.push(
+                <div key={`date-sep-${dateLabel}-${index}`} className="flex justify-center my-3 select-none">
+                  <div className="bg-[var(--bg-card)]/90 backdrop-blur-sm border border-[var(--border-color)]/30 text-[10px] text-[var(--text-secondary)] px-3 py-1 rounded-full shadow-sm font-semibold tracking-wide uppercase">
+                    {dateLabel}
+                  </div>
+                </div>
+              );
+            }
+
+            items.push(
               <MessageBubble 
                 key={msg.id}
                 msg={msg}
@@ -145,6 +191,8 @@ export const MessageList: React.FC<MessageListProps> = ({
               />
             );
           });
+
+          return items;
         })()}
         
         <AnimatePresence>

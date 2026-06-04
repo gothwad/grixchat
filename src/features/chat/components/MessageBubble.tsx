@@ -4,7 +4,9 @@ import {
   FileIcon, 
   Download,
   CornerUpRight,
-  ChevronsRight
+  ChevronsRight,
+  CheckCheck,
+  Clock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../providers/AuthProvider.tsx';
@@ -183,7 +185,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             actualIsMe 
               ? 'bg-[var(--bubble-own)] text-[var(--bubble-text-own)] ml-auto' 
               : 'bg-[var(--bubble-other)] text-[var(--bubble-text-other)] mr-auto'
-          } ${isSelected ? 'ring-3 ring-[#00a884]/70 bg-[#07362e]/90 animate-pulse' : ''}`}
+          } ${isSelected ? 'ring-3 ring-[#0494f4]/70 bg-[#0494f4]/15 animate-pulse' : ''}`}
         >
           {isForwardedMany ? (
             <p className="text-[10px] text-sky-400 font-extrabold italic mb-1 flex items-center gap-1 select-none">
@@ -308,11 +310,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               )
             )}
             
-            <div className="flex items-center justify-end gap-1 mt-0.5 -mr-1">
-              <span className="text-[10px] text-zinc-500 font-medium">
+            <div className="flex items-center justify-end gap-1.5 mt-0.5 -mr-1">
+              <span className={`text-[10px] font-medium ${actualIsMe ? 'text-[var(--bubble-text-own)]/60' : 'text-[var(--bubble-text-other)]/60'}`}>
                 {formatTime(msg.created_at)}
                 {msg.is_edited && ' • Edited'}
               </span>
+              {actualIsMe && (
+                <span className="shrink-0 flex items-center">
+                  {msg.status === 'sending' ? (
+                    <Clock size={11} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/60' : 'text-[var(--bubble-text-other)]/60'} animate-pulse`} />
+                  ) : msg.is_read ? (
+                    <CheckCheck size={14} className="text-[#34b7f1]" strokeWidth={2.5} />
+                  ) : (
+                    <CheckCheck size={14} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/40' : 'text-[var(--bubble-text-other)]/40'}`} strokeWidth={2.5} />
+                  )}
+                </span>
+              )}
             </div>
           </div>
 
@@ -328,14 +341,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           )}
         </motion.div>
       </div>
-      {isMe && isLatestMessage && (
-        <span className="text-[10px] text-zinc-400/80 mt-1 mr-2 px-1 font-medium select-none text-right flex items-center justify-end gap-1.5">
-          {msg.is_read && (
-            <span className="w-1.5 h-1.5 rounded-full bg-[#0494f4] inline-block shadow-[0_0_4px_#0494f4] shrink-0" />
-          )}
-          {getStatusString(msg)}
-        </span>
-      )}
+
     </div>
   );
 };

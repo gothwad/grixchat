@@ -48,9 +48,6 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
   const { theme } = useTheme();
   const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
-  // Track page of menu (1 or 2)
-  const [page, setPage] = useState<1 | 2>(1);
-
   // Confirm delete modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
@@ -63,8 +60,6 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
   useEffect(() => {
     if (!activeMessageMenu) return;
 
-    // Reset to page 1 whenever menu is newly opened for a different message
-    setPage(1);
     setShowConfirmModal(false);
     setShowFullEmojiPicker(false);
 
@@ -183,194 +178,125 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                   exit={{ opacity: 0, scale: 0.95 }}
                   className="w-full flex flex-col items-center gap-1.5"
                 >
-                  {/* Reaction shortcut bar: exactly 6 emojis, with perfectly symmetrical padding */}
+                  {/* Reaction shortcut bar: 5 emojis and 1 dropdown triangle icon to open full emoji library */}
                   <div className="flex items-center justify-between bg-[var(--bg-card)] border border-[var(--border-color)]/60 shadow-xl rounded-full px-4 py-2 w-full shrink-0">
-                    {['❤️', '😂', '🥰', '🔥', '👍', '🙏'].map(emoji => (
+                    {['❤️', '😂', '🥰', '🔥', '👍'].map(emoji => (
                       <button
                         key={emoji}
+                        type="button"
                         onClick={() => handleEmojiClick(emoji)}
-                        className="w-8 h-8 rounded-full hover:bg-[var(--bg-main)] active:scale-135 transition-all flex items-center justify-center text-[21px] cursor-pointer"
+                        className="w-8 h-8 rounded-full hover:bg-[var(--bg-main)] active:scale-135 transition-all flex items-center justify-center text-[21px] cursor-pointer bg-transparent border-none"
                       >
                         {emoji}
                       </button>
                     ))}
+                    {/* 6th item: Dropdown/triangle icon button that triggers full reaction picker */}
+                    <button
+                      type="button"
+                      onClick={() => setShowFullEmojiPicker(true)}
+                      className="w-8 h-8 rounded-full hover:bg-[var(--bg-main)] active:scale-110 transition-all flex items-center justify-center text-[var(--text-secondary)] hover:text-[#0494f4] cursor-pointer bg-transparent border-none"
+                    >
+                      <ChevronDown size={21} className="stroke-[3]" />
+                    </button>
                   </div>
 
                   {/* Action options container */}
                   <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/60 shadow-[0_10px_35px_rgba(0,0,0,0.15)] rounded-2xl p-1.5 flex flex-col gap-[1px] w-[185px] overflow-hidden text-[var(--text-primary)]">
-                    <AnimatePresence mode="wait">
-                      {page === 1 ? (
-                        <motion.div 
-                          key="page1"
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 10 }}
-                          transition={{ duration: 0.1 }}
-                          className="flex flex-col gap-[1px]"
+                    <div className="flex flex-col gap-[1px]">
+                      {/* Option: Reply */}
+                      <button 
+                        type="button"
+                        onClick={() => { setReplyingTo(activeMessageMenu); setActiveMessageMenu(null); }}
+                        className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                      >
+                        <Reply size={16} className="text-[var(--text-secondary)]" />
+                        <span>Reply</span>
+                      </button>
+
+                      {/* Option: Copy Text */}
+                      <button 
+                        type="button"
+                        onClick={handleCopyText} 
+                        className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                      >
+                        <Copy size={16} className="text-[var(--text-secondary)]" />
+                        <span>Copy Text</span>
+                      </button>
+
+                      {/* Option: Edit (if self-authored) */}
+                      {isMe && (
+                        <button 
+                          type="button"
+                          onClick={() => { startEdit(activeMessageMenu); setActiveMessageMenu(null); }}
+                          className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
                         >
-                          {/* Option: Reply */}
-                          <button 
-                            type="button"
-                            onClick={() => { setReplyingTo(activeMessageMenu); setActiveMessageMenu(null); }}
-                            className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
-                          >
-                            <Reply size={16} className="text-[var(--text-secondary)]" />
-                            <span>Reply</span>
-                          </button>
-
-                          {/* Option: Copy Text */}
-                          <button 
-                            type="button"
-                            onClick={handleCopyText} 
-                            className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
-                          >
-                            <Copy size={16} className="text-[var(--text-secondary)]" />
-                            <span>Copy Text</span>
-                          </button>
-
-                          {/* Option: Edit (if self-authored) */}
-                          {isMe && (
-                            <button 
-                              type="button"
-                              onClick={() => { startEdit(activeMessageMenu); setActiveMessageMenu(null); }}
-                              className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
-                            >
-                              <Edit2 size={16} className="text-[var(--text-secondary)]" />
-                              <span>Edit</span>
-                            </button>
-                          )}
-
-                          {/* Option: Forward - WhatsApp dynamic screen */}
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              if (onForwardClick) {
-                                onForwardClick(activeMessageMenu);
-                              } else {
-                                navigator.clipboard.writeText(activeMessageMenu.content || activeMessageMenu.text || '');
-                                alert("Message text copied!");
-                              }
-                              setActiveMessageMenu(null);
-                            }}
-                            className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
-                          >
-                            <Forward size={16} className="text-[var(--text-secondary)]" />
-                            <span>Forward</span>
-                          </button>
-
-                          {/* Option: Select - interactive multi-select mode */}
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              if (onSelectClick) {
-                                onSelectClick(activeMessageMenu);
-                              } else {
-                                alert("Batch selection enabled!");
-                              }
-                              setActiveMessageMenu(null);
-                            }}
-                            className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
-                          >
-                            <CheckCircle2 size={16} className="text-[var(--text-secondary)]" />
-                            <span>Select</span>
-                          </button>
-
-                          {/* Option: Delete */}
-                          <button 
-                            type="button"
-                            onClick={() => { setShowConfirmModal(true); }}
-                            className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-[#ff595a] hover:bg-[#ff595a]/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
-                          >
-                            <Trash size={16} className="text-[#ff595a]" />
-                            <span>Delete</span>
-                          </button>
-
-                          {/* Toggle Mode Option: More */}
-                          <button 
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setPage(2); }}
-                            className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[#0494f4] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center justify-between rounded-xl cursor-pointer border-none bg-transparent border-t border-[var(--border-color)]/30 mt-1 pt-2"
-                          >
-                            <span className="flex items-center gap-3">
-                              <ChevronRight size={16} className="text-[#0494f4]" />
-                              <span>More</span>
-                            </span>
-                            <ChevronRight size={15} className="text-[#0494f4]/80" />
-                          </button>
-                        </motion.div>
-                      ) : (
-                        <motion.div 
-                          key="page2"
-                          initial={{ opacity: 0, x: 10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -10 }}
-                          transition={{ duration: 0.1 }}
-                          className="flex flex-col gap-[1px]"
-                        >
-                          {/* Option: Pin */}
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              if (onPinClick) {
-                                onPinClick(activeMessageMenu);
-                              } else {
-                                alert("Message pinned inside this session!");
-                              }
-                              setActiveMessageMenu(null);
-                            }}
-                            className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
-                          >
-                            <Pin size={16} className="text-[var(--text-secondary)]" />
-                            <span>Pin</span>
-                          </button>
-
-                          {/* Option: Download */}
-                          <button 
-                            type="button"
-                            onClick={handleDownload}
-                            className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
-                          >
-                            <Download size={16} className="text-[var(--text-secondary)]" />
-                            <span>Download</span>
-                          </button>
-
-                          {/* Option: Reactions / Custom Emoji trigger */}
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setShowFullEmojiPicker(true);
-                            }}
-                            className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
-                          >
-                            <Smile size={16} className="text-[var(--text-secondary)]" />
-                            <span>Reactions</span>
-                          </button>
-
-                          {/* Option: Delete For Me */}
-                          <button 
-                            type="button"
-                            onClick={() => { setShowConfirmModal(true); }}
-                            className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-[#ff595a] hover:bg-[#ff595a]/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
-                          >
-                            <Trash size={16} className="text-[#ff595a]" />
-                            <span>Delete For Me</span>
-                          </button>
-
-                          {/* Toggle Mode Option: Less */}
-                          <button 
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setPage(1); }}
-                            className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[#0494f4] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center justify-between rounded-xl cursor-pointer border-none bg-transparent border-t border-[var(--border-color)]/30 mt-1 pt-2"
-                          >
-                            <span className="flex items-center gap-3">
-                              <ChevronLeft size={16} className="text-[#0494f4]" />
-                              <span>Back</span>
-                            </span>
-                            <ChevronLeft size={15} className="text-[#0494f4]/80" />
-                          </button>
-                        </motion.div>
+                          <Edit2 size={16} className="text-[var(--text-secondary)]" />
+                          <span>Edit</span>
+                        </button>
                       )}
-                    </AnimatePresence>
+
+                      {/* Option: Forward */}
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          if (onForwardClick) {
+                            onForwardClick(activeMessageMenu);
+                          } else {
+                            navigator.clipboard.writeText(activeMessageMenu.content || activeMessageMenu.text || '');
+                            alert("Message text copied!");
+                          }
+                          setActiveMessageMenu(null);
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                      >
+                        <Forward size={16} className="text-[var(--text-secondary)]" />
+                        <span>Forward</span>
+                      </button>
+
+                      {/* Option: Select */}
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          if (onSelectClick) {
+                            onSelectClick(activeMessageMenu);
+                          } else {
+                            alert("Batch selection enabled!");
+                          }
+                          setActiveMessageMenu(null);
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                      >
+                        <CheckCircle2 size={16} className="text-[var(--text-secondary)]" />
+                        <span>Select</span>
+                      </button>
+
+                      {/* Option: Pin (replaces Delete location) */}
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          if (onPinClick) {
+                            onPinClick(activeMessageMenu);
+                          } else {
+                            alert("Message pinned inside this session!");
+                          }
+                          setActiveMessageMenu(null);
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                      >
+                        <Pin size={16} className="text-[var(--text-secondary)]" />
+                        <span>Pin</span>
+                      </button>
+
+                      {/* Option: Delete (replaces More location) */}
+                      <button 
+                        type="button"
+                        onClick={() => { setShowConfirmModal(true); }}
+                        className="w-full px-4 py-2.5 text-left text-[13px] font-bold text-[#ff595a] hover:bg-[#ff595a]/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                      >
+                        <Trash size={16} className="text-[#ff595a]" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               ) : (

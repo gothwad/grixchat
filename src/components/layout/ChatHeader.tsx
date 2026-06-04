@@ -169,7 +169,7 @@ export default function ChatHeader({
               className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer border-none bg-transparent"
               title="Close Search"
             >
-              <X size={21} className="text-[#00a884] font-bold animate-pulse" />
+              <X size={21} className="text-[#0494f4] font-bold animate-pulse" />
             </button>
           )}
 
@@ -235,7 +235,7 @@ export default function ChatHeader({
               <div className="relative w-7 h-7 flex items-center justify-center hover:bg-zinc-700/60 rounded-full transition-colors shrink-0">
                 <Calendar 
                   size={16} 
-                  className={selectedDate ? "text-[#00a884] font-bold" : "text-zinc-400"} 
+                  className={selectedDate ? "text-[#0494f4] font-bold" : "text-zinc-400"} 
                 />
                 <input 
                   type="date"
@@ -264,12 +264,12 @@ export default function ChatHeader({
                 <div className="flex flex-wrap gap-1.5 items-center">
                   <span className="text-[10px] text-zinc-500">Filters:</span>
                   {searchQuery && (
-                    <span className="text-[10px] font-semibold bg-[#222e35] text-[#00a884] px-2 py-0.5 rounded-full border border-[#00a884]/20">
+                    <span className="text-[10px] font-semibold bg-[#222e35] text-[#0494f4] px-2 py-0.5 rounded-full border border-[#0494f4]/20">
                       &ldquo;{searchQuery}&rdquo;
                     </span>
                   )}
                   {selectedDate && (
-                    <span className="text-[10px] font-semibold bg-[#222e35] text-[#00a884] px-2 py-0.5 rounded-full border border-[#00a884]/20 flex items-center gap-1">
+                    <span className="text-[10px] font-semibold bg-[#222e35] text-[#0494f4] px-2 py-0.5 rounded-full border border-[#0494f4]/20 flex items-center gap-1">
                       <span>Date:</span>
                       <span>{selectedDate}</span>
                     </span>
@@ -279,7 +279,7 @@ export default function ChatHeader({
                 <button
                   type="button"
                   onClick={clearAllFilters}
-                  className="text-[10px] text-[#00a884] hover:text-[#00c298] font-bold underline cursor-pointer bg-transparent border-none flex items-center gap-1"
+                  className="text-[10px] text-[#0494f4] hover:text-[#0382d6] font-bold underline cursor-pointer bg-transparent border-none flex items-center gap-1"
                 >
                   <Eraser size={11} />
                   <span>Reset filters</span>

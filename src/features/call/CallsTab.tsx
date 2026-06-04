@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Link as LinkIcon, 
-  Share2, 
-  Check
-} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import { CallsHistoryList } from './components/CallsHistoryList';
 import { CallsContactsList } from './components/CallsContactsList';
 import { LocalDataCache } from '../../services/LocalDataCache';
+
+// Modular Call Module elements
+import { CallsQuickActions, StatusFilterOption } from './components/CallsQuickActions';
+import { CallsSearchBar } from './components/CallsSearchBar';
+import { MeetingView } from './components/MeetingView';
+import { JoinView } from './components/JoinView';
 
 export default function CallsTab() {
   const { user: authUser } = useAuth();
@@ -49,8 +50,56 @@ export default function CallsTab() {
     return true;
   });
 
-  const [linkCopied, setLinkCopied] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'calls' | 'contacts'>('calls');
+  const [statusFilter, setStatusFilter] = useState<StatusFilterOption>('calls');
+  const [meetingCopied, setMeetingCopied] = useState(false);
+  const [roomCode, setRoomCode] = useState('');
+  const [joinCode, setJoinCode] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const authUserZone = () => {
+    return authUser && authUser.id;
+  };
+
+  const handleOpenMeeting = () => {
+    const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+    setRoomCode(`GRX-MEET-${randomSuffix}`);
+    setJoinCode('');
+    setMeetingCopied(false);
+    setStatusFilter('meeting');
+  };
+
+  const handleCopyMeetingLink = (code: string) => {
+    const link = `https://grixchat.com/call/room-${code.toLowerCase()}?type=video`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(link).then(() => {
+        setMeetingCopied(true);
+        setTimeout(() => setMeetingCopied(false), 2000);
+      }).catch(() => {
+        setMeetingCopied(true);
+        setTimeout(() => setMeetingCopied(false), 2000);
+      });
+    } else {
+      setMeetingCopied(true);
+      setTimeout(() => setMeetingCopied(false), 2000);
+    }
+  };
+
+  const handleJoinMeeting = (input: string) => {
+    if (!input.trim()) return;
+    
+    let code = input.trim();
+    // Support parsing path if full URL is pasted
+    if (code.includes('/call/')) {
+      const parts = code.split('/call/');
+      const afterCall = parts[parts.length - 1];
+      code = afterCall.split('?')[0]; // strip query parameters
+    } else if (code.includes('?')) {
+      code = code.split('?')[0];
+    }
+    
+    const cleanCode = code.replace(/[^a-zA-Z0-9-]/g, '').toLowerCase();
+    navigate(`/call/${cleanCode}?type=video`);
+  };
 
   const fetchCalls = async () => {
     if (!authUser || !supabase) return;
@@ -102,7 +151,6 @@ export default function CallsTab() {
         setContactsLoading(true);
       }
       
-      // Get following/follower IDs directly representing mutual friend links
       const { data: followRows, error: followError } = await supabase
         .from('follows')
         .select('follower_id, following_id')
@@ -186,115 +234,99 @@ export default function CallsTab() {
     };
   }, [authUser]);
 
-  // Handle live contact refreshing when user switches to contact tab
   useEffect(() => {
     if (statusFilter === 'contacts') {
       fetchContacts();
     }
   }, [statusFilter]);
 
-  const authUserZone = () => {
-    return authUser && authUser.id;
-  };
-
-  const handleCopyCallLink = () => {
-    const randomId = Math.random().toString(36).substring(2, 10);
-    const mockLink = `https://grixchat.com/call-link/${randomId}`;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(mockLink).then(() => {
-        setLinkCopied(true);
-        setTimeout(() => setLinkCopied(false), 2000);
-      }).catch(err => {
-        console.warn("Failed to copy clipboard:", err);
-      });
-    } else {
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
-    }
-  };
-
   const startCallDirectly = (userId: string, callType: 'voice' | 'video') => {
     navigate(`/call/${userId}?type=${callType}`);
   };
 
-  // Status Filters computation
-  // 'calls' covers all standard incoming/outgoing and missed calls seamlessly
   const getFilteredCalls = () => {
-    return calls;
+    let filtered = calls;
+    if (statusFilter === 'missed') {
+      filtered = calls.filter(c => c.isMissed);
+    }
+    if (searchTerm) {
+      filtered = filtered.filter(c => 
+        (c.user || '').toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    return filtered;
   };
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-main)] font-sans relative">
+    <div className="flex flex-col h-full bg-[var(--bg-card)] font-sans relative">
       
-      {/* Scrollable Container with All Call Components */}
-      <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
-        
-        {/* 2-Tab Switch Filter at the absolute top */}
-        <div className="px-4 pt-4 pb-2 shrink-0">
-          <div className="flex bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-color)]/25">
-            <button
-              onClick={() => setStatusFilter('calls')}
-              className={`flex-1 py-2 text-[10.5px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
-                statusFilter === 'calls'
-                  ? 'bg-[#0494f4] text-white shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              CALLS
-            </button>
-            <button
-              onClick={() => setStatusFilter('contacts')}
-              className={`flex-1 py-2 text-[10.5px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
-                statusFilter === 'contacts'
-                  ? 'bg-[#0494f4] text-white shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              CONTACTS
-            </button>
+      {/* 1. Full-Screen Overlay for Meetings */}
+      {statusFilter === 'meeting' && (
+        <MeetingView 
+          roomCode={roomCode}
+          meetingCopied={meetingCopied}
+          onBack={() => setStatusFilter('calls')}
+          onCopy={handleCopyMeetingLink}
+          onJoin={handleJoinMeeting}
+          onNavigateToJoin={() => {
+            setJoinCode('');
+            setStatusFilter('join');
+          }}
+        />
+      )}
+
+      {/* 2. Full-Screen Overlay for Join with Link */}
+      {statusFilter === 'join' && (
+        <JoinView 
+          joinCode={joinCode}
+          setJoinCode={setJoinCode}
+          onBack={() => setStatusFilter('calls')}
+          onJoin={handleJoinMeeting}
+          onNavigateToCreate={handleOpenMeeting}
+        />
+      )}
+
+      {/* 3. Base Calls List Layout (Only shown when not overlayed) */}
+      {statusFilter !== 'meeting' && statusFilter !== 'join' && (
+        <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
+          {/* Quick Actions Selector bar */}
+          <CallsQuickActions 
+            statusFilter={statusFilter}
+            onStatusChange={(filter) => {
+              setSearchTerm('');
+              setStatusFilter(filter);
+            }}
+            onCreateMeeting={handleOpenMeeting}
+          />
+
+          {/* Search bar */}
+          <CallsSearchBar 
+            placeholder={statusFilter === 'contacts' ? "Search contact name..." : "Search calls..."}
+            value={searchTerm}
+            onChange={setSearchTerm}
+            onClear={() => setSearchTerm('')}
+          />
+
+          {/* List display area */}
+          <div className="mt-1">
+            {statusFilter === 'contacts' ? (
+              <CallsContactsList 
+                contacts={contacts} 
+                loading={contactsLoading} 
+                onCall={startCallDirectly} 
+                searchTerm={searchTerm}
+              />
+            ) : (
+              <CallsHistoryList 
+                calls={getFilteredCalls()} 
+                loading={callsLoading} 
+                onCall={startCallDirectly} 
+                onReset={fetchCalls}
+              />
+            )}
           </div>
         </div>
-
-        {/* Create Call Link Header */}
-        <div className="px-4 py-2">
-          <div 
-            onClick={handleCopyCallLink}
-            className="flex items-center gap-4 bg-[var(--bg-card)] border border-[var(--border-color)]/50 p-4 rounded-2xl hover:bg-[var(--bg-card)]/90 transition-all cursor-pointer shadow-sm group active:scale-[0.99]"
-          >
-            <div className="w-11 h-11 rounded-full bg-[#0494f4]/10 text-[#0494f4] flex items-center justify-center shrink-0">
-              <LinkIcon size={20} className="transform rotate-45" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="text-sm font-black text-[var(--text-primary)]">Create call link</h4>
-              <p className="text-[11px] text-[var(--text-secondary)] truncate">
-                {linkCopied ? 'Link copied successfully!' : 'Share a custom link for your Grix call'}
-              </p>
-            </div>
-            <div className="shrink-0 text-[10px] uppercase font-bold text-[#0494f4] bg-[#0494f4]/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
-              {linkCopied ? <Check size={11} strokeWidth={2.5} /> : <Share2 size={11} />}
-              <span>{linkCopied ? 'Copied' : 'Share'}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Section rendering segment */}
-        <div className="mt-2">
-          {statusFilter === 'contacts' ? (
-            <CallsContactsList 
-              contacts={contacts} 
-              loading={contactsLoading} 
-              onCall={startCallDirectly} 
-            />
-          ) : (
-            <CallsHistoryList 
-              calls={getFilteredCalls()} 
-              loading={callsLoading} 
-              onCall={startCallDirectly} 
-              onReset={fetchCalls}
-            />
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 }

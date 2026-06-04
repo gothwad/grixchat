@@ -95,7 +95,7 @@ export const VoiceMessage: React.FC<{
       <div className="shrink-0">
         <button 
           onClick={togglePlay}
-          className={`w-10 h-10 flex items-center justify-center rounded-full active:scale-95 transition-transform ${isMe ? 'text-white' : 'text-[#00a884]'}`}
+          className={`w-10 h-10 flex items-center justify-center rounded-full active:scale-95 transition-transform ${isMe ? 'text-white' : 'text-[#0494f4]'}`}
         >
           {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" />}
         </button>
@@ -112,7 +112,7 @@ export const VoiceMessage: React.FC<{
             onChange={handleSeek}
             className={`w-full h-1 rounded-full appearance-none cursor-pointer accent-current ${isMe ? 'bg-white/20' : 'bg-black/10'}`}
             style={{
-              background: `linear-gradient(to right, ${isMe ? '#fff' : '#00a884'} ${(currentTime / (duration || 0.01)) * 100}%, ${isMe ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'} ${(currentTime / (duration || 0.01)) * 100}%)`
+              background: `linear-gradient(to right, ${isMe ? '#fff' : '#0494f4'} ${(currentTime / (duration || 0.01)) * 100}%, ${isMe ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'} ${(currentTime / (duration || 0.01)) * 100}%)`
             }}
           />
         </div>
@@ -128,10 +128,10 @@ export const VoiceMessage: React.FC<{
 
       <div className="relative shrink-0 flex items-center justify-center w-10 h-10">
         <div className="w-9 h-9 rounded-full overflow-hidden bg-black/5 flex items-center justify-center ring-1 ring-black/5">
-          <Mic size={18} className={isMe ? 'text-white/40' : 'text-[#00a884] opacity-50'} />
+          <Mic size={18} className={isMe ? 'text-white/40' : 'text-[#0494f4] opacity-50'} />
         </div>
         <div className={`absolute bottom-0 right-0 rounded-full p-0.5 border border-white/10 ${isMe ? 'bg-[#005c4b]' : 'bg-[#2b3943]'}`}>
-           <Mic size={10} className={isMe ? 'text-white/80' : 'text-[#00a884]'} />
+           <Mic size={10} className={isMe ? 'text-white/80' : 'text-[#0494f4]'} />
         </div>
       </div>
     </div>
