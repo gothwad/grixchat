@@ -99,5 +99,37 @@ ALTER TABLE public.conversations
 ADD COLUMN IF NOT EXISTS last_message TEXT,
 ADD COLUMN IF NOT EXISTS last_message_at TIMESTAMPTZ;
 
+-- 8. MESSAGE DELETION (DELETE FOR ME & DELETE FOR EVERYONE) ENHANCEMENTS
+-- Add message deletion columns if they don't exist
+ALTER TABLE public.messages 
+ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS deleted_by UUID[] DEFAULT '{}'::UUID[];
+
+-- Add RLS policy for deleting messages (necessary to prevent silent failures on deletion queries)
+DROP POLICY IF EXISTS "Allow participants to delete messages" ON public.messages;
+CREATE POLICY "Allow participants to delete messages" 
+ON public.messages 
+FOR DELETE 
+USING (
+    EXISTS (
+        SELECT 1 FROM public.conversation_participants 
+        WHERE conversation_participants.conversation_id = messages.conversation_id 
+          AND conversation_participants.user_id = auth.uid()
+    )
+);
+
+-- Ensure "Allow participants to update messages" exists and is robust for both text and deleted_by updates
+DROP POLICY IF EXISTS "Allow participants to update messages" ON public.messages;
+CREATE POLICY "Allow participants to update messages" 
+ON public.messages 
+FOR UPDATE 
+USING (
+    EXISTS (
+        SELECT 1 FROM public.conversation_participants 
+        WHERE conversation_participants.conversation_id = messages.conversation_id 
+          AND conversation_participants.user_id = auth.uid()
+    )
+);
+
 -- Clear any potential stale schema caches
 NOTIFY pgrst, 'reload schema';

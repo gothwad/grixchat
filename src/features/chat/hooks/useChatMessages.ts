@@ -357,8 +357,17 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
     return () => unsubscribe();
   }, [conversationId]);
 
+  const visibleMessages = messages.filter((m: any) => {
+    if (!m) return false;
+    // Hide completely if current authenticated user's id is inside deleted_by array
+    if (user?.id && Array.isArray(m.deleted_by) && m.deleted_by.includes(user.id)) {
+      return false;
+    }
+    return true;
+  });
+
   return { 
-    messages, 
+    messages: visibleMessages, 
     loading, 
     loadingMore,
     loadMore,

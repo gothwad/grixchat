@@ -121,7 +121,7 @@ class LocalDataCacheService {
   /**
    * Instantly updates the last message of a cached conversation and pushes it to the top.
    */
-  public updateLastMessage(myUserId: string, conversationId: string, lastMessageText: string, timestamp: string = new Date().toISOString()): void {
+  public updateLastMessage(myUserId: string, conversationId: string, lastMessageText: string, timestamp: string = new Date().toISOString(), lastMsgStatus?: 'Sent' | 'Received'): void {
     const list = this.getConversations(myUserId);
     if (list && Array.isArray(list)) {
       let found = false;
@@ -133,6 +133,7 @@ class LocalDataCacheService {
             lastMsg: lastMessageText,
             lastMsgAt: timestamp,
             time: this.formatTimeForCache(new Date(timestamp)),
+            lastMsgStatus: lastMsgStatus !== undefined ? lastMsgStatus : 'Sent',
           };
         }
         return conv;

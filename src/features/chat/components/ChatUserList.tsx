@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, Lock, Archive, Check } from 'lucide-react';
+import { MessageCircle, Lock, Archive, Check, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import { aiService } from '../../../services/AIService';
 import { useLayout } from '../../../contexts/LayoutContext';
@@ -18,6 +18,7 @@ interface ChatItem {
   isOnline: boolean;
   otherUserId: string;
   type?: 'direct' | 'group';
+  lastMsgStatus?: 'Sent' | 'Received';
 }
 
 interface OtherUser {
@@ -120,10 +121,17 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
                 {chat.time}
               </span>
             </div>
-            <div className="flex justify-between items-center">
-              <p className="text-xs truncate font-medium text-[var(--text-secondary)]">
+            <div className="flex justify-between items-center gap-2">
+              <p className="text-xs truncate font-medium text-[var(--text-secondary)] flex-1">
                 {chat.lastMsg}
               </p>
+              {!chat.unread && chat.lastMsgStatus && (
+                chat.lastMsgStatus === 'Sent' ? (
+                  <ArrowUpRight size={16} strokeWidth={2.8} className="text-[#0494f4] shrink-0" />
+                ) : (
+                  <ArrowDownLeft size={16} strokeWidth={2.8} className="text-emerald-500 shrink-0" />
+                )
+              )}
             </div>
           </div>
         </div>
@@ -156,18 +164,27 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
               {chat.time}
             </span>
           </div>
-          <div className="flex justify-between items-center">
-            <p className={`text-xs truncate font-medium ${chat.unread ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-secondary)]'}`}>
+          <div className="flex justify-between items-center gap-2">
+            <p className={`text-xs truncate font-medium flex-1 ${chat.unread ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-secondary)]'}`}>
               {chat.lastMsg}
             </p>
-            {chat.unread && (
-              <div className="min-w-[18px] h-[18px] px-1.5 bg-[var(--primary)] rounded-full flex items-center justify-center shadow-lg shadow-[var(--primary-shadow)]/20 ml-2">
-                <span className="text-[10.5px] text-white font-black leading-none">
-                  {chat.unreadCount && chat.unreadCount > 4 ? '4+' : chat.unreadCount}
-                </span>
-              </div>
-            )}
-  
+            <div className="flex items-center gap-2 shrink-0">
+              {chat.unread ? (
+                <div className="min-w-[18px] h-[18px] px-1.5 bg-[var(--primary)] rounded-full flex items-center justify-center shadow-lg shadow-[var(--primary-shadow)]/20">
+                  <span className="text-[10.5px] text-white font-black leading-none">
+                    {chat.unreadCount && chat.unreadCount > 4 ? '4+' : chat.unreadCount}
+                  </span>
+                </div>
+              ) : (
+                chat.lastMsgStatus && (
+                  chat.lastMsgStatus === 'Sent' ? (
+                    <ArrowUpRight size={16} strokeWidth={2.8} className="text-[#0494f4] shrink-0" />
+                  ) : (
+                    <ArrowDownLeft size={16} strokeWidth={2.8} className="text-emerald-500 shrink-0" />
+                  )
+                )
+              )}
+            </div>
           </div>
         </div>
       </Link>

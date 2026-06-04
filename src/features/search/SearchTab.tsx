@@ -9,7 +9,8 @@ import {
   Check, 
   Clock, 
   MessageSquare,
-  Plus
+  Plus,
+  ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { supabase } from '../../lib/supabase';
@@ -267,11 +268,11 @@ export default function SearchTab() {
       </div>
 
       <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-2">
 
           {/* BEAUTIFIED SEARCH INPUT */}
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl shadow-sm p-3.5">
-            <div className="flex items-center bg-[var(--bg-main)] hover:bg-[var(--bg-main)]/90 focus-within:bg-[var(--bg-main)] rounded-2xl px-4 h-11.5 border border-[var(--border-color)]/25 focus-within:border-[#0494f4]/45 focus-within:ring-2 focus-within:ring-[#0494f4]/5 transition-all duration-200">
+          <div className="py-2">
+            <div className="flex items-center bg-[var(--bg-card)] hover:bg-[var(--bg-card)]/80 focus-within:bg-[var(--bg-card)] rounded-xl px-4 h-11.5 border border-[var(--border-color)]/30 focus-within:border-[#0494f4]/60 focus-within:ring-2 focus-within:ring-[#0494f4]/5 transition-all duration-200">
               <Search size={16} className="text-[var(--text-secondary)] mr-2.5 opacity-65 shrink-0" />
               <input 
                 type="text" 
@@ -295,37 +296,35 @@ export default function SearchTab() {
           {!discoverSearchTerm && (
             <div 
               onClick={() => navigate('/chats/requests')}
-              className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl shadow-sm p-4 flex items-center justify-between cursor-pointer group hover:bg-[var(--bg-card)]/90 transition-all select-none"
+              className="py-3.5 px-2 flex items-center justify-between cursor-pointer group hover:bg-[var(--border-color)]/10 active:bg-[var(--border-color)]/15 rounded-xl transition-all select-none border-b border-[var(--border-color)]/15"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3.5">
                 <div className="relative shrink-0">
-                  <div className="w-[38px] h-[38px] rounded-xl bg-[#0494f4]/15 flex items-center justify-center text-[#0494f4] border border-[#0494f4]/10 shadow-inner">
-                    <Users size={16} strokeWidth={2.5} />
+                  <div className="w-10 h-10 rounded-xl bg-[#0494f4]/10 flex items-center justify-center text-[#0494f4]">
+                    <Users size={18} strokeWidth={2.4} />
                   </div>
                   {requestCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-[#0494f4] text-[9px] font-black font-mono text-white rounded-full flex items-center justify-center border border-white dark:border-[var(--bg-card)]">
+                    <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-rose-500 text-[9px] font-black text-white rounded-full flex items-center justify-center shadow-sm">
                       {requestCount}
                     </span>
                   )}
                 </div>
                 <div>
-                  <h4 className="text-[11.5px] font-bold text-[var(--text-primary)]">Pending Requests</h4>
-                  <p className="text-[10px] text-[var(--text-secondary)]">
+                  <h4 className="text-[14px] font-extrabold text-[var(--text-primary)]">Pending Requests</h4>
+                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-medium">
                     {requestCount > 0 ? `${requestCount} incoming request letters waiting` : 'No inbound requests pending'}
                   </p>
                 </div>
               </div>
-              <span className="text-[10px] bg-[#0494f4]/10 hover:bg-[#0494f4]/20 text-[#0494f4] font-black px-3.5 py-1.5 rounded-xl border border-[#0494f4]/10 transition-colors uppercase tracking-wider">
-                Manage
-              </span>
+              <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200" />
             </div>
           )}
 
           {/* Dynamic Users Hub List */}
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl shadow-sm p-4 overflow-hidden">
-            <div className="flex items-center justify-between mb-3.5">
-              <h3 className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1.5 leading-none select-none">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#0494f4]"></span>
+          <div className="py-2.5">
+            <div className="flex items-center justify-between mb-4 px-2">
+              <h3 className="text-[11px] font-black text-[#0494f4] uppercase tracking-widest flex items-center gap-2 select-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#0494f4] shadow-sm shadow-[#0494f4]/45"></span>
                 {discoverSearchTerm ? 'Global Results' : 'Suggested Connections'}
               </h3>
               <span className="text-[10px] bg-[#0494f4]/10 text-[#0494f4] font-black px-2 py-0.5 rounded-full uppercase tracking-wider select-none shrink-0 text-right">
@@ -339,15 +338,15 @@ export default function SearchTab() {
                 <p className="text-[9px] font-black text-[var(--text-secondary)] uppercase tracking-wider">Browsing matches...</p>
               </div>
             ) : (
-              <div className="space-y-2.5 max-h-[480px] overflow-y-auto no-scrollbar pr-0.5">
+              <div className="space-y-1 max-h-[580px] overflow-y-auto no-scrollbar">
                 {((discoverSearchTerm ? userResults : suggestedUsers)
                   .filter(profile => !hiddenUserIds.includes(profile.uid))
                   .length === 0) ? (
-                    <div className="flex flex-col items-center justify-center py-10 text-center select-none bg-[var(--bg-main)]/30 border border-[var(--border-color)]/20 rounded-2xl gap-2">
+                    <div className="flex flex-col items-center justify-center py-12 text-center select-none bg-[var(--bg-main)]/30 border border-[var(--border-color)]/20 rounded-2xl gap-2 mt-2">
                       <Users size={22} className="text-[var(--text-secondary)] opacity-50 shrink-0" />
                       <div>
                         <h4 className="text-[11px] font-bold text-[var(--text-primary)]">No matching users</h4>
-                        <p className="text-[9px] text-[var(--text-secondary)] px-4 leading-tight">Checking search spelling, or wait until more users register on Grixvibe.</p>
+                        <p className="text-[9px] text-[var(--text-secondary)] px-4 leading-tight mt-0.5">Checking search spelling, or wait until more users register on Grixvibe.</p>
                       </div>
                     </div>
                   ) : (
@@ -364,25 +363,25 @@ export default function SearchTab() {
                           <div 
                             key={profile.uid}
                             onClick={() => navigate(`/user/${profile.uid}`)}
-                            className="flex items-center justify-between p-2.5 hover:bg-[var(--bg-main)] rounded-xl transition-all duration-150 cursor-pointer group"
+                            className="flex items-center justify-between py-3.5 px-2 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 rounded-xl transition-all duration-150 cursor-pointer group border-b border-[var(--border-color)]/10 last:border-b-0"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="flex items-center gap-3.5 min-w-0">
                               <div className="relative shrink-0">
                                 <img 
                                   src={profile.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
                                   alt={profile.username}
-                                  className="w-9.5 h-9.5 rounded-full object-cover border border-[var(--border-color)]/40"
+                                  className="w-11 h-11 rounded-full object-cover border border-[var(--border-color)]/30 shadow-none"
                                   referrerPolicy="no-referrer"
                                 />
                                 {profile.isOnline && (
-                                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-[var(--bg-card)] rounded-full"></div>
+                                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[var(--bg-main)] rounded-full"></div>
                                 )}
                               </div>
                               <div className="min-w-0">
-                                <h5 className="text-xs font-black text-[var(--text-primary)] truncate group-hover:text-[#0494f4] transition-colors">
+                                <h5 className="text-[15px] font-extrabold text-[var(--text-primary)] truncate group-hover:text-[#0494f4] transition-colors leading-snug">
                                   {profile.fullName || profile.username}
                                 </h5>
-                                <p className="text-[9px] text-[var(--text-secondary)] font-mono">@{profile.username}</p>
+                                <p className="text-xs text-[var(--text-secondary)] font-mono mt-0.5">@{profile.username}</p>
                               </div>
                             </div>
 
@@ -393,9 +392,9 @@ export default function SearchTab() {
                                     e.stopPropagation();
                                     navigate(`/chat/${profile.uid}`);
                                   }}
-                                  className="px-2.5 py-1.5 bg-[#0494f4] text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                                  className="px-3 py-1.5 bg-[#0494f4] text-white rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer"
                                 >
-                                  <MessageSquare size={10} />
+                                  <MessageSquare size={11} />
                                   <span>Chat</span>
                                 </button>
                               ) : isIncomingRequest ? (
@@ -405,12 +404,12 @@ export default function SearchTab() {
                                     handleAcceptRequest(profile.uid);
                                   }}
                                   disabled={actionInProgressUid === profile.uid}
-                                  className="px-2.5 py-1.5 bg-[#0494f4] text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                                  className="px-3 py-1.5 bg-[#0494f4] text-white rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer"
                                 >
                                   {actionInProgressUid === profile.uid ? (
-                                    <Loader2 size={10} className="animate-spin" />
+                                    <Loader2 size={11} className="animate-spin" />
                                   ) : (
-                                    <Check size={10} />
+                                    <Check size={11} />
                                   )}
                                   <span>Accept</span>
                                 </button>
@@ -421,12 +420,12 @@ export default function SearchTab() {
                                     handleCancelRequest(profile.uid);
                                   }}
                                   disabled={actionInProgressUid === profile.uid}
-                                  className="px-2 py-1.5 bg-[var(--border-color)]/25 text-[var(--text-secondary)] rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                                  className="px-2.5 py-1.5 bg-[var(--border-color)]/25 text-[var(--text-secondary)] rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer"
                                 >
                                   {actionInProgressUid === profile.uid ? (
-                                    <Loader2 size={10} className="animate-spin" />
+                                    <Loader2 size={11} className="animate-spin" />
                                   ) : (
-                                    <Clock size={10} />
+                                    <Clock size={11} />
                                   )}
                                   <span>Sent</span>
                                 </button>
@@ -437,12 +436,12 @@ export default function SearchTab() {
                                     handleSendRequest(profile.uid);
                                   }}
                                   disabled={actionInProgressUid === profile.uid}
-                                  className="px-2.5 py-1.5 bg-[#0494f4]/10 text-[#0494f4] rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer hover:bg-[#0494f4] hover:text-white transition-colors"
+                                  className="px-3 py-1.5 bg-[#0494f4]/10 text-[#0494f4] rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer hover:bg-[#0494f4] hover:text-white transition-colors"
                                 >
                                   {actionInProgressUid === profile.uid ? (
-                                    <Loader2 size={10} className="animate-spin" />
+                                    <Loader2 size={11} className="animate-spin" />
                                   ) : (
-                                    <Plus size={10} />
+                                    <Plus size={11} />
                                   )}
                                   <span>Add</span>
                                 </button>

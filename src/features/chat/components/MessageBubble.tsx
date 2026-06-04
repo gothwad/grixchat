@@ -115,17 +115,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     );
   }
 
-  const mediaUrl = msg.media_url || msg.imageUrl || msg.fileUrl;
+  const rawTextContent = typeof msg.content === 'string' ? msg.content : (msg.text || '');
+  const isMsgDeleted = msg.is_deleted === true || rawTextContent.includes('🚫 This message was deleted') || rawTextContent.includes('This message was deleted');
+
+  const mediaUrl = isMsgDeleted ? null : (msg.media_url || msg.imageUrl || msg.fileUrl);
   const mediaType = msg.media_type || msg.type;
 
-  const rawTextContent = typeof msg.content === 'string' ? msg.content : (msg.text || '');
-  const isForwardedMany = rawTextContent.startsWith('\u200B[FWD_MANY]\u200B');
-  const isForwarded = isForwardedMany || rawTextContent.startsWith('\u200B[FWD]\u200B');
-  const cleanRawText = rawTextContent
-    .replace('\u200B[FWD_MANY]\u200B', '')
-    .substring(0) // Safe copy
-    .replace('\u200B[FWD]\u200B', '');
-  const isGrixAiMessage = cleanRawText.startsWith('🤖 Grix AI:');
+  const isForwardedMany = !isMsgDeleted && rawTextContent.startsWith('\u200B[FWD_MANY]\u200B');
+  const isForwarded = !isMsgDeleted && (isForwardedMany || rawTextContent.startsWith('\u200B[FWD]\u200B'));
+  const cleanRawText = isMsgDeleted 
+    ? (isMe ? '🚫 You deleted this message' : '🚫 This message was deleted')
+    : rawTextContent
+        .replace('\u200B[FWD_MANY]\u200B', '')
+        .substring(0) // Safe copy
+        .replace('\u200B[FWD]\u200B', '');
+  const isGrixAiMessage = !isMsgDeleted && cleanRawText.startsWith('🤖 Grix AI:');
   const actualIsMe = isGrixAiMessage ? false : isMe;
 
   let renderedContent = cleanRawText;
@@ -168,9 +172,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               if (window.navigator.vibrate) try { window.navigator.vibrate(10); } catch(e){}
             }
           }}
-          onClick={(e) => handleMessageTap(e as any, msg)}
+          onClick={(e) => {
+            if (isMsgDeleted) return;
+            handleMessageTap(e as any, msg);
+          }}
           onContextMenu={(e) => {
             e.preventDefault();
+            if (isMsgDeleted) return;
             handleMessageTap(e as any, msg);
           }}
           whileTap={{ scale: 0.98 }}
@@ -302,7 +310,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             
             {renderedContent && (
               typeof renderedContent === 'string' ? (
-                <p className={`${contentFontClass} break-words whitespace-pre-wrap overflow-visible [word-break:normal]`}>
+                <p className={`${isMsgDeleted ? 'italic text-zinc-400 dark:text-zinc-500 font-medium select-none text-[13px] opacity-80' : contentFontClass} break-words whitespace-pre-wrap overflow-visible [word-break:normal]`}>
                   {renderedContent}
                 </p>
               ) : (
@@ -329,7 +337,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </div>
           </div>
 
-          {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+          {msg.reactions && Object.keys(msg.reactions).length > 0 && !isMsgDeleted && (
             <div className={`absolute -bottom-3 ${isMe ? 'right-2' : 'left-2'} flex items-center gap-0.5 bg-[var(--bg-main)] rounded-full px-1.5 py-0.5 shadow-sm border border-[var(--border-color)] z-20`}>
               {Object.entries(msg.reactions).slice(0, 3).map(([uid, emoji]) => (
                 <span key={uid} className="text-[13px]">{emoji as string}</span>

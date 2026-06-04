@@ -152,27 +152,67 @@ export const useChatActions = (conversationId: string, receiverId: string) => {
     }
   }, [conversationId, user]);
 
-  const deleteMessage = useCallback(async (msgId: string) => {
-    if (!supabase) return;
+  const deleteMessage = useCallback(async (msgId: string, deleteType: 'me' | 'everyone' = 'everyone') => {
+    if (!supabase || !user) return;
 
     // Instantly/optimistically update local messages cache and notify listeners
     const cached = LocalDataCache.getMessages(conversationId) || [];
+    
+    // For both cases, we filter out this specific message from the local UI cache so there is no trace left
     const updated = cached.filter((m: any) => m.id !== msgId);
+
     LocalDataCache.saveMessages(conversationId, updated);
     LocalDataCache.notify(`messages:${conversationId}`, updated);
 
+    // Update the conversation list's last message and status optimistically
+    const nextLatest = updated.length > 0 ? updated[updated.length - 1] : null;
+    const lastMsgText = nextLatest 
+      ? (nextLatest.text || (nextLatest.media_type ? `Sent a ${nextLatest.media_type}` : 'Sent a file'))
+      : 'New Conversation';
+    const lastMsgTimestamp = nextLatest ? nextLatest.created_at : new Date().toISOString();
+    const nextMsgSenderId = nextLatest ? nextLatest.sender_id : null;
+    const lastMsgStatusVal = nextMsgSenderId ? (nextMsgSenderId === user.id ? 'Sent' : 'Received') : undefined;
+
+    LocalDataCache.updateLastMessage(user.id, conversationId, lastMsgText, lastMsgTimestamp, lastMsgStatusVal);
+
     try {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .eq('id', msgId);
-      if (error) {
-        console.error('Error deleting message in Supabase:', error);
+      if (deleteType === 'me') {
+        // Fetch existing deleted_by array first
+        const { data: currentMsg, error: fetchErr } = await supabase
+          .from('messages')
+          .select('deleted_by')
+          .eq('id', msgId)
+          .maybeSingle();
+
+        if (fetchErr) {
+          console.error('Error fetching message for delete for me:', fetchErr);
+        }
+
+        const currentDeletedBy = Array.isArray(currentMsg?.deleted_by) ? currentMsg.deleted_by : [];
+        if (!currentDeletedBy.includes(user.id)) {
+          const updatedDeletedBy = [...currentDeletedBy, user.id];
+          const { error } = await supabase
+            .from('messages')
+            .update({ deleted_by: updatedDeletedBy })
+            .eq('id', msgId);
+          if (error) {
+            console.error('Error setting deleted_by in Supabase:', error);
+          }
+        }
+      } else {
+        // Delete for Everyone: Physically delete the row from DB completely
+        const { error } = await supabase
+          .from('messages')
+          .delete()
+          .eq('id', msgId);
+        if (error) {
+          console.error('Error deleting for everyone in Supabase:', error);
+        }
       }
     } catch (err) {
       console.error('Failed to delete message:', err);
     }
-  }, [conversationId]);
+  }, [conversationId, user]);
 
   const reactToMessage = useCallback(async (msgId: string, emoji: string) => {
     if (!user || !supabase || !conversationId) return;

@@ -117,15 +117,21 @@ export const useConversations = (activeFilter: string) => {
 
       // Fetch the actual newest message from messages table for each conversation to prevent race conditions
       const latestMessagesMap: Record<string, any> = {};
+      const hasMessagesInDb = new Set<string>();
 
       if (conversationIds.length > 0) {
         const { data: latestMsgs } = await supabase
           .from('messages')
-          .select('conversation_id, text, media_type, created_at')
+          .select('conversation_id, text, media_type, created_at, sender_id, deleted_by')
           .in('conversation_id', conversationIds)
           .order('created_at', { ascending: false });
 
         latestMsgs?.forEach((m: any) => {
+          hasMessagesInDb.add(m.conversation_id);
+          // Filter out if deleted by key-user (Delete for me)
+          if (Array.isArray(m.deleted_by) && m.deleted_by.includes(myId)) {
+            return;
+          }
           if (!latestMessagesMap[m.conversation_id]) {
             latestMessagesMap[m.conversation_id] = m;
           }
@@ -152,10 +158,15 @@ export const useConversations = (activeFilter: string) => {
 
           let lastMsgVal = (conv as any).last_message || 'New Conversation';
           let lastMsgAtVal = (conv as any).last_message_at || conv.updated_at || conv.created_at;
+          let lastMsgSenderId = (conv as any).last_message_sender_id;
 
           if (latestDbMsg) {
             lastMsgVal = latestDbMsg.text || (latestDbMsg.media_type ? `Sent a ${latestDbMsg.media_type}` : 'Sent a file');
             lastMsgAtVal = latestDbMsg.created_at;
+            lastMsgSenderId = latestDbMsg.sender_id;
+          } else if (hasMessagesInDb.has(conv.id)) {
+            // All messages in this conversation were deleted/hidden for this user
+            lastMsgVal = 'New Conversation';
           }
 
           // Clean any forward tagging indicators for raw display in Chat List
@@ -165,6 +176,11 @@ export const useConversations = (activeFilter: string) => {
             } else if (lastMsgVal.startsWith('\u200B[FWD]\u200B')) {
               lastMsgVal = '↪ Forwarded: ' + lastMsgVal.replace('\u200B[FWD]\u200B', '');
             }
+          }
+
+          let lastMsgStatusVal: 'Sent' | 'Received' | undefined = undefined;
+          if (lastMsgSenderId && lastMsgVal !== 'New Conversation') {
+            lastMsgStatusVal = lastMsgSenderId === myId ? 'Sent' : 'Received';
           }
 
           return {
@@ -182,7 +198,8 @@ export const useConversations = (activeFilter: string) => {
               : (firstOther?.photo_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`),
             unread: unreadCount > 0,
             unreadCount: unreadCount,
-            isOnline: isGroup ? false : isUserOnline(firstOther?.is_online, firstOther?.last_seen)
+            isOnline: isGroup ? false : isUserOnline(firstOther?.is_online, firstOther?.last_seen),
+            lastMsgStatus: lastMsgStatusVal
           };
         })
         .filter(Boolean);

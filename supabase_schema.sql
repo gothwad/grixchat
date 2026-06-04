@@ -96,6 +96,8 @@ CREATE TABLE public.messages (
     reactions JSONB DEFAULT '{}'::jsonb,
     is_read BOOLEAN DEFAULT FALSE,
     is_edited BOOLEAN DEFAULT FALSE,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    deleted_by UUID[] DEFAULT '{}'::UUID[],
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -269,6 +271,15 @@ CREATE POLICY "Allow database users to send messages to their chats"
 
 CREATE POLICY "Allow participants to update messages" 
     ON public.messages FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM public.conversation_participants 
+            WHERE conversation_participants.conversation_id = messages.conversation_id 
+              AND conversation_participants.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Allow participants to delete messages" 
+    ON public.messages FOR DELETE USING (
         EXISTS (
             SELECT 1 FROM public.conversation_participants 
             WHERE conversation_participants.conversation_id = messages.conversation_id 

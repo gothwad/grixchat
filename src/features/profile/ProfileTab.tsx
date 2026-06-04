@@ -141,96 +141,90 @@ export default function ProfileTab() {
   return (
     <div className="flex flex-col bg-[var(--bg-main)] font-sans h-full overflow-y-auto no-scrollbar pb-32 animate-fade-in animate-once touch-pan-y overscroll-contain">
       {/* Beautiful Profile Header Section */}
-      <div className="px-4 pt-4 mb-3">
+      <div className="flex flex-col items-center justify-center text-center pt-8 pb-6 px-4 border-b border-[var(--border-color)]/20 mb-4">
+        {/* Centered Avatar Wrapper with Edit Pencil icon overlay */}
         <div 
           onClick={() => navigate('/edit-profile')}
-          className="relative bg-[var(--bg-card)] text-[var(--text-primary)] py-5 px-4 border border-[var(--border-color)]/50 rounded-2xl shadow-sm shrink-0 cursor-pointer hover:bg-[var(--bg-card)]/90 transition-colors flex flex-col items-center justify-center text-center"
+          className="relative group shrink-0 mb-4 cursor-pointer"
         >
-          {/* Centered Avatar Wrapper with Edit Pencil icon overlay */}
-          <div className="relative group shrink-0 mb-3">
-            <div className="w-20 h-20 rounded-full p-[2px] border-2 border-zinc-200 dark:border-zinc-800 bg-[var(--bg-main)] flex items-center justify-center shrink-0">
-              <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-[var(--bg-main)]">
-                <img 
-                  src={profilePic || DEFAULT_LOGO} 
-                  className="w-full h-full object-cover shrink-0"
-                  referrerPolicy="no-referrer"
-                  alt="Profile Avatar"
-                />
-              </div>
+          <div className="w-24 h-24 rounded-full p-[2px] border-2 border-zinc-200 dark:border-zinc-800 bg-[var(--bg-main)] flex items-center justify-center shrink-0 shadow-none">
+            <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-[var(--bg-main)]">
+              <img 
+                src={profilePic || DEFAULT_LOGO} 
+                className="w-full h-full object-cover shrink-0"
+                referrerPolicy="no-referrer"
+                alt="Profile Avatar"
+              />
             </div>
-            <span className="absolute bottom-0 right-0 w-6.5 h-6.5 bg-[#0494f4] text-white rounded-full flex items-center justify-center shadow-lg border-2 border-[var(--bg-card)] hover:scale-105 active:scale-95 transition-all">
-              <Pencil size={11} strokeWidth={2.5} />
-            </span>
           </div>
-
-          {/* Name & Username Column */}
-          <div className="flex flex-col items-center min-w-0">
-            <h2 className="text-base font-extrabold tracking-tight text-[var(--text-primary)] leading-tight">
-              {userData?.fullName || 'GrixChat User'}
-            </h2>
-            <span className="text-[10px] text-[#0494f4] font-semibold font-mono tracking-wide mt-1.5 px-2.5 py-0.5 bg-[#0494f4]/15 rounded-full select-none">
-              @{userData?.username || 'user'}
-            </span>
-          </div>
-
-          {/* Bio & Status section */}
-          <div className="mt-3.5 pt-3 border-t border-[var(--border-color)]/30 w-full text-center">
-            <span className="text-[8.5px] font-bold text-[var(--text-secondary)] uppercase tracking-wider block mb-0.5 font-mono opacity-80">
-              Bio & status
-            </span>
-            <p className="text-xs text-[var(--text-primary)] leading-normal max-w-xs mx-auto break-words whitespace-pre-line text-[var(--text-secondary)] font-medium">
-              {userData?.bio ? truncateToChars(userData.bio) : 'Tap to describe yourself & write a custom bio.'}
-            </p>
-          </div>
+          <span className="absolute bottom-1 right-1 w-7 h-7 bg-[#0494f4] text-white rounded-full flex items-center justify-center shadow-md border-2 border-[var(--bg-main)] hover:scale-105 active:scale-95 transition-all">
+            <Pencil size={12} strokeWidth={2.5} />
+          </span>
         </div>
+
+        {/* Name & Username Column */}
+        <div className="flex flex-col items-center min-w-0">
+          <h2 className="text-lg font-extrabold tracking-tight text-[var(--text-primary)] leading-tight">
+            {userData?.fullName || 'GrixChat User'}
+          </h2>
+          <span className="text-[11px] text-[#0494f4] font-semibold font-mono tracking-wide mt-2 px-3 py-1 bg-[#0494f4]/15 rounded-full select-none">
+            @{userData?.username || 'user'}
+          </span>
+        </div>
+
+        {/* Bio & Status section */}
+        {userData?.bio && (
+          <p className="text-xs text-[var(--text-secondary)] leading-normal max-w-xs mx-auto break-words whitespace-pre-line font-medium mt-3.5 italic">
+            "{truncateToChars(userData.bio)}"
+          </p>
+        )}
       </div>
 
       {/* Friends Count Block (Centered and Sleek) */}
-      <div className="px-4 mb-5">
-        <div 
+      <div className="px-4 mb-4">
+        <button 
           onClick={() => navigate('/profile/friends')}
-          className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)]/50 overflow-hidden shadow-sm py-3 px-4 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-card)]/90 transition-all select-none"
+          className="w-full flex items-center gap-4 py-4 px-2 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group text-left cursor-pointer border-b border-[var(--border-color)]/10"
         >
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#0494f4]/10 rounded-xl text-[#0494f4]">
-              <Users size={18} />
-            </div>
-            <div>
-              <h4 className="text-sm font-black text-[var(--text-primary)]">My Friends</h4>
-              <p className="text-[10px] text-[var(--text-secondary)]">Interact with mutual contacts</p>
-            </div>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#0494f4]/10 text-[#0494f4] group-active:scale-95 transition-transform shrink-0">
+            <Users size={19} strokeWidth={2.4} />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-base font-black text-[#0494f4] bg-[#0494f4]/10 px-3 py-1 rounded-xl">
+          <div className="flex-1 min-w-0">
+            <h4 className="text-[15px] font-extrabold text-[var(--text-primary)] tracking-wide group-hover:text-[#0494f4] transition-colors">My Friends</h4>
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate font-medium">Interact with mutual contacts</p>
+          </div>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <span className="text-sm font-black text-[#0494f4] bg-[#0494f4]/10 px-3 py-1 rounded-xl">
               {friendsCount}
             </span>
+            <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200" />
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Integrated App Settings section */}
-      <div className="px-4 pb-6 space-y-5">
+      <div className="px-4 pb-6 space-y-6">
         {settingsOptions.map((section) => (
-          <div key={section.title} className="space-y-2">
-            <h3 className="px-2 text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em] flex items-center gap-1.5 select-none opacity-85">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#0494f4]"></span>
+          <div key={section.title} className="space-y-2.5">
+            <h3 className="px-2 text-[11px] font-black text-[#0494f4] uppercase tracking-widest flex items-center gap-2 select-none">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0494f4] shadow-sm shadow-[#0494f4]/45"></span>
               {section.title}
             </h3>
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl divide-y divide-[var(--border-color)]/30 overflow-hidden shadow-sm">
+            <div className="divide-y divide-[var(--border-color)]/10">
               {section.items.map((item) => (
                 <button 
                   key={item.label}
                   onClick={item.onClick}
-                  className="w-full flex items-center gap-3.5 px-4.5 py-3.5 hover:bg-[var(--bg-main)]/40 active:bg-[var(--bg-main)]/60 transition-colors group text-left cursor-pointer"
+                  className="w-full flex items-center gap-4 py-4 px-2 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group text-left cursor-pointer"
                 >
-                  <div className="w-8.5 h-8.5 rounded-xl flex items-center justify-center bg-[#0494f4]/10 text-[#0494f4] group-active:scale-95 transition-transform shrink-0">
-                    <item.icon size={17} strokeWidth={2.2} />
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#0494f4]/10 text-[#0494f4] group-active:scale-95 transition-transform shrink-0">
+                    <item.icon size={19} strokeWidth={2.4} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-xs font-extrabold text-[var(--text-primary)] tracking-wide group-hover:text-[#0494f4] transition-colors">{item.label}</h4>
-                    {item.sub && <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate font-medium">{item.sub}</p>}
+                    <h4 className="text-[15px] font-extrabold text-[var(--text-primary)] tracking-wide group-hover:text-[#0494f4] transition-colors">{item.label}</h4>
+                    {item.sub && <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate font-medium">{item.sub}</p>}
                   </div>
-                  <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200" />
+                  <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200" />
                 </button>
               ))}
             </div>
@@ -238,20 +232,26 @@ export default function ProfileTab() {
         ))}
 
         {/* Live Session Logout Block */}
-        <div className="space-y-2 pt-1.5">
-          <h3 className="px-2 text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em] select-none opacity-85">
+        <div className="space-y-2.5 pt-1.5">
+          <h3 className="px-2 text-[11px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2 select-none">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/45"></span>
             Active Session
           </h3>
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl overflow-hidden shadow-sm">
+          <div className="divide-y divide-[var(--border-color)]/15">
             <button 
               onClick={handleLogout}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-rose-500/5 hover:text-rose-600 transition-colors text-rose-500 font-extrabold text-xs text-left cursor-pointer group"
+              className="w-full flex items-center justify-between py-4 px-2 hover:bg-rose-500/5 hover:text-rose-600 transition-colors text-rose-500 font-extrabold text-xs text-left cursor-pointer group"
             >
-              <div className="flex items-center gap-3">
-                <LogOut size={16} strokeWidth={2.5} />
-                <span>Log out of GrixChat</span>
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-rose-500/10 text-rose-500 shrink-0">
+                  <LogOut size={19} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h4 className="text-[15px] font-extrabold text-rose-500 tracking-wide">Log out of GrixChat</h4>
+                  <p className="text-xs text-rose-400 mt-0.5 font-medium">Instantly terminate current session</p>
+                </div>
               </div>
-              <ChevronRight size={16} className="text-rose-500 opacity-20 group-hover:opacity-80 group-hover:translate-x-0.5 transition-all duration-200" />
+              <ChevronRight size={18} className="text-rose-500 opacity-20 group-hover:opacity-80 group-hover:translate-x-0.5 transition-all duration-200" />
             </button>
           </div>
         </div>

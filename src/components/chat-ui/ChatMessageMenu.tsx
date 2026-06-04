@@ -22,7 +22,7 @@ export interface ChatMessageMenuProps {
   setActiveMessageMenu: (msg: any) => void;
   setReplyingTo: (msg: any) => void;
   startEdit: (msg: any) => void;
-  deleteMessage: (id: string) => void;
+  deleteMessage: (id: string, deleteType?: 'me' | 'everyone') => void;
   currentUserUid: string | undefined;
   setShowReactionPicker: (msg: any) => void;
   performReactToMessage?: (id: string, emoji: string) => void;
@@ -379,7 +379,7 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          deleteMessage(activeMessageMenu.id);
+                          deleteMessage(activeMessageMenu.id, 'everyone');
                           setShowConfirmModal(false);
                           setActiveMessageMenu(null);
                         }}
@@ -391,7 +391,7 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          deleteMessage(activeMessageMenu.id);
+                          deleteMessage(activeMessageMenu.id, 'me');
                           setShowConfirmModal(false);
                           setActiveMessageMenu(null);
                         }}
@@ -404,7 +404,7 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        deleteMessage(activeMessageMenu.id);
+                        deleteMessage(activeMessageMenu.id, 'me');
                         setShowConfirmModal(false);
                         setActiveMessageMenu(null);
                       }}

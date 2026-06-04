@@ -82,8 +82,9 @@ export default function SettingsMainScreen() {
       {/* Settings list scroll area */}
       <div className="flex-1 overflow-y-auto no-scrollbar px-4 py-5 space-y-6 pb-24">
         {settingsOptions.map((section) => (
-          <div key={section.title} className="space-y-2">
-            <h3 className="px-2 text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em]">
+          <div key={section.title} className="space-y-2.5">
+            <h3 className="px-2 text-[11px] font-black text-[#0494f4] uppercase tracking-widest flex items-center gap-2 select-none">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0494f4] shadow-sm shadow-[#0494f4]/45"></span>
               {section.title}
             </h3>
             <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl divide-y divide-[var(--border-color)]/30 overflow-hidden shadow-sm">
@@ -91,16 +92,16 @@ export default function SettingsMainScreen() {
                 <button 
                   key={item.label}
                   onClick={item.onClick}
-                  className="w-full flex items-center gap-4 px-5 py-4 hover:bg-[var(--bg-main)]/35 active:bg-[var(--bg-main)]/50 transition-colors group text-left cursor-pointer"
+                  className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-[var(--bg-main)]/40 active:bg-[var(--bg-main)]/60 transition-colors group text-left cursor-pointer"
                 >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.color} group-active:scale-95 transition-transform shrink-0`}>
-                    <item.icon size={18} strokeWidth={2.2} />
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#0494f4]/10 text-[#0494f4] group-active:scale-95 transition-transform shrink-0">
+                    <item.icon size={19} strokeWidth={2.4} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-[13.5px] font-extrabold text-[var(--text-primary)] tracking-wide">{item.label}</h4>
-                    {item.sub && <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate font-medium">{item.sub}</p>}
+                    <h4 className="text-[15px] font-extrabold text-[var(--text-primary)] tracking-wide group-hover:text-[#0494f4] transition-colors">{item.label}</h4>
+                    {item.sub && <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate font-medium">{item.sub}</p>}
                   </div>
-                  <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-40 transition-opacity" />
+                  <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200" />
                 </button>
               ))}
             </div>
@@ -108,20 +109,26 @@ export default function SettingsMainScreen() {
         ))}
 
         {/* Session / Authentication Block */}
-        <div className="space-y-2">
-          <h3 className="px-2 text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em]">
+        <div className="space-y-2.5 pt-1.5">
+          <h3 className="px-2 text-[11px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2 select-none">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/45"></span>
             Session
           </h3>
           <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl overflow-hidden shadow-sm">
             <button 
               onClick={handleLogout}
-              className="w-full flex items-center gap-4 px-5 py-4 hover:bg-red-500/5 transition-colors text-red-500 font-extrabold text-sm text-[13.5px] text-left flex justify-between items-center cursor-pointer group"
+              className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-rose-500/5 hover:text-rose-600 transition-colors text-rose-500 font-extrabold text-xs text-left cursor-pointer group"
             >
-              <div className="flex items-center gap-3">
-                <LogOut size={18} />
-                <span>Log out of GrixChat</span>
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-rose-500/10 text-rose-500 shrink-0">
+                  <LogOut size={19} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h4 className="text-[15px] font-extrabold text-rose-500 tracking-wide">Log out of GrixChat</h4>
+                  <p className="text-xs text-rose-400 mt-0.5 font-medium">Instantly terminate current session</p>
+                </div>
               </div>
-              <ChevronRight size={18} className="text-red-500 opacity-20 group-hover:opacity-60 transition-opacity" />
+              <ChevronRight size={18} className="text-rose-500 opacity-20 group-hover:opacity-80 group-hover:translate-x-0.5 transition-all duration-200" />
             </button>
           </div>
         </div>
