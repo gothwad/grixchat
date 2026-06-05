@@ -75,11 +75,9 @@ export const GrixAITelemetryOverlay: React.FC<GrixAITelemetryOverlayProps> = ({
         className="absolute inset-0 opacity-[0.04] pointer-events-none" 
         style={{
           backgroundImage: `
-            radial-gradient(circle, #6366f1 1px, transparent 1px),
-            linear-gradient(to right, rgba(99,102,241,0.15) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(99,102,241,0.15) 1px, transparent 1px)
+            radial-gradient(circle, #6366f1 1.2px, transparent 1.2px)
           `,
-          backgroundSize: '20px 20px, 40px 40px, 40px 40px'
+          backgroundSize: '24px 24px'
         }}
       />
 

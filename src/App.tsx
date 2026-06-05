@@ -135,6 +135,40 @@ export default function App() {
     };
   }, []);
 
+  // Sync visual viewport height for mobile keyboards / emoji section height changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleViewportResize = () => {
+      const vv = window.visualViewport;
+      const height = vv ? vv.height : window.innerHeight;
+      document.documentElement.style.setProperty('--true-height', `${height}px`);
+      
+      // Auto-counter any rogue scrolls triggered by native inputs inside iframes
+      if (vv && vv.offsetTop > 0) {
+        window.scrollTo(0, 0);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize);
+      window.visualViewport.addEventListener('scroll', handleViewportResize);
+    } else {
+      window.addEventListener('resize', handleViewportResize);
+    }
+
+    handleViewportResize();
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportResize);
+        window.visualViewport.removeEventListener('scroll', handleViewportResize);
+      } else {
+        window.removeEventListener('resize', handleViewportResize);
+      }
+    };
+  }, []);
+
   // Centralized Document Title Management
   useEffect(() => {
     const titles: { [key: string]: string } = {

@@ -141,7 +141,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fetchIncomingCall = async () => {
       const { data, error } = await supabase
         .from('calls')
-        .select('*, users:caller_id(username, photo_url, full_name)')
+        .select('*, users:users!calls_caller_id_fkey (username, photo_url, full_name)')
         .eq('receiver_id', authUser.id)
         .eq('status', 'ringing')
         .order('created_at', { ascending: false })

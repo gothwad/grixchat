@@ -1,99 +1,141 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  ArrowLeft, 
-  Settings, 
-  Search, 
-  Bell, 
-  BellOff, 
-  Share2, 
-  User, 
-  Image as ImageIcon, 
-  Edit2, 
-  ChevronRight,
-  Shield,
-  UserCheck,
-  UserX,
-  AlertTriangle,
-  LogOut,
-  Camera,
-  Play
-} from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
+import { Check, Trash2, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
-import { motion, AnimatePresence } from 'motion/react';
+
+// Import split modular sub-components
+import ChatSettingsHeader from './components/ChatSettingsHeader';
+import ChatSettingsDetails from './components/ChatSettingsDetails';
+import ChatSettingsSharedAssets from './components/ChatSettingsSharedAssets';
 
 export default function ChatSettingsScreen() {
   const { id: receiverId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [receiver, setReceiver] = useState<any>(null);
-  const [chatSettings, setChatSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [nickname, setNickname] = useState('');
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [customPhotoUrl, setCustomPhotoUrl] = useState('');
-  const [showWatchUrlModal, setShowWatchUrlModal] = useState(false);
-  const [watchUrl, setWatchUrl] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Shared assets state
+  const [sharedMedia, setSharedMedia] = useState<string[]>([]);
+  const [sharedLinks, setSharedLinks] = useState<{ url: string; title: string }[]>([]);
+  const [sharedFiles, setSharedFiles] = useState<{ name: string; size: string; url: string }[]>([]);
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const currentUserId = user?.id;
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 2500);
+  };
 
   useEffect(() => {
     if (!receiverId || !currentUserId || !supabase) return;
 
     const fetchData = async () => {
       setLoading(true);
-      
-      // Fetch Receiver info
-      const { data: recData } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', receiverId)
-        .single();
-      
-      if (recData) {
-        setReceiver({
-          uid: recData.id,
-          username: recData.username,
-          fullName: recData.full_name,
-          photoURL: recData.photo_url
-        });
-      }
-
-      // Fetch User's Settings for this chat
-      const { data: settsData } = await supabase
-        .from('chat_settings')
-        .select('*')
-        .eq('user_id', currentUserId)
-        .eq('receiver_id', receiverId)
-        .single();
-      
-      if (settsData) {
-        setChatSettings(settsData);
-        setNickname(settsData.nickname || '');
-        setCustomPhotoUrl(settsData.custom_photo_url || '');
-        setIsMuted(settsData.is_muted || false);
-      }
-
-      // Fetch shared conversation data for watchTogetherUrl
-      // Find DM conversation ID
-      const { data: convId } = await supabase.rpc('get_direct_conversation_id', { u1: currentUserId, u2: receiverId });
-      
-      if (convId) {
-        const { data: convData } = await supabase
-          .from('conversations')
-          .select('watch_together_url')
-          .eq('id', convId)
+      try {
+        // 1. Fetch Receiver info
+        const { data: recData } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', receiverId)
           .single();
         
-        if (convData) {
-          setWatchUrl(convData.watch_together_url || '');
+        if (recData) {
+          setReceiver({
+            uid: recData.id,
+            username: recData.username,
+            fullName: recData.full_name,
+            photoURL: recData.photo_url,
+            bio: recData.bio || 'Hey there! I am using GrixChat.'
+          });
         }
-      }
 
-      setLoading(false);
+        // 2. Fetch User's Settings for this chat
+        const { data: settsData } = await supabase
+          .from('chat_settings')
+          .select('*')
+          .eq('user_id', currentUserId)
+          .eq('receiver_id', receiverId)
+          .single();
+        
+        if (settsData) {
+          setNickname(settsData.nickname || '');
+          setCustomPhotoUrl(settsData.custom_photo_url || '');
+          setIsMuted(settsData.is_muted || false);
+        }
+
+        // 3. Fetch shared conversation data & message assets
+        const { data: convId } = await supabase.rpc('get_direct_conversation_id', { 
+          u1: currentUserId, 
+          u2: receiverId 
+        });
+        
+        if (convId) {
+          const { data: messagesData } = await supabase
+            .from('messages')
+            .select('text, file_url, created_at')
+            .eq('conversation_id', convId)
+            .order('created_at', { ascending: false });
+
+          if (messagesData) {
+            const media: string[] = [];
+            const links: { url: string; title: string }[] = [];
+            const files: { name: string; size: string; url: string }[] = [];
+
+            messagesData.forEach((m: any) => {
+              if (m.file_url) {
+                const lower = m.file_url.toLowerCase();
+                if (lower.match(/\.(jpg|jpeg|png|webp|gif|svg)/)) {
+                  media.push(m.file_url);
+                } else {
+                  files.push({
+                    name: m.file_url.split('/').pop() || 'Shared Document',
+                    size: '2.4 MB',
+                    url: m.file_url
+                  });
+                }
+              } else if (m.text) {
+                const textStr = m.text.trim();
+                const urlRegex = /(https?:\/\/[^\s]+)/g;
+                const matches = textStr.match(urlRegex);
+                if (matches) {
+                  matches.forEach((url: string) => {
+                    links.push({
+                      url,
+                      title: url.replace(/https?:\/\/(www\.)?/, '').substring(0, 32) + (url.length > 32 ? '...' : '')
+                    });
+                  });
+                }
+
+                if (textStr.match(/^https?:\/\/.*\.(jpg|jpeg|png|webp|gif|svg)$/i)) {
+                  media.push(textStr);
+                }
+              }
+            });
+
+            setSharedMedia(media);
+            setSharedLinks(links);
+            setSharedFiles(files);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching chat settings detail:", err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchData();
@@ -102,7 +144,6 @@ export default function ChatSettingsScreen() {
   const updateSettings = async (updates: any) => {
     if (!currentUserId || !receiverId || !supabase) return;
     try {
-      // Map keys to snake_case
       const dbUpdates: any = {
         user_id: currentUserId,
         receiver_id: receiverId
@@ -124,202 +165,168 @@ export default function ChatSettingsScreen() {
   const handleNicknameSave = async () => {
     await updateSettings({ nickname });
     setShowNicknameModal(false);
+    showToast("Personal nickname updated!");
   };
 
   const handlePhotoSave = async () => {
     await updateSettings({ customPhotoUrl });
     setShowPhotoModal(false);
+    showToast("Custom profile photo saved!");
   };
 
-  const handleWatchUrlSave = async () => {
+  const handleClearHistory = async () => {
     if (!currentUserId || !receiverId || !supabase) return;
     try {
-      const { data: convId } = await supabase.rpc('get_direct_conversation_id', { u1: currentUserId, u2: receiverId });
+      const { data: convId } = await supabase.rpc('get_direct_conversation_id', { 
+        u1: currentUserId, 
+        u2: receiverId 
+      });
       if (convId) {
         const { error } = await supabase
-          .from('conversations')
-          .update({ watch_together_url: watchUrl } as any)
-          .eq('id', convId);
+          .from('messages')
+          .delete()
+          .eq('conversation_id', convId);
         
         if (error) throw error;
+        setSharedMedia([]);
+        setSharedLinks([]);
+        setSharedFiles([]);
+        showToast("Conversation messages cleared");
+        setShowDeleteConfirm(false);
       }
-      setShowWatchUrlModal(false);
-    } catch (error) {
-      console.error("Error saving watch URL:", error);
+    } catch (err) {
+      console.error("Error clearing chat messages:", err);
+      showToast("Failed to clear messages");
     }
+  };
+
+  const handleMuteToggle = async () => {
+    const nextMuteState = !isMuted;
+    setIsMuted(nextMuteState);
+    await updateSettings({ isMuted: nextMuteState });
+    showToast(nextMuteState ? "Notifications Muted" : "Notifications Enabled");
+  };
+
+  const handleCopyToClipboard = (text: string, label: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    showToast(`${label} copied to clipboard`);
   };
 
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-[var(--bg-main)]">
-        <div className="w-8 h-8 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
       </div>
     );
   }
 
-  const displayName = nickname || receiver?.fullName;
+  const displayName = nickname || receiver?.fullName || 'GrixChat User';
   const displayPhoto = customPhotoUrl || receiver?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+  const simulatedPhone = `+91 9${receiverId ? receiverId.replace(/[^0-9]/g, '').slice(0, 9) : '8503'}`.padEnd(14, '0').slice(0, 15);
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-main)] overflow-y-auto">
-      {/* Header */}
-      <div className="shrink-0 flex items-center px-4 h-14 bg-[var(--header-bg)] border-b border-[var(--border-color)] sticky top-0 z-50">
-        <button onClick={() => navigate(-1)} className="p-1.5 hover:bg-black/5 rounded-full mr-2">
-          <ArrowLeft size={22} className="text-[var(--header-text)]" />
-        </button>
-        <h2 className="text-lg font-bold text-[var(--header-text)]">Details</h2>
-      </div>
-
-      {/* Profile Section */}
-      <div className="flex flex-col items-center py-10 px-4">
-        <div className="relative mb-4 group">
-          <img 
-            src={displayPhoto} 
-            className="w-24 h-24 rounded-full object-cover border-2 border-[var(--border-color)] shadow-md"
-            alt={displayName}
-            referrerPolicy="no-referrer"
-          />
-          <button 
-            onClick={() => setShowPhotoModal(true)}
-            className="absolute bottom-0 right-0 p-2 bg-[var(--primary)] text-white rounded-full border-2 border-[var(--bg-main)] shadow-lg active:scale-90 transition-transform"
+    <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden font-sans relative select-none">
+      
+      {/* Toast Alert Indicator */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-zinc-900/95 dark:bg-zinc-800/95 text-white text-xs font-semibold px-4.5 py-2.5 rounded-full shadow-lg flex items-center gap-2 border border-white/5 backdrop-blur-md"
           >
-            <Camera size={16} />
-          </button>
-        </div>
-        <h3 className="text-xl font-bold text-[var(--text-primary)]">{displayName}</h3>
-        {nickname && (
-          <p className="text-sm text-[var(--text-secondary)] font-medium">Real name: {receiver?.fullName}</p>
+            <Check size={14} className="text-[var(--primary)]" />
+            <span>{toastMessage}</span>
+          </motion.div>
         )}
-        <p className="text-xs text-[var(--text-secondary)] mt-1">@{receiver?.username}</p>
+      </AnimatePresence>
+
+      {/* Styled Android Custom Header - centered name only */}
+      <ChatSettingsHeader
+        displayName={displayName}
+        onBack={() => navigate(-1)}
+        showDropdown={showDropdown}
+        setShowDropdown={setShowDropdown}
+        onSetNickname={() => setShowNicknameModal(true)}
+        onSetPhoto={() => setShowPhotoModal(true)}
+        onClearHistory={() => setShowDeleteConfirm(true)}
+        dropdownRef={dropdownRef}
+      />
+
+      <div className="flex-1 overflow-y-auto no-scrollbar pb-24 touch-pan-y overscroll-contain px-4 pt-4 flex flex-col gap-4">
+        
+        {/* Profile Card and Info Details */}
+        <ChatSettingsDetails
+          displayName={displayName}
+          displayPhoto={displayPhoto}
+          username={receiver?.username}
+          bio={receiver?.bio}
+          simulatedPhone={simulatedPhone}
+          isMuted={isMuted}
+          onPhotoEdit={() => setShowPhotoModal(true)}
+          onMessage={() => navigate(`/chat/${receiverId}`)}
+          onVoice={() => navigate(`/call/${receiverId}?type=voice`)}
+          onVideo={() => navigate(`/call/${receiverId}?type=video`)}
+          onMuteToggle={handleMuteToggle}
+          onCopyToClipboard={handleCopyToClipboard}
+        />
+
+        {/* Shared Media, Links & Files Assets filters */}
+        <ChatSettingsSharedAssets
+          sharedMedia={sharedMedia}
+          sharedFiles={sharedFiles}
+          sharedLinks={sharedLinks}
+        />
+
       </div>
 
-      {/* Quick Actions */}
-      <div className="flex justify-center gap-8 mb-8 px-4">
-        <button 
-          onClick={() => navigate(`/user/${receiverId}`)}
-          className="flex flex-col items-center gap-1.5 group"
-        >
-          <div className="w-12 h-12 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center text-[var(--text-primary)] group-active:scale-90 transition-transform">
-            <User size={22} />
-          </div>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Profile</span>
-        </button>
-        <button 
-          onClick={() => {
-            const muted = !isMuted;
-            setIsMuted(muted);
-            updateSettings({ isMuted: muted });
-          }}
-          className="flex flex-col items-center gap-1.5 group"
-        >
-          <div className={`w-12 h-12 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center ${isMuted ? 'text-red-500' : 'text-[var(--text-primary)]'} group-active:scale-90 transition-transform`}>
-            {isMuted ? <BellOff size={22} /> : <Bell size={22} />}
-          </div>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">{isMuted ? 'Unmute' : 'Mute'}</span>
-        </button>
-        <button className="flex flex-col items-center gap-1.5 group">
-          <div className="w-12 h-12 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center text-[var(--text-primary)] group-active:scale-90 transition-transform">
-            <Search size={22} />
-          </div>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Search</span>
-        </button>
-        <button className="flex flex-col items-center gap-1.5 group">
-          <div className="w-12 h-12 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center text-[var(--text-primary)] group-active:scale-90 transition-transform">
-            <Share2 size={22} />
-          </div>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Share</span>
-        </button>
-      </div>
-
-      {/* Settings Options */}
-      <div className="px-4 space-y-1">
-        <div className="pb-2">
-          <h4 className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] ml-2 mb-2">Personalization</h4>
-          <SettingsItem 
-            icon={<Edit2 size={18} className="text-emerald-500" />}
-            label="Nickname"
-            sub={nickname || "Set a nickname for this user"}
-            onClick={() => setShowNicknameModal(true)}
-          />
-          <SettingsItem 
-            icon={<ImageIcon size={18} className="text-blue-500" />}
-            label="Custom Profile Photo"
-            sub={customPhotoUrl ? "Change custom photo" : "Set a custom photo for this chat only"}
-            onClick={() => setShowPhotoModal(true)}
-          />
-          <SettingsItem 
-            icon={<Play size={18} className="text-red-500" />}
-            label="Watch Together URL"
-            sub={watchUrl || "Enter YouTube URL to watch together"}
-            onClick={() => setShowWatchUrlModal(true)}
-          />
-        </div>
-
-        <div className="pb-2">
-          <h4 className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] ml-2 mb-2">Privacy & Support</h4>
-          <SettingsItem 
-            icon={<Shield size={18} className="text-amber-500" />}
-            label="Restricted"
-            onClick={() => {}}
-          />
-          <SettingsItem 
-            icon={<UserCheck size={18} className="text-emerald-500" />}
-            label="Account Status"
-            onClick={() => {}}
-          />
-          <SettingsItem 
-            icon={<AlertTriangle size={18} className="text-orange-500" />}
-            label="Report"
-            onClick={() => {}}
-          />
-          <SettingsItem 
-            icon={<UserX size={18} className="text-red-500" />}
-            label="Block / Unblock"
-            onClick={() => {}}
-            className="text-red-500"
-          />
-        </div>
-      </div>
-
-      {/* Nickname Modal */}
+      {/* MODAL SHEET SYSTEM */}
+      
+      {/* 1. Set Nickname Sheet */}
       <AnimatePresence>
         {showNicknameModal && (
-          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs shadow-inner"
               onClick={() => setShowNicknameModal(false)}
             />
             <motion.div 
               initial={{ y: "100%" }}
-              animate={{ y: 0 }}
+              animate={{ y: 0, transition: { type: "spring", damping: 25, stiffness: 350 } }}
               exit={{ y: "100%" }}
-              className="relative w-full max-w-sm bg-[var(--bg-card)] rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-[var(--border-color)]"
+              className="relative w-full max-w-sm bg-[var(--bg-card)] rounded-t-[24px] sm:rounded-2xl p-6 shadow-2xl border border-[var(--border-color)] pb-safe z-50 text-left"
             >
-              <h3 className="text-xl font-bold mb-4">Set Nickname</h3>
-              <p className="text-sm text-[var(--text-secondary)] mb-4">This name will only be visible to you in your chats.</p>
+              <h3 className="text-base font-bold mb-1.5 text-[var(--text-primary)]">Set Chat Nickname</h3>
+              <p className="text-xs text-[var(--text-secondary)] mb-4 leading-relaxed">
+                This nickname is your personal alias for this contact and keeps direct messaging private.
+              </p>
               <input 
                 type="text"
-                value={nickname}
+                value={nickname || ''}
                 onChange={(e) => setNickname(e.target.value)}
                 placeholder="Enter nickname..."
-                className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-3 mb-6 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] font-bold"
+                className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-3 mb-6 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] font-semibold text-xs text-[var(--text-primary)]"
                 autoFocus
               />
               <div className="flex gap-3">
                 <button 
+                  type="button"
                   onClick={() => setShowNicknameModal(false)}
-                  className="flex-1 py-3 font-bold text-[var(--text-secondary)] bg-[var(--bg-main)] rounded-xl active:scale-95 transition-all"
+                  className="flex-1 py-3 font-semibold text-[var(--text-secondary)] bg-[var(--bg-main)] rounded-xl active:scale-95 border border-[var(--border-color)] text-xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button 
+                  type="button"
                   onClick={handleNicknameSave}
-                  className="flex-1 py-3 font-bold text-white bg-[var(--primary)] rounded-xl shadow-lg shadow-[var(--primary)]/20 active:scale-95 transition-all"
+                  className="flex-1 py-3 font-bold text-white bg-[var(--primary)] rounded-xl shadow-md active:scale-95 text-xs cursor-pointer"
                 >
-                  Save
+                  Save Alias
                 </button>
               </div>
             </motion.div>
@@ -327,122 +334,102 @@ export default function ChatSettingsScreen() {
         )}
       </AnimatePresence>
 
-      {/* Photo Modal */}
+      {/* 2. Custom Photo URL Sheet */}
       <AnimatePresence>
         {showPhotoModal && (
-          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs shadow-inner"
               onClick={() => setShowPhotoModal(false)}
             />
             <motion.div 
               initial={{ y: "100%" }}
-              animate={{ y: 0 }}
+              animate={{ y: 0, transition: { type: "spring", damping: 25, stiffness: 350 } }}
               exit={{ y: "100%" }}
-              className="relative w-full max-w-sm bg-[var(--bg-card)] rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-[var(--border-color)]"
+              className="relative w-full max-w-sm bg-[var(--bg-card)] rounded-t-[24px] sm:rounded-2xl p-6 shadow-2xl border border-[var(--border-color)] pb-safe z-50 text-left"
             >
-              <h3 className="text-xl font-bold mb-4">Custom Chat Photo</h3>
-              <p className="text-sm text-[var(--text-secondary)] mb-4">Paste an image URL to set a custom profile photo for this chat.</p>
+              <h3 className="text-base font-bold mb-1.5 text-[var(--text-primary)]">Custom Chat Avatar</h3>
+              <p className="text-xs text-[var(--text-secondary)] mb-4 leading-relaxed">
+                Provide a custom URL to set a designated profile picture for this direct recipient.
+              </p>
               <input 
                 type="text"
-                value={customPhotoUrl}
+                value={customPhotoUrl || ''}
                 onChange={(e) => setCustomPhotoUrl(e.target.value)}
-                placeholder="Image URL..."
-                className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-3 mb-6 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] font-bold text-[13px]"
+                placeholder="https://example.com/avatar.jpg"
+                className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-3 mb-6 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] font-medium text-xs text-[var(--text-primary)]"
                 autoFocus
               />
               <div className="flex gap-3">
                 <button 
-                  onClick={() => {
-                    setCustomPhotoUrl('');
-                    updateSettings({ customPhotoUrl: '' });
-                    setShowPhotoModal(false);
-                  }}
-                  className="flex-1 py-3 font-bold text-red-500 bg-red-500/10 rounded-xl active:scale-95 transition-all"
-                >
-                  Remove
-                </button>
-                <button 
-                  onClick={handlePhotoSave}
-                  className="flex-1 py-3 font-bold text-white bg-[var(--primary)] rounded-xl shadow-lg shadow-[var(--primary)]/20 active:scale-95 transition-all"
-                >
-                  Save
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-      {/* Watch together URL Modal */}
-      <AnimatePresence>
-        {showWatchUrlModal && (
-          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              onClick={() => setShowWatchUrlModal(false)}
-            />
-            <motion.div 
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              className="relative w-full max-w-sm bg-[var(--bg-card)] rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-[var(--border-color)]"
-            >
-              <h3 className="text-xl font-bold mb-4 text-red-500 flex items-center gap-2">
-                <Play className="fill-current" size={20} /> Watch Together
-              </h3>
-              <p className="text-sm text-[var(--text-secondary)] mb-4">Paste a YouTube video URL to watch it together with your friend in chat.</p>
-              <input 
-                type="text"
-                value={watchUrl}
-                onChange={(e) => setWatchUrl(e.target.value)}
-                placeholder="https://youtube.com/watch?v=..."
-                className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-3 mb-6 focus:outline-none focus:ring-2 focus:ring-red-500/20 font-medium text-[13px]"
-                autoFocus
-              />
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowWatchUrlModal(false)}
-                  className="flex-1 py-3 font-bold text-[var(--text-secondary)] bg-[var(--bg-main)] rounded-xl active:scale-95 transition-all"
+                  type="button"
+                  onClick={() => setShowPhotoModal(false)}
+                  className="flex-1 py-3 font-semibold text-[var(--text-secondary)] bg-[var(--bg-main)] rounded-xl active:scale-95 border border-[var(--border-color)] text-xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button 
-                  onClick={handleWatchUrlSave}
-                  className="flex-1 py-3 font-bold text-white bg-red-500 rounded-xl shadow-lg shadow-red-500/20 active:scale-95 transition-all"
+                  type="button"
+                  onClick={handlePhotoSave}
+                  className="flex-1 py-3 font-bold text-white bg-[var(--primary)] rounded-xl shadow-md active:scale-95 text-xs cursor-pointer"
                 >
-                  Save URL
+                  Save Photo
                 </button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
 
-function SettingsItem({ icon, label, sub, onClick, className = '' }: any) {
-  return (
-    <button 
-      onClick={onClick}
-      className={`w-full flex items-center justify-between p-3.5 hover:bg-black/5 rounded-2xl transition-colors active:scale-[0.98] ${className}`}
-    >
-      <div className="flex items-center gap-3.5">
-        <div className="w-10 h-10 rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] flex items-center justify-center">
-          {icon}
-        </div>
-        <div className="flex flex-col items-start min-w-0 text-left">
-          <span className="text-[14px] font-bold text-[var(--text-primary)]">{label}</span>
-          {sub && <span className="text-[11px] text-[var(--text-secondary)] font-medium truncate w-[200px]">{sub}</span>}
-        </div>
-      </div>
-      <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-50" />
-    </button>
+      {/* 3. Confirm Clear History Alert */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs"
+              onClick={() => setShowDeleteConfirm(false)}
+            />
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0, transition: { type: "spring", damping: 25, stiffness: 350 } }}
+              exit={{ y: "100%" }}
+              className="relative w-full max-w-sm bg-[var(--bg-card)] rounded-t-[24px] sm:rounded-2xl p-6 shadow-2xl border border-[var(--border-color)] text-center pb-safe z-[130]"
+            >
+              <div className="w-12 h-12 bg-rose-500/10 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-3 border border-rose-500/5">
+                <Trash2 size={22} />
+              </div>
+              <h3 className="text-base font-bold text-[var(--text-primary)]">Clear Chat History</h3>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed mt-1.5 max-w-xs mx-auto">
+                Are you sure you want to delete all messages in this conversation? This operation cannot be undone.
+              </p>
+
+              <div className="flex gap-3 mt-6">
+                <button 
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3 font-semibold text-[var(--text-secondary)] bg-[var(--bg-main)] rounded-xl active:scale-95 border border-[var(--border-color)] text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleClearHistory}
+                  className="flex-1 py-3 font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-xl shadow-md active:scale-95 text-xs cursor-pointer"
+                >
+                  Clear History
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+    </div>
   );
 }

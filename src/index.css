@@ -7,6 +7,21 @@
   --color-primary-foreground: var(--primary-foreground);
   --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   
+  --color-bg-main: var(--bg-main);
+  --color-bg-card: var(--bg-card);
+  --color-bg-chat: var(--bg-chat);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-border-color: var(--border-color);
+  --color-accent-color: var(--accent-color);
+  --color-header-bg: var(--header-bg);
+  --color-header-text: var(--header-text);
+  --color-nav-bg: var(--nav-bg);
+  --color-nav-text: var(--nav-text);
+  --color-brand-color: var(--brand-color);
+  --color-box-bg: var(--box-bg);
+  --color-box-text: var(--box-text);
+
   --animate-ping-slow: ping-slow 3s cubic-bezier(0, 0, 0.2, 1) infinite;
 
   @keyframes ping-slow {
@@ -85,7 +100,9 @@
   body {
     background-color: var(--bg-main);
     color: var(--text-primary);
-    @apply antialiased overflow-x-hidden w-full h-[100dvh] fixed inset-0;
+    width: 100vw;
+    height: var(--true-height, 100dvh);
+    @apply antialiased overflow-x-hidden fixed inset-0;
     font-family: var(--font-sans);
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
@@ -109,18 +126,24 @@
 
 
   html {
-    @apply overflow-hidden w-full h-[100dvh] fixed inset-0;
+    width: 100vw;
+    height: var(--true-height, 100dvh);
+    @apply overflow-hidden fixed inset-0;
     -webkit-text-size-adjust: 100%;
     overscroll-behavior: none;
   }
 
   #root {
-    @apply w-full h-full overflow-hidden flex bg-[var(--bg-main)];
+    width: 100vw;
+    height: var(--true-height, 100dvh);
+    @apply overflow-hidden flex bg-[var(--bg-main)];
   }
 
   /* Global Fluid Container */
   .app-container {
-    @apply w-full h-full bg-[var(--bg-card)] relative overflow-hidden flex flex-col;
+    width: 100vw;
+    height: var(--true-height, 100dvh);
+    @apply bg-[var(--bg-card)] relative overflow-hidden flex flex-col;
   }
 
   /* Prevent any element from breaking layout */

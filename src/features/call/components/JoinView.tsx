@@ -17,51 +17,64 @@ export const JoinView: React.FC<JoinViewProps> = ({
   onNavigateToCreate,
 }) => {
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-[var(--bg-card)]">
+    <div 
+      className="fixed inset-0 z-[60] flex flex-col bg-bg-card"
+      style={{ backgroundColor: 'var(--bg-card)' }}
+    >
       {/* Subheader Header */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-[var(--border-color)]/10 bg-[var(--bg-card)]">
+      <div 
+        className="flex items-center gap-3 px-4 py-4 border-b border-border-color/10 bg-bg-card"
+        style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+      >
         <button 
           onClick={onBack}
-          className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--bg-main)] hover:bg-[var(--bg-main)]/80 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-none cursor-pointer transition-all active:scale-95 shrink-0"
+          className="w-10 h-10 rounded-full flex items-center justify-center bg-bg-main hover:bg-bg-main/80 text-text-secondary hover:text-text-primary border-none cursor-pointer transition-all active:scale-95 shrink-0"
+          style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-secondary)' }}
         >
           <ArrowLeft size={18} className="stroke-[2.5]" />
         </button>
         <div>
-          <h2 className="text-[15px] font-black text-[var(--text-primary)] leading-tight select-none">
+          <h2 className="text-[15px] font-black text-text-primary leading-tight select-none">
             Join Meeting
           </h2>
-          <p className="text-[10px] font-bold text-[var(--text-secondary)]/90 tracking-wide select-none uppercase">
+          <p className="text-[10px] font-bold text-text-secondary/90 tracking-wide select-none uppercase">
             Connect with Invite Code
           </p>
         </div>
       </div>
 
       {/* Body Content */}
-      <div className="flex-1 overflow-y-auto no-scrollbar p-6 bg-[var(--bg-card)]">
+      <div 
+        className="flex-1 overflow-y-auto no-scrollbar p-6 bg-bg-card"
+        style={{ backgroundColor: 'var(--bg-card)' }}
+      >
         <div className="text-center mb-6 pt-2 select-none">
           <div className="w-16 h-16 rounded-full bg-[#0494f4]/15 text-[#0494f4] flex items-center justify-center mx-auto mb-4 border border-[#0494f4]/20 shadow-inner">
             <LogIn size={28} className="stroke-[2.2]" />
           </div>
-          <h3 className="text-lg font-black text-[var(--text-primary)] leading-tight">Join with Link</h3>
-          <p className="text-xs font-semibold text-[var(--text-secondary)]/90 max-w-[280px] mx-auto mt-2 leading-relaxed">
+          <h3 className="text-lg font-black text-text-primary leading-tight">Join with Link</h3>
+          <p className="text-xs font-semibold text-text-secondary/90 max-w-[280px] mx-auto mt-2 leading-relaxed">
             Paste a shared Grix Room link or enter the secure room code to connect to the video feed.
           </p>
         </div>
 
         <div className="space-y-4 max-w-sm mx-auto">
-          <div className="relative flex items-center bg-[var(--bg-main)] border border-[var(--border-color)]/25 focus-within:border-[#0494f4]/80 focus-within:ring-2 focus-within:ring-[#0494f4]/15 rounded-2xl p-0.5 transition-all">
+          <div 
+            className="relative flex items-center bg-bg-main border border-border-color/25 focus-within:border-[#0494f4]/80 focus-within:ring-2 focus-within:ring-[#0494f4]/15 rounded-2xl p-0.5 transition-all"
+            style={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-color)' }}
+          >
             <input 
               type="text"
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value)}
               placeholder="Paste meeting link or enter code..."
-              className="w-full h-11 bg-transparent text-xs font-semibold px-4 text-[var(--text-primary)] placeholder-[var(--text-secondary)]/50 focus:outline-none"
+              className="w-full h-11 bg-transparent text-xs font-semibold px-4 text-text-primary placeholder:text-text-secondary/50 focus:outline-none"
             />
             {joinCode && (
               <button
                 type="button"
                 onClick={() => setJoinCode('')}
-                className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-full mr-2 transition-colors cursor-pointer border-none bg-transparent text-[var(--text-secondary)]"
+                className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-full mr-2 transition-colors cursor-pointer border-none bg-transparent text-text-secondary"
               >
                 <X size={14} />
               </button>
@@ -91,7 +104,7 @@ export const JoinView: React.FC<JoinViewProps> = ({
           {/* Encrypt safe note */}
           <div className="mt-6 flex items-start gap-2.5 bg-[#0494f4]/5 rounded-2xl p-3.5 border border-[#0494f4]/15 select-none">
             <Info size={14} className="text-[#0494f4] shrink-0 mt-0.5" />
-            <p className="text-[10px] font-semibold text-[var(--text-secondary)] leading-normal">
+            <p className="text-[10px] font-semibold text-text-secondary leading-normal">
               Grix Room connection relies on end-to-end encrypted tunnels. Only users with the invite payload can enter your feed.
             </p>
           </div>

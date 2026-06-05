@@ -115,7 +115,7 @@ export default function EditProfileScreen() {
         {isTextArea ? (
           <div>
             <textarea
-              value={value}
+              value={value || ''}
               onChange={(e) => setter(e.target.value)}
               maxLength={100}
               rows={3}
@@ -134,7 +134,7 @@ export default function EditProfileScreen() {
           <div>
             <input 
               type={type}
-              value={value}
+              value={value || ''}
               onChange={(e) => {
                 if (field === 'username') {
                   const val = e.target.value.toLowerCase().replace(/\s/g, '_').substring(0, 15);

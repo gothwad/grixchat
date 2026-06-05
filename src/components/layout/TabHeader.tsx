@@ -30,6 +30,7 @@ import { useSearch } from '../../contexts/SearchContext.tsx';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { useLayout } from '../../contexts/LayoutContext.tsx';
 import { ChatTabDropdown } from '../chat-ui/ChatTabDropdown';
+import { CallsTabDropdown } from '../chat-ui/CallsTabDropdown';
 
 export default function TabHeader() {
   const { userData, user: authUser } = useAuth();
@@ -117,6 +118,7 @@ export default function TabHeader() {
   const isPostsPage = location.pathname === '/posts';
   const isSearchPage = location.pathname === '/search';
   const isProfilePage = location.pathname === '/profile';
+  const isCallsPage = location.pathname === '/calls';
 
   return (
     <div className="w-full px-4 min-h-[56px] flex justify-between items-center z-50 shrink-0 relative">
@@ -164,6 +166,23 @@ export default function TabHeader() {
               chatListFilter={chatListFilter}
               setChatListFilter={setChatListFilter}
               showHiddenChatsEntry={userData?.hiddenChatSettings?.showMenuEntry !== false}
+            />
+          </div>
+        )}
+
+        {/* 3 Dots Menu - Show on Calls Tab */}
+        {isCallsPage && (
+          <div className="relative" ref={menuRef}>
+            <button 
+              onClick={() => setShowMenu(prev => !prev)}
+              className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
+              id="header-three-dots-calls"
+            >
+              <MoreVertical size={22} className="text-[var(--header-text)]" />
+            </button>
+            <CallsTabDropdown 
+              isOpen={showMenu}
+              onClose={() => setShowMenu(false)}
             />
           </div>
         )}

@@ -78,11 +78,9 @@ export const GrixAICallOverlay: React.FC<GrixAICallOverlayProps> = ({ recipient,
         className="absolute inset-0 opacity-5 pointer-events-none" 
         style={{
           backgroundImage: `
-            radial-gradient(circle, #3b82f6 1px, transparent 1px),
-            linear-gradient(to right, rgba(59,130,246,0.1) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(59,130,246,0.1) 1px, transparent 1px)
+            radial-gradient(circle, #3b82f6 1.2px, transparent 1.2px)
           `,
-          backgroundSize: '16px 16px, 32px 32px, 32px 32px'
+          backgroundSize: '24px 24px'
         }}
       />
 

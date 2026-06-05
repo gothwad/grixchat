@@ -170,7 +170,8 @@ export default function CameraCaptureModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black z-[9999] flex flex-col justify-between overflow-hidden"
+        className="fixed inset-0 w-screen bg-black z-[9999] flex flex-col justify-between overflow-hidden select-none"
+        style={{ height: 'var(--true-height, 100dvh)' }}
       >
         {/* Top Header Controls */}
         <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/60 to-transparent">
@@ -190,7 +191,7 @@ export default function CameraCaptureModal({
         </div>
 
         {/* Mid Viewfinder / Captured Screen */}
-        <div className="flex-1 w-full h-full flex items-center justify-center relative bg-black">
+        <div className="relative flex-1 min-h-0 w-full bg-black flex items-center justify-center overflow-hidden">
           {!capturedImg ? (
             errorMsg ? (
               <div className="flex flex-col items-center justify-center text-center p-6 text-zinc-400 gap-4 max-w-sm">
@@ -199,7 +200,7 @@ export default function CameraCaptureModal({
                 <button
                   type="button"
                   onClick={startCamera}
-                  className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-full text-[13px] font-bold shadow-md transition-allactive:scale-95"
+                  className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-full text-[13px] font-bold shadow-md transition-all active:scale-95"
                 >
                   Retry Camera Access
                 </button>
@@ -232,7 +233,7 @@ export default function CameraCaptureModal({
         </div>
 
         {/* Bottom Actions Frame */}
-        <div className="bg-black/80 p-4 pb-safe flex flex-col gap-4 z-10">
+        <div className="bg-black/85 p-4 pb-safe flex flex-col gap-4 z-10 shrink-0">
           {capturedImg ? (
             /* Confirm Screen controls */
             <div className="flex flex-col gap-3 w-full max-w-lg mx-auto">

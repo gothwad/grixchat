@@ -16,8 +16,8 @@ export const useCalls = () => {
         .from('calls')
         .select(`
           *,
-          caller:caller_id(id, username, full_name, photo_url),
-          receiver:receiver_id(id, username, full_name, photo_url)
+          caller:users!calls_caller_id_fkey (id, username, full_name, photo_url),
+          receiver:users!calls_receiver_id_fkey (id, username, full_name, photo_url)
         `)
         .or(`caller_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
