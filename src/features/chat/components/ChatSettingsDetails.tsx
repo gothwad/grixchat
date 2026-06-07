@@ -11,6 +11,8 @@ import {
   MessageSquare
 } from 'lucide-react';
 
+import Avatar from '../../../components/common/Avatar';
+
 interface ChatSettingsDetailsProps {
   displayName: string;
   displayPhoto: string;
@@ -49,12 +51,7 @@ export default function ChatSettingsDetails({
         <div className="relative mb-3.5 group shrink-0">
           <div className="w-24 h-24 rounded-full p-[2px] bg-gradient-to-tr from-[var(--primary)] to-cyan-500 flex items-center justify-center shrink-0 shadow-lg transition-transform duration-300 group-hover:scale-105">
             <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-[var(--bg-main)]">
-              <img 
-                src={displayPhoto} 
-                className="w-full h-full object-cover shrink-0"
-                alt={displayName}
-                referrerPolicy="no-referrer"
-              />
+              <Avatar url={displayPhoto} type="direct" size="custom" customSizeClass="w-full h-full" name={displayName} />
             </div>
           </div>
           <button 

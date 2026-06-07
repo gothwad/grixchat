@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { X, Loader2, Music, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import Avatar from '../../components/common/Avatar';
 
 export default function StoryWatcherScreen() {
   const { userId } = useParams();
@@ -138,11 +139,7 @@ export default function StoryWatcherScreen() {
       {/* Header */}
       <div className="absolute top-8 left-0 right-0 px-4 flex items-center justify-between z-20">
         <div className="flex items-center gap-3">
-          <img 
-            src={currentStory?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-            className="w-10 h-10 rounded-full border border-white/20 object-cover"
-            referrerPolicy="no-referrer"
-          />
+          <Avatar url={currentStory?.photoURL} name={currentStory?.username} size="sm" className="border border-white/20" />
           <span className="text-white font-extrabold text-xs tracking-wider">@{currentStory?.username}</span>
         </div>
         <button onClick={() => navigate('/chats')} className="text-white p-1 hover:bg-white/10 rounded-full transition-all cursor-pointer">

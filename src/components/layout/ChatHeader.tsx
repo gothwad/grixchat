@@ -10,6 +10,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChatHeaderDropdown } from '../chat-ui/ChatHeaderDropdown';
+import Avatar from '../common/Avatar';
 
 interface ChatHeaderProps {
   receiver: any;
@@ -137,17 +138,12 @@ export default function ChatHeader({
             className="flex items-center gap-2 cursor-pointer min-w-0" 
             onClick={handleHeaderClick}
           >
-            <div className="relative shrink-0">
-              <img 
-                src={(receiverId === 'gx-ai' || receiverId === 'grix-ai') ? '/assets/favicon.png' : (receiver?.photoURL || receiver?.icon || `https://cdn-icons-png.flaticon.com/512/149/149071.png`)} 
-                className="w-9 h-9 rounded-full object-cover border border-black/10 shadow-sm"
-                referrerPolicy="no-referrer"
-                alt=""
-              />
-              {((isOnline && !isGroup) || receiverId === 'gx-ai' || receiverId === 'grix-ai') && (
-                <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-[var(--header-bg)] rounded-full"></div>
-              )}
-            </div>
+            <Avatar 
+              url={(receiverId === 'gx-ai' || receiverId === 'grix-ai') ? '/assets/favicon.png' : (receiver?.photoURL || receiver?.icon)} 
+              type={isGroup ? 'group' : 'direct'} 
+              size="sm" 
+              isOnline={(!isGroup && isOnline) || (receiverId === 'gx-ai' || receiverId === 'grix-ai')}
+            />
             <div className="flex flex-col min-w-0">
               <h2 className="text-[14px] font-black text-[var(--header-text)] leading-tight truncate">
                 {isGroup ? (receiver?.name || 'Group') : (receiver?.fullName || (receiverId === 'gx-ai' || receiverId === 'flow-ai' || receiverId === 'grix-ai' ? 'Grix AI' : 'GrixChat User'))}

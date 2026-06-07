@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
   Bell, 
@@ -22,7 +23,8 @@ import {
   PlaySquare,
   Radio,
   MessageCircle,
-  Info
+  Info,
+  LogOut
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -30,7 +32,10 @@ import { useSearch } from '../../contexts/SearchContext.tsx';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { useLayout } from '../../contexts/LayoutContext.tsx';
 import { ChatTabDropdown } from '../chat-ui/ChatTabDropdown';
+import { SearchTabDropdown } from '../chat-ui/SearchTabDropdown';
+import { GroupsTabDropdown } from '../chat-ui/GroupsTabDropdown';
 import { CallsTabDropdown } from '../chat-ui/CallsTabDropdown';
+import { authService } from '../../features/auth/services/authService.ts';
 
 export default function TabHeader() {
   const { userData, user: authUser } = useAuth();
@@ -41,12 +46,26 @@ export default function TabHeader() {
   const [isMuted, setIsMuted] = useState(false);
   const [hasUnreadLikes, setHasUnreadLikes] = useState(false);
   const [hasUnreadNotifs, setHasUnreadNotifs] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  const handleProfileLogout = async () => {
+    try {
+      await authService.logout();
+      navigate('/login');
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowMenu(false);
+      }
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setShowProfileMenu(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -160,13 +179,29 @@ export default function TabHeader() {
             >
               <MoreVertical size={22} className="text-[var(--header-text)]" />
             </button>
-            <ChatTabDropdown 
-              isOpen={showMenu}
-              onClose={() => setShowMenu(false)}
-              chatListFilter={chatListFilter}
-              setChatListFilter={setChatListFilter}
-              showHiddenChatsEntry={userData?.hiddenChatSettings?.showMenuEntry !== false}
-            />
+            <AnimatePresence>
+              {showMenu && (
+                isChatsPage ? (
+                  <ChatTabDropdown 
+                    isOpen={showMenu}
+                    onClose={() => setShowMenu(false)}
+                    chatListFilter={chatListFilter}
+                    setChatListFilter={setChatListFilter}
+                    showHiddenChatsEntry={userData?.hiddenChatSettings?.showMenuEntry !== false}
+                  />
+                ) : isGroupsPage ? (
+                  <GroupsTabDropdown 
+                    isOpen={showMenu}
+                    onClose={() => setShowMenu(false)}
+                  />
+                ) : (
+                  <SearchTabDropdown 
+                    isOpen={showMenu}
+                    onClose={() => setShowMenu(false)}
+                  />
+                )
+              )}
+            </AnimatePresence>
           </div>
         )}
 
@@ -180,10 +215,43 @@ export default function TabHeader() {
             >
               <MoreVertical size={22} className="text-[var(--header-text)]" />
             </button>
-            <CallsTabDropdown 
-              isOpen={showMenu}
-              onClose={() => setShowMenu(false)}
-            />
+            <AnimatePresence>
+              {showMenu && (
+                <CallsTabDropdown 
+                  isOpen={showMenu}
+                  onClose={() => setShowMenu(false)}
+                />
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {/* 3 Dots Menu - Show on Profile Tab with direct slide-out Logout action */}
+        {isProfilePage && (
+          <div className="relative flex items-center gap-2" ref={profileMenuRef}>
+            <AnimatePresence>
+              {showProfileMenu && (
+                <motion.button
+                  initial={{ opacity: 0, x: 8, scale: 0.95 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 8, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={handleProfileLogout}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500 hover:bg-rose-600 active:scale-95 text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer select-none"
+                  id="btn_header_logout"
+                >
+                  <LogOut size={13} strokeWidth={2.5} />
+                  <span>Logout</span>
+                </motion.button>
+              )}
+            </AnimatePresence>
+            <button 
+              onClick={() => setShowProfileMenu(prev => !prev)}
+              className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
+              id="header-profile-three-dots"
+            >
+              <MoreVertical size={22} className="text-[var(--header-text)]" />
+            </button>
           </div>
         )}
 

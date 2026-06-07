@@ -6,6 +6,7 @@ import { useAuth } from '../../providers/AuthProvider';
 import { getAcceptedChats, acceptChat, declineChat } from '../../utils/acceptedChats';
 import { chatService } from './services/chatService';
 import { LocalDataCache } from '../../services/LocalDataCache';
+import Avatar from '../../components/common/Avatar';
 
 export default function MessageRequestsScreen() {
   const navigate = useNavigate();
@@ -61,7 +62,7 @@ export default function MessageRequestsScreen() {
               id: u.id,
               username: u.username,
               fullName: u.full_name,
-              photoURL: u.photo_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+              photoURL: u.photo_url || '',
               bio: u.bio,
               isOnline: u.is_online
             }
@@ -83,7 +84,7 @@ export default function MessageRequestsScreen() {
               id: u.id,
               username: u.username,
               fullName: u.full_name,
-              photoURL: u.photo_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+              photoURL: u.photo_url || '',
               bio: u.bio,
               isOnline: u.is_online
             }
@@ -249,16 +250,7 @@ export default function MessageRequestsScreen() {
                   >
                     {/* User profile details */}
                     <div className="flex items-center gap-3.5 min-w-0 flex-1 cursor-pointer" onClick={() => navigate(`/user/${item.otherUser.id}`)}>
-                      <div className="relative shrink-0">
-                        <img 
-                          src={item.otherUser.photoURL} 
-                          alt="" 
-                          className="w-12 h-12 rounded-full object-cover border border-[var(--border-color)] shadow-sm bg-zinc-200"
-                        />
-                        {item.otherUser.isOnline && (
-                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[var(--bg-card)] rounded-full"></span>
-                        )}
-                      </div>
+                      <Avatar url={item.otherUser.photoURL} type="direct" size="md" name={item.otherUser.fullName || item.otherUser.username} isOnline={item.otherUser.isOnline} />
                       <div className="min-w-0 flex-1">
                         <span className="text-[13px] font-extrabold text-[var(--text-primary)] truncate block">
                           {item.otherUser.fullName}
@@ -310,16 +302,7 @@ export default function MessageRequestsScreen() {
                   >
                     {/* User profile details */}
                     <div className="flex items-center gap-3.5 min-w-0 flex-1 cursor-pointer" onClick={() => navigate(`/user/${item.otherUser.id}`)}>
-                      <div className="relative shrink-0">
-                        <img 
-                          src={item.otherUser.photoURL} 
-                          alt="" 
-                          className="w-12 h-12 rounded-full object-cover border border-[var(--border-color)] shadow-sm bg-zinc-200"
-                        />
-                        {item.otherUser.isOnline && (
-                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[var(--bg-card)] rounded-full"></span>
-                        )}
-                      </div>
+                      <Avatar url={item.otherUser.photoURL} type="direct" size="md" name={item.otherUser.fullName || item.otherUser.username} isOnline={item.otherUser.isOnline} />
                       <div className="min-w-0 flex-1">
                         <span className="text-[13px] font-extrabold text-[var(--text-primary)] truncate block">
                           {item.otherUser.fullName}

@@ -26,13 +26,15 @@ export default function CallScreen() {
   const [receiver, setReceiver] = useState<any>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(type === 'voice');
-  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const [speakerState, setSpeakerState] = useState<number>(2); // 0 = voice muted, 1 = earpiece, 2 = loudspeaker
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [callStatus, setCallStatus] = useState<CallStatus>('connecting');
   const [timer, setTimer] = useState(0);
   const [currentCallId, setCurrentCallId] = useState<string | null>(urlCallId);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
 
   // Stop outgoing sound effects when line connected/finalized
   useEffect(() => {
@@ -111,7 +113,7 @@ export default function CallScreen() {
   };
 
   // Wire WebRTC signaling and media flow
-  const { localStream, endCallPeer } = useWebrtc({
+  const { localStream, endCallPeer, flipCamera } = useWebrtc({
     otherUserId,
     isReceiver,
     type,
@@ -150,63 +152,103 @@ export default function CallScreen() {
   };
 
   const toggleMute = () => {
-    if (localStream.current) {
-      const audioTrack = localStream.current.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsMuted(!audioTrack.enabled);
+    setIsMuted(prev => {
+      const targetMuted = !prev;
+      if (localStream.current) {
+        const audioTrack = localStream.current.getAudioTracks()[0];
+        if (audioTrack) {
+          audioTrack.enabled = !targetMuted;
+        }
       }
-    }
+      return targetMuted;
+    });
   };
 
   const toggleVideo = async () => {
-    if (localStream.current) {
-      let videoTrack = localStream.current.getVideoTracks()[0];
-      if (!videoTrack && isVideoOff) {
-        try {
-          const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-          const newTrack = videoStream.getVideoTracks()[0];
-          if (newTrack) {
-            localStream.current.addTrack(newTrack);
-            if (localVideoRef.current) {
-              localVideoRef.current.srcObject = localStream.current;
-            }
-            videoTrack = newTrack;
-          }
-        } catch (e) {
-          console.warn("Could not activate camera track dynamically:", e);
+    setIsVideoOff(prev => {
+      const targetVideoOff = !prev;
+      if (localStream.current) {
+        let videoTrack = localStream.current.getVideoTracks()[0];
+        if (!videoTrack && !targetVideoOff) {
+          navigator.mediaDevices.getUserMedia({ video: true })
+            .then(videoStream => {
+              const newTrack = videoStream.getVideoTracks()[0];
+              if (newTrack && localStream.current) {
+                localStream.current.addTrack(newTrack);
+                if (localVideoRef.current) {
+                  localVideoRef.current.srcObject = localStream.current;
+                }
+                newTrack.enabled = true;
+              }
+            })
+            .catch(e => console.warn("Could not activate camera track dynamically:", e));
+        } else if (videoTrack) {
+          videoTrack.enabled = !targetVideoOff;
         }
       }
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoOff(!videoTrack.enabled);
-      } else {
-        setIsVideoOff(prev => !prev);
-      }
-    } else {
-      setIsVideoOff(prev => !prev);
-    }
+      return targetVideoOff;
+    });
   };
 
   const toggleSpeaker = () => {
-    setIsSpeakerOn(!isSpeakerOn);
+    setSpeakerState(prev => (prev + 1) % 3);
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] bg-[#0b141a] flex flex-col items-center justify-between text-white font-sans overflow-hidden select-none">
-      {/* Background for Voice Call */}
-      {type === 'voice' && (
-        <div className="absolute inset-0 z-0 overflow-hidden">
-          <img 
-            src={receiver?.photoURL || receiver?.photo_url || "https://picsum.photos/seed/user/800/1200"} 
-            className="w-full h-full object-cover blur-3xl opacity-20 scale-125 transition-opacity duration-1000"
-            alt=""
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0b141a]/40 via-transparent to-[#0b141a]/95"></div>
-        </div>
-      )}
+  const toggleScreenShare = async () => {
+    if (isScreenSharing) {
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(track => {
+          track.stop();
+          track.enabled = false;
+        });
+        screenStreamRef.current = null;
+      }
+      setIsScreenSharing(false);
+      // Revert remote video/local video back to standard feed
+      if (localStream.current && localVideoRef.current) {
+        localVideoRef.current.srcObject = localStream.current;
+      }
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        screenStreamRef.current = stream;
+        setIsScreenSharing(true);
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+        
+        // Listen for when browser cancels screen sharing
+        stream.getVideoTracks()[0].onended = () => {
+          setIsScreenSharing(false);
+          screenStreamRef.current = null;
+          if (localStream.current && localVideoRef.current) {
+            localVideoRef.current.srcObject = localStream.current;
+          }
+        };
+      } catch (e) {
+        console.warn("Screen sharing failed or cancelled by user:", e);
+      }
+    }
+  };
 
+  // Regulate remote client's stream volume dynamically based on earpiece vs loudspeaker vs muted State
+  useEffect(() => {
+    if (remoteVideoRef.current) {
+      if (speakerState === 0) {
+        remoteVideoRef.current.volume = 0;
+        remoteVideoRef.current.muted = true;
+      } else if (speakerState === 1) {
+        remoteVideoRef.current.volume = 0.25; // low speaker/receiver mode
+        remoteVideoRef.current.muted = false;
+      } else {
+        remoteVideoRef.current.volume = 1.0; // loudspeaker mode
+        remoteVideoRef.current.muted = false;
+      }
+    }
+  }, [speakerState]);
+
+  return (
+    <div className="absolute inset-0 z-[100] bg-[var(--bg-main)] flex flex-col items-center justify-between text-[var(--text-primary)] font-sans overflow-hidden select-none">
       {/* Video Streams */}
       {type === 'video' && (
         <VideoFeed 
@@ -224,6 +266,8 @@ export default function CallScreen() {
         callStatus={callStatus}
         timer={timer}
         type={type}
+        onBack={endCall}
+        onFlipCamera={flipCamera}
       />
 
       {/* Embedded/Sticky Bottom control panel which matches WhatsApp aesthetics */}
@@ -231,10 +275,12 @@ export default function CallScreen() {
         type={type}
         isMuted={isMuted}
         isVideoOff={isVideoOff}
-        isSpeakerOn={isSpeakerOn}
+        speakerState={speakerState}
+        isScreenSharing={isScreenSharing}
         onToggleMute={toggleMute}
         onToggleVideo={toggleVideo}
         onToggleSpeaker={toggleSpeaker}
+        onToggleScreenShare={toggleScreenShare}
         onEndCall={endCall}
       />
     </div>

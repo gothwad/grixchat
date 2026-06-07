@@ -5,6 +5,7 @@ import { useAuth } from '../../providers/AuthProvider.tsx';
 import { Search, X, ArrowLeft, Loader2, Play, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { isUserOnline } from '../../utils/presence';
+import Avatar from '../../components/common/Avatar';
 
 interface UserProfile {
   uid: string;
@@ -27,17 +28,7 @@ const UserItem = ({
     onClick={() => navigate(`/user/${user.uid}`)}
     className="flex items-center gap-3 p-4 hover:bg-[var(--bg-main)] transition-colors cursor-pointer group"
   >
-    <div className="relative">
-      <img 
-        src={user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-        alt={user.username}
-        className="w-12 h-12 rounded-full object-cover border border-[var(--border-color)] group-hover:scale-105 transition-transform"
-        referrerPolicy="no-referrer"
-      />
-      {user.isOnline && (
-        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[var(--bg-card)] rounded-full"></div>
-      )}
-    </div>
+    <Avatar url={user.photoURL} type="direct" size="md" name={user.username} isOnline={user.isOnline} />
     <div className="flex-1 min-w-0">
       <h4 className="text-sm font-bold text-[var(--text-primary)] truncate">{user.fullName || user.username}</h4>
       <p className="text-xs text-[var(--text-secondary)] truncate">@{user.username}</p>

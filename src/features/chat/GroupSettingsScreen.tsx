@@ -19,6 +19,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageService } from '../../services/ImageService.ts';
+import Avatar from '../../components/common/Avatar';
 
 export default function GroupSettingsScreen() {
   const { id: chatId } = useParams();
@@ -234,7 +235,7 @@ export default function GroupSettingsScreen() {
                   <Loader2 size={32} className="animate-spin text-blue-500" />
                 </div>
               ) : (
-                <img src={group.photo_url || 'https://cdn-icons-png.flaticon.com/512/166/166258.png'} className="w-full h-full object-cover rounded-full" alt={group.name} />
+                <Avatar url={group.photo_url} type="group" size="custom" customSizeClass="w-full h-full" name={group.name} />
               )}
             </div>
             {isAdmin && (
@@ -288,7 +289,7 @@ export default function GroupSettingsScreen() {
                 const isMe = member.uid === authUserId;
                 return (
                   <div key={member.uid} className="flex items-center gap-3 p-4">
-                    <img src={member.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} className="w-11 h-11 rounded-full object-cover border border-[var(--border-color)]" alt="" />
+                    <Avatar url={member.photoURL} type="direct" size="custom" customSizeClass="w-11 h-11" name={member.fullName} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-bold text-[var(--text-primary)] truncate">{member.fullName}</p>

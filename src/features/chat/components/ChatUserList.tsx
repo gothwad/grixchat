@@ -4,6 +4,7 @@ import { MessageCircle, Lock, Archive, Check, ArrowDownLeft, ArrowUpRight } from
 import { motion } from 'motion/react';
 import { aiService } from '../../../services/AIService';
 import { useLayout } from '../../../contexts/LayoutContext';
+import Avatar from '../../../components/common/Avatar';
 
 interface ChatItem {
   id: string;
@@ -86,50 +87,40 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
         <div 
           key={chat.id} 
           onClick={() => handleToggleSelect(chat.id)}
-          className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all cursor-pointer group select-none"
+          className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all cursor-pointer border-b border-[var(--border-color)]/10 last:border-0 group select-none"
         >
           {/* Symmetrical blue/light-border circular checkbox */}
           <div className="shrink-0 flex items-center justify-center">
-            <div className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-all ${
+            <div className={`w-[20px] h-[20px] rounded-full border-2 flex items-center justify-center transition-all ${
               isSelected 
-                ? 'bg-[#0494f4] border-[#0494f4] scale-110 shadow-sm' 
+                ? 'bg-[#0494f4] border-[#0494f4]' 
                 : 'border-[var(--text-secondary)]/30 hover:border-[#0494f4]'
             }`}>
               {isSelected && (
-                <Check className="text-white animate-scaleIn" size={13} strokeWidth={3} />
+                <Check className="text-white animate-scaleIn" size={11} strokeWidth={3} />
               )}
             </div>
           </div>
 
-          <div className="relative shrink-0 select-none">
-            <img 
-              src={chat.avatar || `https://cdn-icons-png.flaticon.com/512/149/149071.png`} 
-              className="w-[52px] h-[52px] object-cover rounded-full border border-[var(--border-color)]/30 shadow-sm transition-transform group-hover:scale-105"
-              referrerPolicy="no-referrer"
-              alt={chat.user}
-            />
-            {chat.isOnline && (
-              <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
-            )}
-          </div>
-          <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 relative">
+          <Avatar url={chat.avatar} type={chat.type} name={chat.user} isOnline={chat.isOnline} />
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div className="flex justify-between items-baseline mb-0.5">
-              <h3 className="text-[15px] truncate font-bold text-[var(--text-primary)]">
+              <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
                 {chat.user}
               </h3>
-              <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)]">
+              <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] opacity-60">
                 {chat.time}
               </span>
             </div>
             <div className="flex justify-between items-center gap-2">
-              <p className="text-xs truncate font-medium text-[var(--text-secondary)] flex-1">
+              <p className="text-[13px] truncate text-[var(--text-secondary)] opacity-75 flex-1">
                 {chat.lastMsg}
               </p>
               {!chat.unread && chat.lastMsgStatus && (
                 chat.lastMsgStatus === 'Sent' ? (
-                  <ArrowUpRight size={16} strokeWidth={2.8} className="text-[#0494f4] shrink-0" />
+                  <ArrowUpRight size={15} strokeWidth={2.8} className="text-[#0494f4] shrink-0 opacity-70" />
                 ) : (
-                  <ArrowDownLeft size={16} strokeWidth={2.8} className="text-emerald-500 shrink-0" />
+                  <ArrowDownLeft size={15} strokeWidth={2.8} className="text-emerald-500 shrink-0 opacity-70" />
                 )
               )}
             </div>
@@ -142,45 +133,35 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       <Link 
         to={`/chat/${chat.otherUserId}`} 
         key={chat.id} 
-        className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group"
+        className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 last:border-0 group"
       >
-        <div className="relative shrink-0 select-none">
-          <img 
-            src={chat.avatar || `https://cdn-icons-png.flaticon.com/512/149/149071.png`} 
-            className="w-[52px] h-[52px] object-cover rounded-full border border-[var(--border-color)]/30 shadow-sm group-hover:scale-105 transition-transform"
-            referrerPolicy="no-referrer"
-            alt={chat.user}
-          />
-          {chat.isOnline && (
-            <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 relative">
+        <Avatar url={chat.avatar} type={chat.type} name={chat.user} isOnline={chat.isOnline} />
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="flex justify-between items-baseline mb-0.5">
-            <h3 className={`text-[15px] truncate font-bold text-[var(--text-primary)] ${chat.unread ? 'font-black' : ''}`}>
+            <h3 className={`text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[#0494f4] transition-colors ${chat.unread ? 'font-bold' : ''}`}>
               {chat.user}
             </h3>
-            <span className={`text-[10px] whitespace-nowrap ${chat.unread ? 'text-[var(--primary)] font-bold' : 'text-[var(--text-secondary)]'}`}>
+            <span className={`text-[10.5px] whitespace-nowrap ${chat.unread ? 'text-[var(--primary)] font-semibold' : 'text-[var(--text-secondary)] opacity-60'}`}>
               {chat.time}
             </span>
           </div>
           <div className="flex justify-between items-center gap-2">
-            <p className={`text-xs truncate font-medium flex-1 ${chat.unread ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-secondary)]'}`}>
+            <p className={`text-[13px] truncate flex-1 leading-snug ${chat.unread ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-secondary)] opacity-75'}`}>
               {chat.lastMsg}
             </p>
             <div className="flex items-center gap-2 shrink-0">
               {chat.unread ? (
-                <div className="min-w-[18px] h-[18px] px-1.5 bg-[var(--primary)] rounded-full flex items-center justify-center shadow-lg shadow-[var(--primary-shadow)]/20">
-                  <span className="text-[10.5px] text-white font-black leading-none">
+                <div className="min-w-[18px] h-[18px] px-1.5 bg-[var(--primary)] rounded-full flex items-center justify-center shadow-sm">
+                  <span className="text-[9.5px] text-white font-extrabold leading-none">
                     {chat.unreadCount && chat.unreadCount > 4 ? '4+' : chat.unreadCount}
                   </span>
                 </div>
               ) : (
                 chat.lastMsgStatus && (
                   chat.lastMsgStatus === 'Sent' ? (
-                    <ArrowUpRight size={16} strokeWidth={2.8} className="text-[#0494f4] shrink-0" />
+                    <ArrowUpRight size={15} strokeWidth={2.8} className="text-[#0494f4] shrink-0 opacity-70" />
                   ) : (
-                    <ArrowDownLeft size={16} strokeWidth={2.8} className="text-emerald-500 shrink-0" />
+                    <ArrowDownLeft size={15} strokeWidth={2.8} className="text-emerald-500 shrink-0 opacity-70" />
                   )
                 )
               )}
@@ -196,31 +177,21 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       <Link 
         to={`/chat/${user.uid}`} 
         key={user.uid} 
-        className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group"
+        className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 last:border-0 group"
       >
-        <div className="relative shrink-0 select-none">
-          <img 
-            src={user.photoURL || `https://cdn-icons-png.flaticon.com/512/149/149071.png`} 
-            className="w-[52px] h-[52px] object-cover shadow-sm group-hover:scale-105 transition-transform rounded-full border border-[var(--border-color)]/30"
-            referrerPolicy="no-referrer"
-            alt={user.fullName || user.username}
-          />
-          {user.isOnline && (
-            <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 relative">
+        <Avatar url={user.photoURL} type="direct" name={user.fullName || user.username} isOnline={user.isOnline} />
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="flex justify-between items-baseline mb-0.5">
-            <h3 className="text-[15px] truncate font-bold text-[var(--text-primary)]">
+            <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
               {user.fullName || user.username}
             </h3>
-            <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] uppercase font-bold tracking-tight opacity-40">
+            <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] uppercase font-semibold tracking-tight opacity-40">
               Suggested
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <p className="text-xs truncate font-medium text-[var(--text-secondary)] italic">
-              Say hi! 👋
+            <p className="text-[13px] truncate text-[var(--text-secondary)] opacity-70 italic">
+              Say hi 👋
             </p>
           </div>
         </div>
@@ -234,24 +205,24 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       {showSecretHeader && (
         <div 
           onClick={onSecretHeaderClick}
-          className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer border-b border-[var(--border-color)]/30"
+          className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 group cursor-pointer"
         >
-          <div className="relative shrink-0 z-10 animate-pulse">
-            <div className="w-[52px] h-[52px] rounded-full bg-indigo-500/10 dark:bg-zinc-800 flex items-center justify-center text-indigo-500 group-hover:scale-105 transition-transform border border-[var(--border-color)]/30">
-              <Lock size={21} className="text-indigo-500 animate-bounce" />
+          <div className="relative shrink-0 z-10">
+            <div className="w-12 h-12 rounded-full bg-indigo-500/10 dark:bg-zinc-800 flex items-center justify-center text-indigo-500 group-hover:scale-[1.02] transition-transform border border-[var(--border-color)]/10">
+              <Lock size={19} className="text-indigo-500 animate-pulse" />
             </div>
           </div>
-          <div className="flex-1 min-w-0 relative">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div className="flex justify-between items-baseline mb-0.5">
-              <h3 className="text-[15px] truncate font-black text-[var(--text-primary)]">
+              <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
                 Hidden Chats
               </h3>
-              <span className="text-[11px] whitespace-nowrap text-indigo-500 font-bold tracking-tight bg-indigo-500/10 px-2 py-0.5 rounded-full">
+              <span className="text-[9.5px] whitespace-nowrap text-indigo-500 font-semibold tracking-tight bg-indigo-500/10 px-2 py-0.5 rounded-full">
                 Unlocked
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
+              <p className="text-[12px] truncate text-[var(--text-secondary)] font-medium opacity-75">
                 {secretCount > 0 ? `${secretCount} hidden conversations available` : 'Private conversations space'}
               </p>
             </div>
@@ -279,7 +250,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
         return (
           <div 
             onClick={() => navigate('/chat/grix-ai')}
-            className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer"
+            className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 group cursor-pointer"
           >
             <div 
               className="relative shrink-0 z-10"
@@ -290,23 +261,23 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
             >
               <img 
                 src="/assets/favicon.png" 
-                className="w-[52px] h-[52px] rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform border border-[var(--border-color)]/30"
+                className="w-12 h-12 rounded-full object-cover shadow-sm group-hover:scale-[1.02] transition-transform border border-[var(--border-color)]/15"
                 referrerPolicy="no-referrer"
                 alt="Grix AI"
               />
-              <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
             </div>
-            <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 relative">
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
               <div className="flex justify-between items-baseline mb-0.5">
-                <h3 className="text-[15px] truncate font-black text-[var(--text-primary)]">
+                <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
                   Grix AI
                 </h3>
-                <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] font-bold">
+                <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] opacity-60">
                   {lastAiTime}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
+                <p className="text-[13px] truncate text-[var(--text-secondary)] font-medium opacity-75">
                   {lastAiText}
                 </p>
               </div>
@@ -319,25 +290,25 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       {showGrixAI && (
         <div 
           onClick={() => navigate('/chats/archived')}
-          className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer"
+          className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 group cursor-pointer"
         >
           <div className="relative shrink-0 z-10">
-            <div className="w-[52px] h-[52px] rounded-full bg-[#0494f4]/10 dark:bg-zinc-800 flex items-center justify-center text-[var(--primary)] group-hover:scale-105 transition-transform border border-[var(--border-color)]/30">
-              <Archive size={21} className="text-[var(--primary)]" />
+            <div className="w-12 h-12 rounded-full bg-[#0494f4]/10 dark:bg-zinc-800 flex items-center justify-center text-[var(--primary)] group-hover:scale-[1.02] transition-transform border border-[var(--border-color)]/15">
+              <Archive size={19} className="text-[var(--primary)]" />
             </div>
           </div>
-          <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 relative">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div className="flex justify-between items-baseline mb-0.5">
-              <h3 className="text-[15px] truncate font-black text-[var(--text-primary)]">
+              <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
                 Archived Chats
               </h3>
-              <span className="text-[11px] whitespace-nowrap text-[#0494f4] font-bold tracking-tight">
-                View
+              <span className="text-[10px] whitespace-nowrap text-[#0494f4] font-semibold tracking-tight bg-[#0494f4]/10 px-2 py-0.5 rounded-full">
+                {archivedCount > 0 ? archivedCount : 'View'}
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
-                Some of your conversion can be in archived
+              <p className="text-[12px] truncate text-[var(--text-secondary)] font-medium opacity-75">
+                Saved and hidden from main mailbox
               </p>
             </div>
           </div>
@@ -348,24 +319,24 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       {showGrixAI && showHiddenChatsEntry && !showSecretHeader && (
         <div 
           onClick={() => navigate('/chats/hidden')}
-          className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer"
+          className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 group cursor-pointer"
         >
           <div className="relative shrink-0 z-10">
-            <div className="w-[52px] h-[52px] rounded-full bg-indigo-500/10 dark:bg-zinc-800 flex items-center justify-center text-indigo-500 group-hover:scale-105 transition-transform border border-[var(--border-color)]/30">
-              <Lock size={21} className="text-indigo-500" />
+            <div className="w-12 h-12 rounded-full bg-indigo-500/10 dark:bg-zinc-800 flex items-center justify-center text-indigo-500 group-hover:scale-[1.02] transition-transform border border-[var(--border-color)]/15">
+              <Lock size={19} className="text-indigo-500" />
             </div>
           </div>
-          <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 relative">
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div className="flex justify-between items-baseline mb-0.5">
-              <h3 className="text-[15px] truncate font-black text-[var(--text-primary)]">
+              <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
                 Hidden Chats
               </h3>
-              <span className="text-[11px] whitespace-nowrap text-indigo-500 font-bold tracking-tight">
+              <span className="text-[10px] whitespace-nowrap text-indigo-500 font-semibold tracking-tight bg-indigo-500/10 px-2 py-0.5 rounded-full">
                 Secret
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <p className="text-xs truncate text-[var(--text-secondary)] font-medium">
+              <p className="text-[12px] truncate text-[var(--text-secondary)] font-medium opacity-75">
                 Private conversations protected with secret code
               </p>
             </div>

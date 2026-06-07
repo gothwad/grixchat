@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
+import Avatar from '../../../components/common/Avatar';
 
 interface ChatOptionsSheetProps {
   isOpen: boolean;
@@ -88,11 +89,11 @@ export const ChatOptionsSheet: React.FC<ChatOptionsSheetProps> = ({
             {/* Header */}
             <div className="px-6 py-1 flex items-center justify-between border-b border-[var(--border-color)]/20 shrink-0">
               <div className="flex items-center gap-3">
-                <img 
-                  src={receiver?.photoURL || `https://cdn-icons-png.flaticon.com/512/149/149071.png`}
-                  className="w-8 h-8 rounded-full object-cover border border-black/5"
-                  referrerPolicy="no-referrer"
-                  alt=""
+                <Avatar 
+                  url={receiver?.photoURL}
+                  size="sm"
+                  type="direct"
+                  name={receiver?.fullName || receiver?.username}
                 />
                 <h3 className="text-[18px] font-black text-[var(--text-primary)] tracking-tight">Chat Options</h3>
               </div>

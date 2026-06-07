@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Phone, Video, Search, X, User } from 'lucide-react';
+import Avatar from '../../../components/common/Avatar';
 
 interface ContactRecord {
   id: string;
@@ -80,34 +81,22 @@ export const CallsContactsList: React.FC<CallsContactsListProps> = ({
           filtered.map((contact) => (
             <div
               key={contact.id}
-              className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer select-none"
+              className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 last:border-0 group cursor-pointer select-none"
             >
-              {/* Avatar resembling ChatUserList */}
-              <div className="relative shrink-0 select-none">
-                <img
-                  src={contact.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'}
-                  alt={contact.username}
-                  className="w-[52px] h-[52px] rounded-full object-cover border border-[var(--border-color)]/30 shadow-sm group-hover:scale-105 transition-transform"
-                  referrerPolicy="no-referrer"
-                />
-                {contact.isOnline && (
-                  <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
-                )}
-              </div>
+              <Avatar url={contact.photoURL} name={contact.username} isOnline={contact.isOnline} />
               
-              {/* Detailed Row matching ChatUserList divider lines perfectly */}
-              <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 flex items-center justify-between">
+              {/* Detailed Row matching ChatUserList specifications */}
+              <div className="flex-1 min-w-0 flex items-center justify-between">
                 <div className="min-w-0 pr-2">
-                  <h4 className="text-[15px] truncate font-bold text-[var(--text-primary)]">
+                  <h4 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
                     {contact.fullName || contact.username}
                   </h4>
-                  <p className="text-xs font-semibold text-[var(--text-secondary)]/80 mt-0.5">
+                  <p className="text-[13px] text-[var(--text-secondary)] opacity-75 mt-0.5">
                     @{contact.username}
                   </p>
                 </div>
-
-                {/* Elegant Action Buttons on the Right */}
-                <div className="flex items-center gap-1 shrink-0">
+                {/* Elegant Action Buttons on the Right matching official Avatar proportions and styling exactly */}
+                <div className="flex items-center gap-2 shrink-0">
                   {/* Voice Call Button */}
                   <button
                     type="button"
@@ -115,12 +104,12 @@ export const CallsContactsList: React.FC<CallsContactsListProps> = ({
                       e.stopPropagation();
                       onCall(contact.id, 'voice');
                     }}
-                    className="w-10 h-10 rounded-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 text-[#0494f4] active:scale-95 transition-all flex items-center justify-center cursor-pointer border-none"
+                    className="w-12 h-12 rounded-full flex items-center justify-center bg-transparent text-[#0494f4] hover:bg-[var(--border-color)]/10 active:scale-95 transition-all duration-150 cursor-pointer shrink-0"
                     title="Voice Call"
                   >
-                    <Phone size={19} className="stroke-[2.2]" />
+                    <Phone size={22} className="stroke-[2.2]" />
                   </button>
-
+ 
                   {/* Video Call Button */}
                   <button
                     type="button"
@@ -128,10 +117,10 @@ export const CallsContactsList: React.FC<CallsContactsListProps> = ({
                       e.stopPropagation();
                       onCall(contact.id, 'video');
                     }}
-                    className="w-10 h-10 rounded-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 text-[#0494f4] active:scale-95 transition-all flex items-center justify-center cursor-pointer border-none"
+                    className="w-12 h-12 rounded-full flex items-center justify-center bg-transparent text-[#0494f4] hover:bg-[var(--border-color)]/10 active:scale-95 transition-all duration-150 cursor-pointer shrink-0"
                     title="Video Call"
                   >
-                    <Video size={20} className="stroke-[2.2]" />
+                    <Video size={22} className="stroke-[2.2]" />
                   </button>
                 </div>
               </div>

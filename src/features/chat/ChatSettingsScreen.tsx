@@ -222,7 +222,7 @@ export default function ChatSettingsScreen() {
   }
 
   const displayName = nickname || receiver?.fullName || 'GrixChat User';
-  const displayPhoto = customPhotoUrl || receiver?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+  const displayPhoto = customPhotoUrl || receiver?.photoURL || '';
   const simulatedPhone = `+91 9${receiverId ? receiverId.replace(/[^0-9]/g, '').slice(0, 9) : '8503'}`.padEnd(14, '0').slice(0, 15);
 
   return (

@@ -5,8 +5,9 @@ import {
   PhoneMissed, 
   ArrowDownLeft, 
   ArrowUpRight, 
-  PhoneCall 
+  PhoneCall
 } from 'lucide-react';
+import Avatar from '../../../components/common/Avatar';
 
 interface CallRecord {
   id: string;
@@ -74,45 +75,37 @@ export const CallsHistoryList: React.FC<CallsHistoryListProps> = ({
         return (
           <div 
             key={call.id}
-            className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group cursor-pointer select-none"
+            className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 last:border-0 group cursor-pointer select-none"
           >
-            {/* Avatar Container resembling ChatUserList */}
-            <div className="relative shrink-0 select-none">
-              <img 
-                src={call.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-                alt={call.user} 
-                className="w-[52px] h-[52px] rounded-full object-cover border border-[var(--border-color)]/30 shadow-sm group-hover:scale-105 transition-transform"
-                referrerPolicy="no-referrer"
-              />
-            </div>
+            <Avatar url={call.avatar} name={call.user} />
             
-            {/* Detailed Row matching ChatUserList divider lines perfectly */}
-            <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/30 pb-3 group-last:border-0 flex items-center justify-between">
+            {/* Detailed Row matching ChatUserList layout */}
+            <div className="flex-1 min-w-0 flex items-center justify-between">
               <div className="min-w-0 pr-2">
-                <h4 className={`text-[15px] truncate font-bold ${isMissed ? 'text-rose-500' : 'text-[var(--text-primary)]'}`}>
+                <h4 className={`text-[14.5px] truncate font-semibold ${isMissed ? 'text-rose-500' : 'text-[var(--text-primary)]'}`}>
                   {call.user}
                 </h4>
                 
-                <div className="flex items-center gap-1.5 mt-1 select-none">
+                <div className="flex items-center gap-1.5 mt-0.5 select-none animate-fade-in">
                   {call.isMissed ? (
                     call.isIncoming ? (
-                      <ArrowDownLeft size={14} strokeWidth={3} className="text-rose-500 shrink-0" />
+                      <ArrowDownLeft size={13} strokeWidth={3} className="text-rose-500 shrink-0" />
                     ) : (
-                      <ArrowUpRight size={14} strokeWidth={3} className="text-amber-500 shrink-0" />
+                      <ArrowUpRight size={13} strokeWidth={3} className="text-amber-500 shrink-0" />
                     )
                   ) : call.isIncoming ? (
-                    <ArrowDownLeft size={14} strokeWidth={3} className="text-emerald-500 shrink-0" />
+                    <ArrowDownLeft size={13} strokeWidth={3} className="text-emerald-500 shrink-0" />
                   ) : (
-                    <ArrowUpRight size={14} strokeWidth={3} className="text-[#0494f4] shrink-0" />
+                    <ArrowUpRight size={13} strokeWidth={3} className="text-[#0494f4] shrink-0" />
                   )}
                   
-                  <span className="text-xs font-semibold text-[var(--text-secondary)]/80">
+                  <span className="text-[13px] text-[var(--text-secondary)] opacity-75">
                     {call.type === 'video' ? 'Video' : 'Voice'} Call · {call.time}
                   </span>
                 </div>
               </div>
-
-              {/* Action Button styled cleanly on the right */}
+ 
+              {/* Action Button styled cleanly on the right with official Avatar proportions and transparent color */}
               <div className="flex items-center gap-2 shrink-0">
                 <button 
                   type="button"
@@ -120,13 +113,13 @@ export const CallsHistoryList: React.FC<CallsHistoryListProps> = ({
                     e.stopPropagation();
                     onCall(call.otherUserId, call.type === 'video' ? 'video' : 'voice');
                   }}
-                  className="w-10 h-10 rounded-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 text-[#0494f4] active:scale-95 transition-all flex items-center justify-center cursor-pointer border-none"
+                  className="w-12 h-12 rounded-full flex items-center justify-center bg-transparent text-[#0494f4] hover:bg-[var(--border-color)]/10 active:scale-95 transition-all duration-150 cursor-pointer shrink-0"
                   title={call.type === 'video' ? "Video Call" : "Voice Call"}
                 >
                   {call.type === 'video' ? (
-                    <Video size={20} className="stroke-[2.2]" />
+                    <Video size={22} className="stroke-[2.2]" />
                   ) : (
-                    <Phone size={19} className="stroke-[2.2]" />
+                    <Phone size={22} className="stroke-[2.2]" />
                   )}
                 </button>
               </div>

@@ -13,6 +13,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageService } from '../../services/ImageService.ts';
+import Avatar from '../../components/common/Avatar';
 
 interface UserProfile {
   id: string;
@@ -116,7 +117,7 @@ export default function NewGroupScreen() {
         throw new Error('Please select at least one member');
       }
 
-      let iconUrl = 'https://cdn-icons-png.flaticon.com/512/166/166258.png';
+      let iconUrl = '';
       if (groupIcon) {
         try {
           iconUrl = await ImageService.uploadImage(groupIcon);
@@ -243,7 +244,7 @@ export default function NewGroupScreen() {
                 <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
                   {selectedUsers.map(user => (
                     <div key={user.id} className="flex items-center gap-1.5 px-2 py-1 bg-[#0494f4]/10 border border-[#0494f4]/20 rounded-full shrink-0">
-                      <img src={user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} className="w-5 h-5 rounded-full object-cover" alt="" />
+                      <Avatar url={user.photoURL} type="direct" size="custom" customSizeClass="w-5 h-5" name={user.fullName} />
                       <span className="text-[9px] font-bold text-[#0494f4] truncate max-w-[60px]">{user.fullName}</span>
                       <button onClick={() => toggleUserSelection(user)} className="text-[#0494f4] hover:text-[#0494f4]/80">
                         <X size={10} />
@@ -282,7 +283,7 @@ export default function NewGroupScreen() {
                         className={`flex items-center gap-3 p-3 rounded-2xl transition-all cursor-pointer ${isSelected ? 'bg-[#0494f4]/5 ring-1 ring-[#0494f4]/20' : 'hover:bg-black/5'}`}
                       >
                         <div className="relative">
-                          <img src={user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} className="w-11 h-11 rounded-full object-cover border border-[var(--border-color)]" alt="" />
+                          <Avatar url={user.photoURL} type="direct" size="custom" customSizeClass="w-11 h-11" name={user.fullName} />
                           {isSelected && (
                             <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-[#0494f4] rounded-full flex items-center justify-center border-2 border-[var(--bg-main)]">
                               <Check size={10} className="text-white" />
@@ -357,7 +358,7 @@ export default function NewGroupScreen() {
                 <div className="grid grid-cols-2 gap-2">
                   {selectedUsers.map(user => (
                     <div key={user.id} className="flex items-center gap-2 p-2 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] overflow-hidden">
-                      <img src={user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} className="w-6 h-6 rounded-full object-cover" alt="" />
+                      <Avatar url={user.photoURL} type="direct" size="custom" customSizeClass="w-6 h-6" name={user.fullName} />
                       <span className="text-[10px] font-bold text-[var(--text-primary)] truncate">{user.fullName}</span>
                     </div>
                   ))}

@@ -42,6 +42,48 @@ export const useWebrtc = ({
   const localStream = useRef<MediaStream | null>(null);
   const remoteStream = useRef<MediaStream | null>(null);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+
+  const flipCamera = async () => {
+    if (type !== 'video' || !localStream.current) return;
+    const nextFacing = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(nextFacing);
+
+    try {
+      const videoTrack = localStream.current.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.stop();
+        localStream.current.removeTrack(videoTrack);
+      }
+
+      const freshStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: nextFacing },
+        audio: false,
+      });
+
+      const newTrack = freshStream.getVideoTracks()[0];
+      if (newTrack) {
+        localStream.current.addTrack(newTrack);
+        
+        // Find sender and replace track live
+        if (pc.current) {
+          const senders = pc.current.getSenders();
+          const videoSender = senders.find(s => s.track?.kind === 'video');
+          if (videoSender) {
+            await videoSender.replaceTrack(newTrack);
+          }
+        }
+
+        // Keep local video element in sync
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = null;
+          localVideoRef.current.srcObject = localStream.current;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to flip camera device:", e);
+    }
+  };
 
   useEffect(() => {
     if (!supabase || !authUser || !otherUserId) return;
@@ -66,9 +108,8 @@ export const useWebrtc = ({
           pc.current?.addTrack(track, stream);
         });
       } catch (err) {
-        console.error("Error accessing media devices in hook:", err);
-        setCallStatus('error');
-        return;
+        console.warn("Could not obtain user media on start (permission denied or no hardware), proceeding anyway:", err);
+        // Continue signaling and connection as requested, so call still gets connected/routed
       }
 
       // 3. Setup remote stream
@@ -89,7 +130,7 @@ export const useWebrtc = ({
         if (!pc.current) return;
         console.log("ICE Connection State hook:", pc.current.iceConnectionState);
         if (pc.current.iceConnectionState === 'disconnected' || pc.current.iceConnectionState === 'failed') {
-          endCallLocally();
+          endCallPeer();
         }
       };
 
@@ -110,7 +151,7 @@ export const useWebrtc = ({
 
             if (data.status === 'ended' || data.status === 'denied') {
               setCallStatus(data.status as any);
-              setTimeout(() => endCallLocally(), 2000);
+              endCallPeer();
             }
             
             if (data.status === 'accepted' && !isReceiver) {
@@ -170,9 +211,7 @@ export const useWebrtc = ({
           await addMessageToChat('missed', callData.id);
         }
 
-        setTimeout(() => {
-          endCallLocally();
-        }, 4000);
+        endCallPeer();
         return;
       }
 
@@ -210,13 +249,14 @@ export const useWebrtc = ({
         }
       };
 
-      // Auto hangup
+      // Auto hangup after 60s
       setTimeout(async () => {
         const { data: snap } = await supabase.from('calls').select('status').eq('id', cid).single();
         if (snap && snap.status === 'ringing') {
           await supabase.from('calls').update({ status: 'ended', is_missed: true } as any).eq('id', cid);
           await addMessageToChat('missed', cid);
-          endCallLocally();
+          setCallStatus('ended');
+          endCallPeer();
         }
       }, 60000);
     };
@@ -285,6 +325,7 @@ export const useWebrtc = ({
     localStream,
     remoteStream,
     endCallPeer,
+    flipCamera,
   };
 };
 

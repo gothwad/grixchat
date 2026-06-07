@@ -18,7 +18,7 @@ import {
 
 // Modular Call Module elements
 import { StatusFilterOption } from './components/CallsQuickActions';
-import { CallsSearchBar } from './components/CallsSearchBar';
+import { CommonSearchBar } from '../../components/common/CommonSearchBar';
 import { MeetingView } from './components/MeetingView';
 import { JoinView } from './components/JoinView';
 
@@ -59,6 +59,10 @@ export default function CallsTab() {
     }
     return true;
   });
+
+  const [limit, setLimit] = useState(15);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Keep references to current calls and contacts to prevent state-reset loop
   const callsRef = useRef(calls);
@@ -185,9 +189,15 @@ export default function CallsTab() {
       const cached = LocalDataCache.get<any[]>(`gx_calls_history_${authUser.id}`);
       const currentCalls = callsRef.current;
       const hasData = (currentCalls && currentCalls.length > 0) || (cached && cached.length > 0);
-      if (!hasData) {
-        setCallsLoading(true);
+      
+      if (limit === 15) {
+        if (!hasData) {
+          setCallsLoading(true);
+        }
+      } else {
+        setLoadingMore(true);
       }
+
       const { data, error } = await supabase
         .from('calls')
         .select(`
@@ -197,10 +207,18 @@ export default function CallsTab() {
         `)
         .or(`caller_id.eq.${authUser.id},receiver_id.eq.${authUser.id}`)
         .order('created_at', { ascending: false })
-        .limit(60);
+        .limit(limit + 1);
 
       if (!error && data) {
-        const callList = data.map((c: any) => {
+        let hasMoreData = false;
+        let queryData = data || [];
+        if (queryData.length > limit) {
+          hasMoreData = true;
+          queryData = queryData.slice(0, limit);
+        }
+        setHasMore(hasMoreData);
+
+        const callList = queryData.map((c: any) => {
           const isCaller = c.caller_id === authUser.id;
           const otherUser = isCaller ? c.receiver : c.caller;
           
@@ -222,8 +240,19 @@ export default function CallsTab() {
       console.error("Error fetching calls:", e);
     } finally {
       setCallsLoading(false);
+      setLoadingMore(false);
     }
-  }, [authUser?.id]);
+  }, [authUser?.id, limit]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const isScrollable = target.scrollHeight > target.clientHeight;
+    if (isScrollable && target.scrollTop > 0 && target.scrollHeight - target.scrollTop <= target.clientHeight + 85) {
+      if (hasMore && !loadingMore && !callsLoading && statusFilter !== 'contacts') {
+        setLimit(prev => prev + 15);
+      }
+    }
+  };
 
   const fetchContacts = React.useCallback(async () => {
     if (!authUserZone() || !supabase) return;
@@ -375,35 +404,48 @@ export default function CallsTab() {
 
       {/* 3. Base Calls List Layout (Always mounted to prevent unmounting flashes) */}
       <div 
-        className="flex-1 overflow-y-auto no-scrollbar pb-32 bg-bg-card"
+        className="flex-1 flex flex-col min-h-0 bg-bg-card"
         style={{ backgroundColor: 'var(--bg-card)' }}
       >
-        
-        {/* Search bar */}
-        <CallsSearchBar 
-          placeholder={statusFilter === 'contacts' ? "Search contact name..." : "Search calls..."}
-          value={searchTerm}
-          onChange={setSearchTerm}
-          onClear={() => setSearchTerm('')}
-        />
+        <div 
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto no-scrollbar pb-32 bg-bg-card"
+          style={{ backgroundColor: 'var(--bg-card)' }}
+        >
+          {/* Search bar inside scroll viewport */}
+          <CommonSearchBar 
+            placeholder={statusFilter === 'contacts' ? "Search contact name..." : "Search calls..."}
+            value={searchTerm}
+            onChange={setSearchTerm}
+            onClear={() => setSearchTerm('')}
+          />
 
-        {/* List display area */}
-        <div className="mt-1">
-          {statusFilter === 'contacts' ? (
-            <CallsContactsList 
-              contacts={contacts} 
-              loading={contactsLoading} 
-              onCall={startCallDirectly} 
-              searchTerm={searchTerm}
-            />
-          ) : (
-            <CallsHistoryList 
-              calls={getFilteredCalls()} 
-              loading={callsLoading} 
-              onCall={startCallDirectly} 
-              onReset={fetchCalls}
-            />
-          )}
+          {/* List display area */}
+          <div className="mt-1">
+            {statusFilter === 'contacts' ? (
+              <CallsContactsList 
+                contacts={contacts} 
+                loading={contactsLoading} 
+                onCall={startCallDirectly} 
+                searchTerm={searchTerm}
+              />
+            ) : (
+              <>
+                <CallsHistoryList 
+                  calls={getFilteredCalls()} 
+                  loading={callsLoading} 
+                  onCall={startCallDirectly} 
+                  onReset={fetchCalls}
+                />
+                {loadingMore && (
+                  <div className="flex items-center justify-center py-4 gap-2 bg-[var(--bg-card)]">
+                    <div className="w-4 h-4 border-2 border-[#0494f4]/20 border-t-[#0494f4] rounded-full animate-spin" />
+                    <span className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">Loading more calls...</span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

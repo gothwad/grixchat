@@ -55,10 +55,10 @@ export const CallsTabDropdown: React.FC<CallsTabDropdownProps> = ({
   };
 
   const options = [
-    { label: 'Recents History', value: 'calls', icon: History, color: 'text-[var(--text-secondary)]' },
-    { label: 'Missed Calls', value: 'missed', icon: PhoneMissed, color: 'text-rose-500' },
-    { label: 'Contacts Directory', value: 'contacts', icon: Users, color: 'text-[var(--text-secondary)]' },
-    { label: 'Join with Room Code', value: 'join', icon: LogIn, color: 'text-[var(--text-secondary)]' },
+    { label: 'Recents', value: 'calls', icon: History, color: 'text-[var(--text-secondary)]' },
+    { label: 'Missed', value: 'missed', icon: PhoneMissed, color: 'text-rose-500' },
+    { label: 'Contacts', value: 'contacts', icon: Users, color: 'text-[var(--text-secondary)]' },
+    { label: 'Join', value: 'join', icon: LogIn, color: 'text-[var(--text-secondary)]' },
   ];
 
   return (
@@ -75,12 +75,8 @@ export const CallsTabDropdown: React.FC<CallsTabDropdownProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: -10 }}
         transition={{ duration: 0.12, ease: 'easeOut' }}
-        className="absolute right-0 top-11 z-[101] w-[210px] bg-[var(--bg-card)] border border-[var(--border-color)]/60 shadow-[0_10px_35px_rgba(0,0,0,0.15)] rounded-2xl p-1.5 flex flex-col gap-[1px] text-[var(--text-primary)] overflow-hidden select-none"
+        className="absolute right-0 top-11 z-[101] w-[190px] bg-[var(--bg-card)] border border-[var(--border-color)]/60 shadow-[0_10px_35px_rgba(0,0,0,0.15)] rounded-2xl p-1.5 flex flex-col gap-[1px] text-[var(--text-primary)] overflow-hidden select-none"
       >
-        <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-4 py-1.5 border-b border-[var(--border-color)]/30 mb-1">
-          Call Options
-        </p>
-
         {options.map((opt) => {
           const isSelected = activeFilter === opt.value;
           const IconComponent = opt.icon;
@@ -109,7 +105,7 @@ export const CallsTabDropdown: React.FC<CallsTabDropdownProps> = ({
         {/* Divider */}
         <div className="h-px bg-[var(--border-color)]/30 mx-2 my-1" />
 
-        {/* Emerald green instant option to build a new session lounge */}
+        {/* Emerald green instant option */}
         <button
           type="button"
           onClick={handleCreateMeeting}
@@ -117,7 +113,7 @@ export const CallsTabDropdown: React.FC<CallsTabDropdownProps> = ({
         >
           <div className="flex items-center gap-3">
             <Video size={16} className="text-emerald-500" />
-            <span>Create New Meeting</span>
+            <span>Meeting</span>
           </div>
           <ChevronRight size={14} className="text-emerald-400 opacity-80" />
         </button>

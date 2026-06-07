@@ -31,6 +31,10 @@ export const useConversations = (activeFilter: string) => {
     return true;
   });
 
+  const [limit, setLimit] = useState(15);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   const chatChannelsRef = useRef<any[]>([]);
   const subscribedIdsRef = useRef<string[]>([]);
 
@@ -47,12 +51,17 @@ export const useConversations = (activeFilter: string) => {
     if (!user || activeFilter === 'Calls' || !supabase || !isAuthReady) return;
     const myId = user.id;
     const cached = LocalDataCache.getConversations(myId);
-    if (!cached || cached.length === 0) {
-      setLoading(true);
+    
+    if (limit === 15) {
+      if (!cached || cached.length === 0) {
+        setLoading(true);
+      }
+    } else {
+      setLoadingMore(true);
     }
 
     try {
-      // 1. Fetch conversations I'm part of
+      // 1. Fetch conversations I'm part of (query limit + 1 to check if there is more)
       const { data, error } = await supabase
         .from('conversation_participants')
         .select(`
@@ -64,12 +73,21 @@ export const useConversations = (activeFilter: string) => {
           )
         `)
         .eq('user_id', myId)
-        .order('joined_at', { ascending: false });
+        .order('joined_at', { ascending: false })
+        .limit(limit + 1);
 
       if (error) {
         console.error('Error fetching conversations:', error);
         return;
       }
+
+      let hasMoreData = false;
+      let queryData = data || [];
+      if (queryData.length > limit) {
+        hasMoreData = true;
+        queryData = queryData.slice(0, limit);
+      }
+      setHasMore(hasMoreData);
 
       // Fetch mutual follows to filter out non-friends from direct chats
       const { data: followRows } = await supabase
@@ -96,7 +114,7 @@ export const useConversations = (activeFilter: string) => {
         }
       });
 
-      const conversationIds = data?.map((item: any) => item.conversation?.id).filter(Boolean) || [];
+      const conversationIds = queryData.map((item: any) => item.conversation?.id).filter(Boolean);
 
       // Fetch unread messages count for all my conversations at once
       let unreadData: any[] = [];
@@ -138,7 +156,7 @@ export const useConversations = (activeFilter: string) => {
         });
       }
 
-      const rawList = data
+      const rawList = queryData
         .map((item: any) => {
           const conv = item.conversation;
           if (!conv) return null;
@@ -244,8 +262,9 @@ export const useConversations = (activeFilter: string) => {
       console.error('Crash in fetchConversations execution details:', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [user, activeFilter, isAuthReady, formatTime]);
+  }, [user, activeFilter, isAuthReady, formatTime, limit]);
 
   useEffect(() => {
     if (!user || activeFilter === 'Calls' || !supabase || !isAuthReady) return;
@@ -372,5 +391,11 @@ export const useConversations = (activeFilter: string) => {
     fetchSuggested();
   }, [user, isAuthReady]);
 
-  return { conversations, otherUsers, loading };
+  const loadMore = useCallback(() => {
+    if (!loading && !loadingMore && hasMore) {
+      setLimit(prev => prev + 15);
+    }
+  }, [loading, loadingMore, hasMore]);
+
+  return { conversations, otherUsers, loading, loadingMore, hasMore, loadMore };
 };

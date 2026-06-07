@@ -7,12 +7,19 @@ export const useCalls = (activeFilter: string) => {
   const { user, userData } = useAuth();
   const [calls, setCalls] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [limit, setLimit] = useState(15);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     if (!user || !supabase) return;
     if (activeFilter !== 'Calls') return;
 
-    setLoading(true);
+    if (limit === 15 && calls.length === 0) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
 
     const fetchCalls = async () => {
       try {
@@ -42,11 +49,16 @@ export const useCalls = (activeFilter: string) => {
           `)
           .or(`caller_id.eq.${user.id},receiver_id.eq.${user.id}`)
           .eq('status', 'ended')
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(limit);
 
         if (error) {
           console.error('Error fetching calls:', error);
           return;
+        }
+
+        if (data) {
+          setHasMore(data.length === limit);
         }
 
         const callList = data
@@ -76,6 +88,7 @@ export const useCalls = (activeFilter: string) => {
         console.error('Error executing fetchCalls:', err);
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
 
@@ -83,21 +96,26 @@ export const useCalls = (activeFilter: string) => {
 
     // Subscribe to changes in calls table
     const subscription = supabase
-      .channel('table-db-changes')
+      .channel('calls-realtime-changes')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'calls',
-        filter: `or(caller_id.eq.${user.id},receiver_id.eq.${user.id})`
+        table: 'calls'
       }, () => {
         fetchCalls();
       })
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      supabase.removeChannel(subscription);
     };
-  }, [activeFilter, user]);
+  }, [activeFilter, user, limit]);
 
-  return { calls, loading };
+  const loadMore = () => {
+    if (!loading && !loadingMore && hasMore) {
+      setLimit(prev => prev + 15);
+    }
+  };
+
+  return { calls, loading, loadingMore, hasMore, loadMore };
 };

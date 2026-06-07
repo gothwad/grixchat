@@ -3,6 +3,7 @@ import { VolumeX, Loader2, X } from 'lucide-react';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
+import Avatar from '../../components/common/Avatar';
 
 export default function MutedAccountsScreen() {
   const { user: authUser, userData: currentUserData } = useAuth();
@@ -111,10 +112,12 @@ export default function MutedAccountsScreen() {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <img 
-                      src={user.photo_url || user.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'} 
-                      className="w-10 h-10 rounded-full object-cover"
-                      alt=""
+                    <Avatar 
+                      url={user.photo_url || user.photoURL} 
+                      type="direct"
+                      size="custom"
+                      customSizeClass="w-10 h-10"
+                      name={user.username}
                     />
                     <div>
                       <h4 className="text-sm font-bold text-[var(--text-primary)]">

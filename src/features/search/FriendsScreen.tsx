@@ -5,6 +5,7 @@ import { useAuth } from '../../providers/AuthProvider.tsx';
 import { Search, X, Loader2, MessageSquare, ArrowLeft, Users, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { isUserOnline } from '../../utils/presence';
+import Avatar from '../../components/common/Avatar';
 
 interface FriendProfile {
   id: string;
@@ -197,17 +198,7 @@ export default function FriendsScreen() {
                 onClick={() => navigate(`/user/${friend.id}`)}
                 className="flex items-center gap-3.5 px-5 py-3.5 hover:bg-[var(--bg-main)]/30 transition-all cursor-pointer group select-none"
               >
-                <div className="relative shrink-0">
-                  <img 
-                    src={friend.photoURL} 
-                    alt={friend.username}
-                    className="w-12 h-12 rounded-full object-cover border border-[var(--border-color)]/30 group-hover:scale-102 transition-transform shadow-sm bg-zinc-200"
-                    referrerPolicy="no-referrer"
-                  />
-                  {friend.isOnline && (
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[var(--bg-card)] rounded-full"></span>
-                  )}
-                </div>
+                <Avatar url={friend.photoURL} type="direct" size="md" name={friend.username} isOnline={friend.isOnline} />
                 
                 <div className="flex-1 min-w-0">
                   <h4 className="text-[13.5px] font-extrabold text-[var(--text-primary)] truncate group-hover:text-[#0494f4] transition-colors">

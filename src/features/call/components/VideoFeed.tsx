@@ -33,7 +33,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
         drag
         dragMomentum={false}
         dragConstraints={{ left: -200, right: 200, top: -400, bottom: 400 }}
-        className="absolute top-10 right-6 w-32 h-48 bg-zinc-900 rounded-3xl overflow-hidden border border-white/20 shadow-2xl z-20 cursor-move"
+        className="absolute top-[80px] md:top-[100px] right-4 w-28 h-40 md:w-32 md:h-48 bg-zinc-900 rounded-3xl overflow-hidden border border-white/20 shadow-2xl z-20 cursor-move"
       >
         <video 
           ref={localVideoRef as any} 
@@ -44,22 +44,10 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
         />
         {isVideoOff && (
           <div className="w-full h-full flex items-center justify-center bg-zinc-900">
-            <VideoOff size={28} className="text-zinc-600" />
+            <VideoOff size={24} className="text-zinc-650" />
           </div>
         )}
       </motion.div>
-      
-      {/* Status Overlay for Video Call */}
-      <div className="absolute top-10 left-6 z-20 flex items-center gap-2 bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-sm">
-        <div className={`w-2 h-2 rounded-full ${callStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
-        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-100">
-          {callStatus === 'connected' ? (
-            <CallTimer seconds={timer} className="text-emerald-400" />
-          ) : (
-            callStatus.toUpperCase()
-          )}
-        </span>
-      </div>
     </div>
   );
 };
