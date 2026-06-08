@@ -68,12 +68,17 @@ export default function Avatar({
           </div>
         )
       ) : (
-        <img 
-          src={url} 
-          className="w-full h-full object-cover rounded-full border border-[var(--border-color)]/20 shadow-sm transition-transform group-hover:scale-[1.02]"
-          referrerPolicy="no-referrer"
-          alt={name}
-        />
+        <div 
+          className="w-full h-full rounded-full overflow-hidden border border-[var(--border-color)]/20 shadow-sm transition-transform group-hover:scale-[1.02] flex items-center justify-center bg-[var(--border-color)]/5"
+          style={{ contentVisibility: 'auto' }}
+        >
+          <img 
+            src={url} 
+            className="w-full h-full object-cover rounded-full"
+            referrerPolicy="no-referrer"
+            alt={name}
+          />
+        </div>
       )}
       {isOnline && (
         <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm animate-pulse"></div>

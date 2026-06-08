@@ -24,7 +24,9 @@ import {
   Radio,
   MessageCircle,
   Info,
-  LogOut
+  LogOut,
+  X,
+  Trash
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -38,7 +40,7 @@ import { CallsTabDropdown } from '../chat-ui/CallsTabDropdown';
 import { authService } from '../../features/auth/services/authService.ts';
 
 export default function TabHeader() {
-  const { userData, user: authUser } = useAuth();
+  const { userData, user: authUser, refreshUserData } = useAuth();
   const { setIsSearchOpen } = useSearch();
   const location = useLocation();
   const navigate = useNavigate();
@@ -112,7 +114,7 @@ export default function TabHeader() {
     };
   }, [authUser?.id]);
 
-  const { chatListFilter, setChatListFilter } = useLayout();
+  const { chatListFilter, setChatListFilter, isChatSelectMode, setChatSelectMode, selectedChatIds, setSelectedChatIds } = useLayout();
 
   const menuOptions = [
     { label: 'New group', icon: Users, path: '/new-group?type=group' },
@@ -139,11 +141,127 @@ export default function TabHeader() {
   const isProfilePage = location.pathname === '/profile';
   const isCallsPage = location.pathname === '/calls';
 
+  if (isChatSelectMode && isChatsPage) {
+    return (
+      <div className="w-full px-4 min-h-[56px] flex justify-between items-center z-50 shrink-0 relative bg-[var(--bg-main)] border-b border-[var(--border-color)]/35 animate-fade-in select-none">
+        <div className="flex items-center gap-3">
+          <button 
+            type="button" 
+            onClick={() => {
+              setChatSelectMode(false);
+              setSelectedChatIds([]);
+            }} 
+            className="w-12 h-12 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer active:scale-95 duration-100"
+          >
+            <X size={22} className="text-[#0494f4]" />
+          </button>
+          <span className="font-black text-[18px] text-[#0494f4]">
+            {selectedChatIds.length} Selected
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1">
+          {/* Mute action */}
+          <button 
+            type="button"
+            disabled={selectedChatIds.length === 0}
+            onClick={() => {
+              alert("Muted selected chats!");
+              setChatSelectMode(false);
+              setSelectedChatIds([]);
+            }}
+            className={`w-12 h-12 flex items-center justify-center rounded-full transition-all cursor-pointer ${
+              selectedChatIds.length > 0 
+                ? 'text-[var(--header-text)] hover:bg-black/5 dark:hover:bg-white/5 active:scale-90' 
+                : 'text-[var(--header-text)]/20 cursor-not-allowed'
+            }`}
+          >
+            <VolumeX size={20} />
+          </button>
+
+          {/* Archive action */}
+          <button 
+            type="button"
+            disabled={selectedChatIds.length === 0}
+            onClick={async () => {
+              if (userData && authUser) {
+                try {
+                  const currentArchived = Array.isArray(userData.archivedChats) ? userData.archivedChats : [];
+                  const updatedArchived = [...new Set([...currentArchived, ...selectedChatIds])];
+                  
+                  if (supabase) {
+                    const targetId = authUser.id || authUser.uid;
+                    await supabase
+                      .from('users')
+                      .update({ archived_chats: updatedArchived })
+                      .eq('id', targetId);
+                    
+                    if (refreshUserData) {
+                      await refreshUserData();
+                    }
+                  }
+                } catch (err) {
+                  console.error('Failed to archive chats:', err);
+                }
+              }
+              setSelectedChatIds([]);
+              setChatSelectMode(false);
+            }}
+            className={`w-12 h-12 flex items-center justify-center rounded-full transition-all cursor-pointer ${
+              selectedChatIds.length > 0 
+                ? 'text-[var(--header-text)] hover:bg-black/5 dark:hover:bg-white/5 active:scale-90' 
+                : 'text-[var(--header-text)]/20 cursor-not-allowed'
+            }`}
+          >
+            <Archive size={20} />
+          </button>
+
+          {/* Delete (Hide) action */}
+          <button 
+            type="button"
+            disabled={selectedChatIds.length === 0}
+            onClick={async () => {
+              if (userData && authUser) {
+                try {
+                  const currentHidden = Array.isArray(userData.hiddenChats) ? userData.hiddenChats : [];
+                  const updatedHidden = [...new Set([...currentHidden, ...selectedChatIds])];
+                  
+                  if (supabase) {
+                    const targetId = authUser.id || authUser.uid;
+                    await supabase
+                      .from('users')
+                      .update({ hidden_chats: updatedHidden })
+                      .eq('id', targetId);
+                    
+                    if (refreshUserData) {
+                      await refreshUserData();
+                    }
+                  }
+                } catch (err) {
+                  console.error('Failed to hide selected chats:', err);
+                }
+              }
+              setSelectedChatIds([]);
+              setChatSelectMode(false);
+            }}
+            className={`w-12 h-12 flex items-center justify-center rounded-full transition-all cursor-pointer ${
+              selectedChatIds.length > 0 
+                ? 'text-rose-500 hover:bg-rose-500/10 active:scale-90' 
+                : 'text-[var(--header-text)]/20 cursor-not-allowed'
+            }`}
+          >
+            <Trash size={20} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full px-4 min-h-[56px] flex justify-between items-center z-50 shrink-0 relative">
       <div className="flex items-center">
         <Link to="/chats" className="flex items-center gap-2">
-          <h1 className="text-2xl font-black text-[var(--header-text)] tracking-tighter">
+          <h1 className="text-[28px] font-black text-[var(--text-primary)] tracking-tighter">
             GrixChat
           </h1>
         </Link>
@@ -152,7 +270,7 @@ export default function TabHeader() {
         {/* Heart Icon - Show on Reels */}
         {isReelsPage && (
           <Link to="/notifications/likes" className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group relative">
-            <Heart size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" fill={location.pathname === '/notifications/likes' ? "currentColor" : "none"} />
+            <Heart size={24} className="text-[var(--header-text)] group-active:scale-110 transition-transform stroke-[2.5]" fill={location.pathname === '/notifications/likes' ? "currentColor" : "none"} />
             {hasUnreadLikes && (
               <span className="absolute top-2 right-2 w-2 h-2 bg-[#0494f4] rounded-full border-2 border-[var(--header-bg)]" />
             )}
@@ -162,7 +280,7 @@ export default function TabHeader() {
         {/* Bell Icon - Show on Reels */}
         {isReelsPage && (
           <Link to="/notifications" className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group relative">
-            <Bell size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform" />
+            <Bell size={24} className="text-[var(--header-text)] group-active:scale-110 transition-transform stroke-[2.5]" />
             {hasUnreadNotifs && (
               <span className="absolute top-2 right-2 w-2 h-2 bg-[#0494f4] rounded-full border-2 border-[var(--header-bg)]" />
             )}
@@ -174,10 +292,10 @@ export default function TabHeader() {
           <div className="relative" ref={menuRef}>
             <button 
               onClick={() => setShowMenu(prev => !prev)}
-              className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
+              className="w-12 h-12 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
               id="header-three-dots"
             >
-              <MoreVertical size={22} className="text-[var(--header-text)]" />
+              <MoreVertical size={24} className="text-[var(--header-text)] stroke-[2.5]" />
             </button>
             <AnimatePresence>
               {showMenu && (
@@ -210,10 +328,10 @@ export default function TabHeader() {
           <div className="relative" ref={menuRef}>
             <button 
               onClick={() => setShowMenu(prev => !prev)}
-              className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
+              className="w-12 h-12 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
               id="header-three-dots-calls"
             >
-              <MoreVertical size={22} className="text-[var(--header-text)]" />
+              <MoreVertical size={24} className="text-[var(--header-text)] stroke-[2.5]" />
             </button>
             <AnimatePresence>
               {showMenu && (
@@ -247,10 +365,10 @@ export default function TabHeader() {
             </AnimatePresence>
             <button 
               onClick={() => setShowProfileMenu(prev => !prev)}
-              className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
+              className="w-12 h-12 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
               id="header-profile-three-dots"
             >
-              <MoreVertical size={22} className="text-[var(--header-text)]" />
+              <MoreVertical size={24} className="text-[var(--header-text)] stroke-[2.5]" />
             </button>
           </div>
         )}

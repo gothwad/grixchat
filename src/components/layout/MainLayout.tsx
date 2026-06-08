@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import { motion } from 'motion/react';
 import TopNav from './TopNav.tsx';
 import TabBottom from './TabBottom.tsx';
 import ResourcesNav, { TabType } from './ResourcesNav.tsx';
@@ -76,42 +77,56 @@ export default function MainLayout() {
         ref={scrollContainerRef}
         className={`flex-1 overflow-x-hidden relative no-scrollbar ${isChatScreen || TAB_PATHS.includes(location.pathname) ? 'overflow-y-hidden' : 'overflow-y-auto'}`}
       >
-        <Suspense fallback={
-          <div className="h-full flex items-center justify-center bg-[var(--bg-main)]">
-            <div className="w-8 h-8 border-4 border-[#0494f4] border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        }>
-          {/* Keep-Alive Tabs: once loaded, we keep them persistent and mounted */}
+          {/* Keep-Alive Tabs: once loaded, we keep them persistent and mounted with isolated Suspense boundaries */}
           {(visitedTabs['/'] || visitedTabs['/chats']) && (
-            <div className={(location.pathname === '/' || location.pathname === '/chats') ? 'h-full w-full' : 'hidden'}>
-              <ChatsTab />
+            <div 
+              className={`h-full w-full absolute inset-0 ${(location.pathname === '/' || location.pathname === '/chats') ? 'visible z-10 pointer-events-auto opacity-100' : 'invisible z-0 pointer-events-none opacity-0'}`}
+            >
+              <Suspense fallback={null}>
+                <ChatsTab />
+              </Suspense>
             </div>
           )}
 
           {visitedTabs['/groups'] && (
-            <div className={location.pathname === '/groups' ? 'h-full w-full' : 'hidden'}>
-              <GroupsTab />
+            <div 
+              className={`h-full w-full absolute inset-0 ${location.pathname === '/groups' ? 'visible z-10 pointer-events-auto opacity-100' : 'invisible z-0 pointer-events-none opacity-0'}`}
+            >
+              <Suspense fallback={null}>
+                <GroupsTab />
+              </Suspense>
             </div>
           )}
 
           {visitedTabs['/search'] && (
-            <div className={location.pathname === '/search' ? 'h-full w-full' : 'hidden'}>
-              <SearchTab />
+            <div 
+              className={`h-full w-full absolute inset-0 ${location.pathname === '/search' ? 'visible z-10 pointer-events-auto opacity-100' : 'invisible z-0 pointer-events-none opacity-0'}`}
+            >
+              <Suspense fallback={null}>
+                <SearchTab />
+              </Suspense>
             </div>
           )}
           
           {visitedTabs['/calls'] && (
-            <div className={location.pathname === '/calls' ? 'h-full w-full' : 'hidden'}>
-              <CallsTab />
+            <div 
+              className={`h-full w-full absolute inset-0 ${location.pathname === '/calls' ? 'visible z-10 pointer-events-auto opacity-100' : 'invisible z-0 pointer-events-none opacity-0'}`}
+            >
+              <Suspense fallback={null}>
+                <CallsTab />
+              </Suspense>
             </div>
           )}
           
           {visitedTabs['/profile'] && (
-            <div className={location.pathname === '/profile' ? 'h-full w-full' : 'hidden'}>
-              <ProfileTab />
+            <div 
+              className={`h-full w-full absolute inset-0 ${location.pathname === '/profile' ? 'visible z-10 pointer-events-auto opacity-100' : 'invisible z-0 pointer-events-none opacity-0'}`}
+            >
+              <Suspense fallback={null}>
+                <ProfileTab />
+              </Suspense>
             </div>
           )}
-        </Suspense>
 
         {/* Regular Routes render inside Outlet ONLY when not a main tab */}
         {!isMainTab && <Outlet />}

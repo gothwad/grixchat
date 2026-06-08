@@ -84,7 +84,10 @@ export default function ProfileTab() {
     const channelId = `profile-tab-friends-realtime-${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
       .channel(channelId)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'follows' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'follows', filter: `follower_id=eq.${authUser.id}` }, () => {
+        fetchFriendsCount();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'follows', filter: `following_id=eq.${authUser.id}` }, () => {
         fetchFriendsCount();
       })
       .subscribe();

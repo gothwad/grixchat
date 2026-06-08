@@ -5,7 +5,7 @@ import { LocalDataCache } from '../../../services/LocalDataCache';
 import { isUserOnline } from '../../../utils/presence';
 
 export const useConversations = (activeFilter: string) => {
-  const { user, isAuthReady } = useAuth();
+  const { user, isAuthReady, userData } = useAuth();
   
   // Use cached data instantly if it exists to prevent loader flickering
   const [conversations, setConversations] = useState<any[]>(() => {
@@ -32,8 +32,9 @@ export const useConversations = (activeFilter: string) => {
   });
 
   const [limit, setLimit] = useState(15);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [isPaginating, setIsPaginating] = useState(false);
 
   const chatChannelsRef = useRef<any[]>([]);
   const subscribedIdsRef = useRef<string[]>([]);
@@ -52,42 +53,87 @@ export const useConversations = (activeFilter: string) => {
     const myId = user.id;
     const cached = LocalDataCache.getConversations(myId);
     
-    if (limit === 15) {
+    if (isPaginating) {
+      setLoadingMore(true);
+    } else if (limit === 15) {
       if (!cached || cached.length === 0) {
         setLoading(true);
       }
-    } else {
-      setLoadingMore(true);
     }
 
     try {
-      // 1. Fetch conversations I'm part of (query limit + 1 to check if there is more)
-      const { data, error } = await supabase
+      // 1. Fetch all conversation IDs the user is part of
+      const { data: participations, error: pError } = await supabase
         .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', myId);
+
+      if (pError) {
+        console.error('Error fetching participant IDs:', pError);
+        return;
+      }
+
+      const convIds = (participations || []).map(p => p.conversation_id);
+      if (convIds.length === 0) {
+        setConversations([]);
+        setHasMore(false);
+        setLoading(false);
+        setLoadingMore(false);
+        setIsPaginating(false);
+        return;
+      }
+
+      // 2. Fetch details for these conversations, ordering by newest activity (updated_at) primarily to ensure live updates bubble to the top
+      const { data: convData, error: cError } = await supabase
+        .from('conversations')
         .select(`
-          conversation:conversations (
-            *,
-            participants:conversation_participants (
-              user:users (*)
-            )
+          *,
+          participants:conversation_participants (
+            user:users (*)
           )
         `)
-        .eq('user_id', myId)
-        .order('joined_at', { ascending: false })
+        .in('id', convIds)
+        .order('updated_at', { ascending: false })
+        .order('last_message_at', { ascending: false })
         .limit(limit + 1);
 
-      if (error) {
-        console.error('Error fetching conversations:', error);
+      if (cError) {
+        console.error('Error fetching conversations details:', cError);
         return;
       }
 
       let hasMoreData = false;
-      let queryData = data || [];
+      let queryData = (convData || []).map(conv => ({ conversation: conv }));
       if (queryData.length > limit) {
         hasMoreData = true;
         queryData = queryData.slice(0, limit);
       }
       setHasMore(hasMoreData);
+
+      // Fetch missing hidden or archived chats so they are never lost from local state
+      const fetchedIds = new Set(queryData.map((item: any) => item.conversation?.id).filter(Boolean));
+      const missingHiddenIds = (userData?.hiddenChats || []).filter((id: string) => !fetchedIds.has(id));
+      const missingArchivedIds = (userData?.archivedChats || []).filter((id: string) => !fetchedIds.has(id));
+      const allMissingIds = [...missingHiddenIds, ...missingArchivedIds];
+
+      if (allMissingIds.length > 0) {
+        const { data: missingData, error: missingError } = await supabase
+          .from('conversation_participants')
+          .select(`
+            conversation:conversations (
+              *,
+              participants:conversation_participants (
+                user:users (*)
+              )
+            )
+          `)
+          .eq('user_id', myId)
+          .in('conversation_id', allMissingIds);
+        
+        if (!missingError && missingData && missingData.length > 0) {
+          queryData = [...queryData, ...missingData];
+        }
+      }
 
       // Fetch mutual follows to filter out non-friends from direct chats
       const { data: followRows } = await supabase
@@ -263,8 +309,9 @@ export const useConversations = (activeFilter: string) => {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      setIsPaginating(false);
     }
-  }, [user, activeFilter, isAuthReady, formatTime, limit]);
+  }, [user, activeFilter, isAuthReady, formatTime, limit, isPaginating, userData]);
 
   useEffect(() => {
     if (!user || activeFilter === 'Calls' || !supabase || !isAuthReady) return;
@@ -284,16 +331,13 @@ export const useConversations = (activeFilter: string) => {
     const channelId = `conversations-realtime-${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
       .channel(channelId)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
-        fetchConversations();
-      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_participants', filter: `user_id=eq.${user.id}` }, () => {
         fetchConversations();
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'follows', filter: `follower_id=eq.${user.id}` }, () => {
         fetchConversations();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'follows' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'follows', filter: `following_id=eq.${user.id}` }, () => {
         fetchConversations();
       })
       .subscribe();
@@ -393,6 +437,7 @@ export const useConversations = (activeFilter: string) => {
 
   const loadMore = useCallback(() => {
     if (!loading && !loadingMore && hasMore) {
+      setIsPaginating(true);
       setLimit(prev => prev + 15);
     }
   }, [loading, loadingMore, hasMore]);

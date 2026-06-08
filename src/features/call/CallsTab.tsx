@@ -61,8 +61,9 @@ export default function CallsTab() {
   });
 
   const [limit, setLimit] = useState(15);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [isPaginating, setIsPaginating] = useState(false);
 
   // Keep references to current calls and contacts to prevent state-reset loop
   const callsRef = useRef(calls);
@@ -190,12 +191,12 @@ export default function CallsTab() {
       const currentCalls = callsRef.current;
       const hasData = (currentCalls && currentCalls.length > 0) || (cached && cached.length > 0);
       
-      if (limit === 15) {
+      if (isPaginating) {
+        setLoadingMore(true);
+      } else if (limit === 15) {
         if (!hasData) {
           setCallsLoading(true);
         }
-      } else {
-        setLoadingMore(true);
       }
 
       const { data, error } = await supabase
@@ -241,14 +242,18 @@ export default function CallsTab() {
     } finally {
       setCallsLoading(false);
       setLoadingMore(false);
+      setIsPaginating(false);
     }
-  }, [authUser?.id, limit]);
+  }, [authUser?.id, limit, isPaginating]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     const isScrollable = target.scrollHeight > target.clientHeight;
-    if (isScrollable && target.scrollTop > 0 && target.scrollHeight - target.scrollTop <= target.clientHeight + 85) {
+    // Safer threshold: scrolling within 100px of bottom
+    const closeToBottom = target.scrollHeight - target.scrollTop - target.clientHeight <= 100;
+    if (isScrollable && target.scrollTop > 5 && closeToBottom) {
       if (hasMore && !loadingMore && !callsLoading && statusFilter !== 'contacts') {
+        setIsPaginating(true);
         setLimit(prev => prev + 15);
       }
     }

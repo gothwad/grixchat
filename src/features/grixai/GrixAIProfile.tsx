@@ -26,7 +26,7 @@ export default function GrixAIProfile() {
   return (
     <div className="flex flex-col h-full bg-[var(--bg-main)] overflow-y-auto no-scrollbar">
       {/* Header */}
-      <div className="sticky top-0 z-50 shrink-0 flex items-center justify-between px-4 min-h-[56px] pt-safe bg-[var(--header-bg)] border-b border-[var(--border-color)] shadow-sm w-full min-w-0 rounded-b-2xl">
+      <div className="sticky top-0 z-50 shrink-0 flex items-center justify-between px-4 min-h-[56px] pt-safe bg-[var(--header-bg)] border-b border-[var(--border-color)] shadow-sm w-full min-w-0">
         <div className="flex items-center gap-3 min-w-0">
           <button 
             onClick={() => navigate(-1)}

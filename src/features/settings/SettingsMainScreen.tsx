@@ -69,7 +69,7 @@ export default function SettingsMainScreen() {
   return (
     <div className="fixed inset-0 bg-[var(--bg-main)] flex flex-col z-50 animate-fade-in font-sans">
       {/* Header bar */}
-      <div className="flex items-center gap-3 px-4 h-14 bg-[var(--header-bg)] border-b border-[var(--border-color)] text-[var(--header-text)] shrink-0 shadow-sm rounded-b-2xl">
+      <div className="flex items-center gap-3 px-4 h-14 bg-[var(--header-bg)] border-b border-[var(--border-color)] text-[var(--header-text)] shrink-0 shadow-sm">
         <button 
           onClick={() => navigate('/profile')} 
           className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-full active:scale-90 transition-transform cursor-pointer"

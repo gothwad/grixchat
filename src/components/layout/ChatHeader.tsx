@@ -122,14 +122,14 @@ export default function ChatHeader({
   };
   
   return (
-    <div className="shrink-0 flex flex-col z-50 w-full bg-[var(--header-bg)] border-b border-[var(--border-color)] shadow-sm rounded-b-2xl">
+    <div className="shrink-0 flex flex-col z-50 w-full bg-[var(--header-bg)] border-b border-[var(--border-color)] shadow-sm">
       {/* Main Bar */}
       <div className="flex items-center justify-between px-4 min-h-[56px] pt-safe w-full min-w-0">
         <div className="flex items-center gap-2 min-w-0">
           <button 
             type="button"
             onClick={() => navigate(-1)} 
-            className="hover:bg-white/10 p-1.5 rounded-full transition-colors shrink-0 border-none bg-transparent cursor-pointer"
+            className="w-12 h-12 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors shrink-0 border-none bg-transparent cursor-pointer"
           >
             <ArrowLeft size={22} className="text-[var(--header-text)]" />
           </button>
@@ -174,7 +174,7 @@ export default function ChatHeader({
             <button 
               type="button"
               onClick={() => setDropdownOpen(true)}
-              className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer border-none bg-transparent"
+              className="w-12 h-12 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors cursor-pointer border-none bg-transparent"
             >
               <MoreVertical size={22} className="text-[var(--header-text)]" />
             </button>

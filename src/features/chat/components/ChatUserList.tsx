@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, Lock, Archive, Check, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { MessageCircle, Lock, Archive, Check, ArrowDownLeft, ArrowUpRight, Trash, VolumeX } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '../../../providers/AuthProvider.tsx';
+import { supabase } from '../../../lib/supabase';
 import { aiService } from '../../../services/AIService';
 import { useLayout } from '../../../contexts/LayoutContext';
 import Avatar from '../../../components/common/Avatar';
@@ -29,6 +31,129 @@ interface OtherUser {
   photoURL: string;
   isOnline: boolean;
 }
+
+const ChatItemRow: React.FC<{
+  chat: ChatItem;
+  isChatSelectMode: boolean;
+  isSelected: boolean;
+  onToggleSelect: (chatId: string) => void;
+  setChatSelectMode: (val: boolean) => void;
+  setSelectedChatIds: React.Dispatch<React.SetStateAction<string[]>>;
+}> = ({
+  chat,
+  isChatSelectMode,
+  isSelected,
+  onToggleSelect,
+  setChatSelectMode,
+  setSelectedChatIds
+}) => {
+  const navigate = useNavigate();
+  const timerRef = React.useRef<any>(null);
+  const startXRef = React.useRef<number>(0);
+  const startYRef = React.useRef<number>(0);
+  const isLongPressActiveRef = React.useRef<boolean>(false);
+
+  const startPress = (e: any) => {
+    isLongPressActiveRef.current = false;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    startXRef.current = clientX;
+    startYRef.current = clientY;
+
+    timerRef.current = setTimeout(() => {
+      isLongPressActiveRef.current = true;
+      setChatSelectMode(true);
+      setSelectedChatIds(prev => prev.includes(chat.id) ? prev : [...prev, chat.id]);
+      if (navigator.vibrate) navigator.vibrate(40);
+    }, 600);
+  };
+
+  const handleMove = (e: any) => {
+    if (!timerRef.current) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const diffX = Math.abs(clientX - startXRef.current);
+    const diffY = Math.abs(clientY - startYRef.current);
+    
+    if (diffX > 10 || diffY > 10) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const cancelPress = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isLongPressActiveRef.current) {
+      e.preventDefault();
+      return;
+    }
+    cancelPress();
+    
+    if (isChatSelectMode) {
+      onToggleSelect(chat.id);
+    } else {
+      navigate(`/chat/${chat.otherUserId}`);
+    }
+  };
+
+  return (
+    <div
+      onTouchStart={startPress}
+      onTouchMove={handleMove}
+      onTouchEnd={cancelPress}
+      onMouseDown={startPress}
+      onMouseMove={handleMove}
+      onMouseUp={cancelPress}
+      onMouseLeave={cancelPress}
+      onClick={handleClick}
+      className={`relative flex items-center gap-3.5 px-4 py-2.5 transition-all duration-205 cursor-pointer select-none border-b border-[var(--border-color)]/5 last:border-0 border-l-[4px] ${
+        isSelected 
+          ? 'bg-[var(--primary)]/10 border-l-[var(--primary)]' 
+          : 'bg-[var(--bg-card)] border-l-transparent hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10'
+      }`}
+    >
+      <Avatar url={chat.avatar} type={chat.type} name={chat.user} isOnline={chat.isOnline} />
+      <div className="flex-1 min-w-0 flex flex-col justify-center">
+        <div className="flex justify-between items-baseline mb-0.5">
+          <h3 className={`text-[14.5px] truncate font-semibold text-[var(--text-primary)] transition-colors ${chat.unread ? 'font-bold' : ''}`}>
+            {chat.user}
+          </h3>
+          <span className={`text-[10.5px] whitespace-nowrap ${chat.unread ? 'text-[var(--primary)] font-semibold' : 'text-[var(--text-secondary)] opacity-60'}`}>
+            {chat.time}
+          </span>
+        </div>
+        <div className="flex justify-between items-center gap-2">
+          <p className={`text-[13px] truncate flex-1 leading-snug p-0 m-0 ${chat.unread ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-secondary)] opacity-75'}`}>
+            {chat.lastMsg}
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            {chat.unread ? (
+              <div className="min-w-[18px] h-[18px] px-1.5 bg-[var(--primary)] rounded-full flex items-center justify-center shadow-sm">
+                <span className="text-[9.5px] text-white font-extrabold leading-none">
+                  {chat.unreadCount && chat.unreadCount > 4 ? '4+' : chat.unreadCount}
+                </span>
+              </div>
+            ) : (
+              chat.lastMsgStatus && (
+                chat.lastMsgStatus === 'Sent' ? (
+                  <ArrowUpRight size={15} strokeWidth={2.8} className="text-[#0494f4] shrink-0 opacity-70" />
+                ) : (
+                  <ArrowDownLeft size={15} strokeWidth={2.8} className="text-emerald-500 shrink-0 opacity-70" />
+                )
+              )
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface ChatUserListProps {
   conversations: ChatItem[];
@@ -60,7 +185,54 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
   showHiddenChatsEntry = true
 }) => {
   const navigate = useNavigate();
-  const { isChatSelectMode, selectedChatIds, setSelectedChatIds } = useLayout();
+  const { isChatSelectMode, setChatSelectMode, selectedChatIds, setSelectedChatIds } = useLayout();
+  const { user: authUser, userData, refreshUserData } = useAuth();
+
+  const handleSwipeArchive = async (chatId: string) => {
+    if (userData && authUser) {
+      try {
+        const currentArchived = Array.isArray(userData.archivedChats) ? userData.archivedChats : [];
+        if (!currentArchived.includes(chatId)) {
+          const updatedArchived = [...currentArchived, chatId];
+          if (supabase) {
+            const targetId = authUser.id || authUser.uid;
+            await supabase
+              .from('users')
+              .update({ archived_chats: updatedArchived })
+              .eq('id', targetId);
+            if (refreshUserData) {
+              await refreshUserData();
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to swipe-archive:', err);
+      }
+    }
+  };
+
+  const handleSwipeDelete = async (chatId: string) => {
+    if (userData && authUser) {
+      try {
+        const currentHidden = Array.isArray(userData.hiddenChats) ? userData.hiddenChats : [];
+        if (!currentHidden.includes(chatId)) {
+          const updatedHidden = [...currentHidden, chatId];
+          if (supabase) {
+            const targetId = authUser.id || authUser.uid;
+            await supabase
+              .from('users')
+              .update({ hidden_chats: updatedHidden })
+              .eq('id', targetId);
+            if (refreshUserData) {
+              await refreshUserData();
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to swipe-delete:', err);
+      }
+    }
+  };
 
   if (loading) {
     return (
@@ -76,99 +248,6 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       prev.includes(chatId) 
         ? prev.filter(id => id !== chatId) 
         : [...prev, chatId]
-    );
-  };
-
-  const renderChatItem = (chat: ChatItem) => {
-    const isSelected = selectedChatIds.includes(chat.id);
-
-    if (isChatSelectMode) {
-      return (
-        <div 
-          key={chat.id} 
-          onClick={() => handleToggleSelect(chat.id)}
-          className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all cursor-pointer border-b border-[var(--border-color)]/10 last:border-0 group select-none"
-        >
-          {/* Symmetrical blue/light-border circular checkbox */}
-          <div className="shrink-0 flex items-center justify-center">
-            <div className={`w-[20px] h-[20px] rounded-full border-2 flex items-center justify-center transition-all ${
-              isSelected 
-                ? 'bg-[#0494f4] border-[#0494f4]' 
-                : 'border-[var(--text-secondary)]/30 hover:border-[#0494f4]'
-            }`}>
-              {isSelected && (
-                <Check className="text-white animate-scaleIn" size={11} strokeWidth={3} />
-              )}
-            </div>
-          </div>
-
-          <Avatar url={chat.avatar} type={chat.type} name={chat.user} isOnline={chat.isOnline} />
-          <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <div className="flex justify-between items-baseline mb-0.5">
-              <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
-                {chat.user}
-              </h3>
-              <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] opacity-60">
-                {chat.time}
-              </span>
-            </div>
-            <div className="flex justify-between items-center gap-2">
-              <p className="text-[13px] truncate text-[var(--text-secondary)] opacity-75 flex-1">
-                {chat.lastMsg}
-              </p>
-              {!chat.unread && chat.lastMsgStatus && (
-                chat.lastMsgStatus === 'Sent' ? (
-                  <ArrowUpRight size={15} strokeWidth={2.8} className="text-[#0494f4] shrink-0 opacity-70" />
-                ) : (
-                  <ArrowDownLeft size={15} strokeWidth={2.8} className="text-emerald-500 shrink-0 opacity-70" />
-                )
-              )}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <Link 
-        to={`/chat/${chat.otherUserId}`} 
-        key={chat.id} 
-        className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 last:border-0 group"
-      >
-        <Avatar url={chat.avatar} type={chat.type} name={chat.user} isOnline={chat.isOnline} />
-        <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <div className="flex justify-between items-baseline mb-0.5">
-            <h3 className={`text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[#0494f4] transition-colors ${chat.unread ? 'font-bold' : ''}`}>
-              {chat.user}
-            </h3>
-            <span className={`text-[10.5px] whitespace-nowrap ${chat.unread ? 'text-[var(--primary)] font-semibold' : 'text-[var(--text-secondary)] opacity-60'}`}>
-              {chat.time}
-            </span>
-          </div>
-          <div className="flex justify-between items-center gap-2">
-            <p className={`text-[13px] truncate flex-1 leading-snug ${chat.unread ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-secondary)] opacity-75'}`}>
-              {chat.lastMsg}
-            </p>
-            <div className="flex items-center gap-2 shrink-0">
-              {chat.unread ? (
-                <div className="min-w-[18px] h-[18px] px-1.5 bg-[var(--primary)] rounded-full flex items-center justify-center shadow-sm">
-                  <span className="text-[9.5px] text-white font-extrabold leading-none">
-                    {chat.unreadCount && chat.unreadCount > 4 ? '4+' : chat.unreadCount}
-                  </span>
-                </div>
-              ) : (
-                chat.lastMsgStatus && (
-                  chat.lastMsgStatus === 'Sent' ? (
-                    <ArrowUpRight size={15} strokeWidth={2.8} className="text-[#0494f4] shrink-0 opacity-70" />
-                  ) : (
-                    <ArrowDownLeft size={15} strokeWidth={2.8} className="text-emerald-500 shrink-0 opacity-70" />
-                  )
-                )
-              )}
-            </div>
-          </div>
-        </div>
-      </Link>
     );
   };
 
@@ -200,7 +279,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-card)]">
+    <div className="flex flex-col bg-[var(--bg-card)]">
       {/* Secret Code Header */}
       {showSecretHeader && (
         <div 
@@ -347,7 +426,17 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       {/* Conversations List */}
       {conversations.length > 0 && (
         <div className="flex flex-col">
-          {conversations.map(renderChatItem)}
+          {conversations.map(chat => (
+            <ChatItemRow
+              key={chat.id}
+              chat={chat}
+              isChatSelectMode={isChatSelectMode}
+              isSelected={selectedChatIds.includes(chat.id)}
+              onToggleSelect={handleToggleSelect}
+              setChatSelectMode={setChatSelectMode}
+              setSelectedChatIds={setSelectedChatIds}
+            />
+          ))}
         </div>
       )}
 

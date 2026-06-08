@@ -295,7 +295,18 @@ export default function ChatScreen() {
   }, [setShowOptions, setShowPlusMenu, setShowEmojiPicker]);
 
   useEffect(() => {
-    if (isOtherTyping) setTimeout(() => scrollToBottom('smooth'), 100);
+    if (isOtherTyping) {
+      // Multiple scroll attempts to align with animate-in height transitions perfectly
+      scrollToBottom('smooth');
+      const t1 = setTimeout(() => scrollToBottom('smooth'), 80);
+      const t2 = setTimeout(() => scrollToBottom('smooth'), 220);
+      const t3 = setTimeout(() => scrollToBottom('smooth'), 450);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
+    }
   }, [isOtherTyping, scrollToBottom]);
 
   const deleteChat = async () => {

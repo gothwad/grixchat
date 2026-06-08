@@ -133,3 +133,25 @@ USING (
 
 -- Clear any potential stale schema caches
 NOTIFY pgrst, 'reload schema';
+
+-- 9. AUTOMATED TRIGGER TO SYNC LAST MESSAGE CACHES IN CONVERSATIONS
+-- This automatically ensures that conversations.updated_at and last_message_at/last_message
+-- are kept perfectly synchronized, regardless of where or how the message was inserted (group creation, calls, offline queue, etc.)
+CREATE OR REPLACE FUNCTION update_conversation_timestamp_and_last_message()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE public.conversations
+    SET 
+        updated_at = NEW.created_at,
+        last_message = COALESCE(NEW.text, CASE WHEN NEW.media_type IS NOT NULL THEN 'Sent a ' || NEW.media_type ELSE 'Sent an attachment' END),
+        last_message_at = NEW.created_at
+    WHERE id = NEW.conversation_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_update_conversation_on_message ON public.messages;
+CREATE TRIGGER trg_update_conversation_on_message
+AFTER INSERT ON public.messages
+FOR EACH ROW
+EXECUTE FUNCTION update_conversation_timestamp_and_last_message();

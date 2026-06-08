@@ -60,7 +60,8 @@ export default function ChatsTab() {
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     const isScrollable = target.scrollHeight > target.clientHeight;
-    if (isScrollable && target.scrollTop > 0 && target.scrollHeight - target.scrollTop <= target.clientHeight + 80) {
+    const closeToBottom = target.scrollHeight - target.scrollTop - target.clientHeight <= 100;
+    if (isScrollable && target.scrollTop > 5 && closeToBottom) {
       if (activeFilter === 'Calls') {
         if (callsHasMore && !callsLoadingMore) {
           callsLoadMore();
@@ -234,99 +235,6 @@ export default function ChatsTab() {
           )}
         </div>
       </div>
-
-      {/* Dynamic Multi-Selection Actions Bar (WhatsApp / Telegram Style) */}
-      <AnimatePresence>
-        {isChatSelectMode && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 350, damping: 25 }}
-            className="absolute bottom-3 left-4 right-4 bg-[var(--bg-card)] border border-[var(--border-color)]/60 py-3 px-5 rounded-2xl shadow-xl flex items-center justify-between z-[90] text-sm text-[var(--text-primary)]"
-          >
-            <div className="flex items-center gap-3">
-              <button 
-                type="button"
-                onClick={() => {
-                  setChatSelectMode(false);
-                  setSelectedChatIds([]);
-                }}
-                className="p-1 hover:bg-[var(--bg-main)] rounded-full text-[var(--text-secondary)] transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-              <span className="font-bold text-xs text-[var(--text-primary)]">
-                {selectedChatIds.length} Selected
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={selectedChatIds.length === 0}
-                onClick={async () => {
-                  // Standard delete action for the selected chats
-                  if (userData && authUser) {
-                    try {
-                      // Perform deletion
-                      console.log('Deleting chats:', selectedChatIds);
-                    } catch (err) {
-                      console.error('Failed to delete selected chats:', err);
-                    }
-                  }
-                  setSelectedChatIds([]);
-                  setChatSelectMode(false);
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-colors cursor-pointer ${
-                  selectedChatIds.length > 0 
-                    ? 'text-red-500 hover:bg-red-500/10' 
-                    : 'text-[var(--text-secondary)]/30 cursor-not-allowed'
-                }`}
-              >
-                <Trash size={14} />
-                <span>Delete</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={selectedChatIds.length === 0}
-                onClick={async () => {
-                  // Archive selected chats
-                  if (userData && authUser) {
-                    try {
-                      const currentArchived = Array.isArray(userData.archivedChats) ? userData.archivedChats : [];
-                      const updatedArchived = [...new Set([...currentArchived, ...selectedChatIds])];
-                      
-                      if (supabase) {
-                        const targetId = authUser.id || authUser.uid;
-                        await supabase
-                          .from('users')
-                          .update({ archived_chats: updatedArchived })
-                          .eq('id', targetId);
-                        
-                        await refreshUserData();
-                      }
-                    } catch (err) {
-                      console.error('Failed to archive chats:', err);
-                    }
-                  }
-                  setSelectedChatIds([]);
-                  setChatSelectMode(false);
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-colors cursor-pointer ${
-                  selectedChatIds.length > 0 
-                    ? 'text-[#0494f4] hover:bg-[#0494f4]/10' 
-                    : 'text-[var(--text-secondary)]/30 cursor-not-allowed'
-                }`}
-              >
-                <Archive size={14} />
-                <span>Archive</span>
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

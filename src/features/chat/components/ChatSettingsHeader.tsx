@@ -24,12 +24,12 @@ export default function ChatSettingsHeader({
   dropdownRef
 }: ChatSettingsHeaderProps) {
   return (
-    <div className="w-full bg-[var(--header-bg)] px-4 h-14 flex justify-between items-center z-50 shrink-0 relative border-b border-[var(--border-color)] shadow-sm rounded-b-2xl">
+    <div className="w-full bg-[var(--header-bg)] px-4 h-14 flex justify-between items-center z-50 shrink-0 relative border-b border-[var(--border-color)] shadow-sm">
       {/* Back button */}
       <button 
         onClick={onBack} 
         id="btn_chat_settings_back"
-        className="hover:bg-black/5 dark:hover:bg-white/5 p-2 rounded-full transition-colors cursor-pointer active:scale-95"
+        className="w-12 h-12 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer active:scale-95"
       >
         <ArrowLeft size={22} className="text-[var(--header-text)]" />
       </button>
@@ -49,7 +49,7 @@ export default function ChatSettingsHeader({
         <button 
           onClick={() => setShowDropdown(!showDropdown)} 
           id="btn_chat_settings_menu"
-          className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-all active:scale-95 text-[var(--header-text)] opacity-90 cursor-pointer"
+          className="w-12 h-12 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-all active:scale-95 text-[var(--header-text)] opacity-90 cursor-pointer"
         >
           <MoreVertical size={22} />
         </button>

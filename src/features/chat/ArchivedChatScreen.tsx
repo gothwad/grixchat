@@ -20,7 +20,7 @@ export default function ArchivedChatScreen() {
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between px-4 h-14 bg-[var(--header-bg)] z-50 shadow-sm border-b border-[var(--border-color)]">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="hover:bg-white/10 p-2 rounded-full transition-colors">
+          <button onClick={() => navigate(-1)} className="w-12 h-12 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors">
             <ArrowLeft size={22} className="text-[var(--header-text)]" />
           </button>
           <h1 className="text-xl font-black text-[var(--header-text)] tracking-tight">

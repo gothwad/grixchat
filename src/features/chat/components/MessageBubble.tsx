@@ -6,12 +6,14 @@ import {
   CornerUpRight,
   ChevronsRight,
   CheckCheck,
-  Clock
+  Clock,
+  Check
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../providers/AuthProvider.tsx';
 import { toDate, formatTime } from '../../../utils/dateUtils.ts';
 import { storage } from '../../../services/StorageService.ts';
+import { isUserOnline } from '../../../utils/presence';
 import { 
   ChatMessageReactions,
   VoiceMessage
@@ -323,17 +325,35 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {formatTime(msg.created_at)}
                 {msg.is_edited && ' • Edited'}
               </span>
-              {actualIsMe && (
-                <span className="shrink-0 flex items-center">
-                  {msg.status === 'sending' ? (
-                    <Clock size={11} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/60' : 'text-[var(--bubble-text-other)]/60'} animate-pulse`} />
-                  ) : msg.is_read ? (
-                    <CheckCheck size={14} className="text-[#34b7f1]" strokeWidth={2.5} />
-                  ) : (
-                    <CheckCheck size={14} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/40' : 'text-[var(--bubble-text-other)]/40'}`} strokeWidth={2.5} />
-                  )}
-                </span>
-              )}
+              {actualIsMe && (() => {
+                const isReceiverOnlineNow = receiver && isUserOnline(
+                  receiver.isOnline !== undefined ? receiver.isOnline : receiver.is_online,
+                  receiver.lastSeen !== undefined ? receiver.lastSeen : receiver.last_seen
+                );
+                let wasReceiverOnlineAfterMessage = false;
+                if (receiver && (receiver.lastSeen || receiver.last_seen)) {
+                  try {
+                    const lastSeenTime = new Date(receiver.lastSeen || receiver.last_seen).getTime();
+                    const msgTime = new Date(msg.created_at).getTime();
+                    wasReceiverOnlineAfterMessage = lastSeenTime >= msgTime;
+                  } catch (e) {}
+                }
+                const isMessageDelivered = isReceiverOnlineNow || wasReceiverOnlineAfterMessage;
+
+                return (
+                  <span className="shrink-0 flex items-center">
+                    {msg.status === 'sending' ? (
+                      <Clock size={11} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/60' : 'text-[var(--bubble-text-other)]/60'} animate-pulse`} />
+                    ) : msg.is_read ? (
+                      <CheckCheck size={14} className="text-[#34b7f1]" strokeWidth={2.5} />
+                    ) : (convType === 'group' || isMessageDelivered) ? (
+                      <CheckCheck size={14} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/40' : 'text-[var(--bubble-text-other)]/40'}`} strokeWidth={2.5} />
+                    ) : (
+                      <Check size={14} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/40' : 'text-[var(--bubble-text-other)]/40'}`} strokeWidth={2.5} />
+                    )}
+                  </span>
+                );
+              })()}
             </div>
           </div>
 

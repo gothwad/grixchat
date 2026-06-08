@@ -8,17 +8,18 @@ export const useCalls = (activeFilter: string) => {
   const [calls, setCalls] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [limit, setLimit] = useState(15);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [isPaginating, setIsPaginating] = useState(false);
 
   useEffect(() => {
     if (!user || !supabase) return;
     if (activeFilter !== 'Calls') return;
 
-    if (limit === 15 && calls.length === 0) {
-      setLoading(true);
-    } else {
+    if (isPaginating) {
       setLoadingMore(true);
+    } else if (limit === 15 && calls.length === 0) {
+      setLoading(true);
     }
 
     const fetchCalls = async () => {
@@ -50,18 +51,22 @@ export const useCalls = (activeFilter: string) => {
           .or(`caller_id.eq.${user.id},receiver_id.eq.${user.id}`)
           .eq('status', 'ended')
           .order('created_at', { ascending: false })
-          .limit(limit);
+          .limit(limit + 1);
 
         if (error) {
           console.error('Error fetching calls:', error);
           return;
         }
 
-        if (data) {
-          setHasMore(data.length === limit);
+        let hasMoreData = false;
+        let queryData = data || [];
+        if (queryData.length > limit) {
+          hasMoreData = true;
+          queryData = queryData.slice(0, limit);
         }
+        setHasMore(hasMoreData);
 
-        const callList = data
+        const callList = queryData
           .map((call: any) => {
             const isCaller = call.caller_id === user.id;
             const otherUser = isCaller ? call.receiver : call.caller;
@@ -89,6 +94,7 @@ export const useCalls = (activeFilter: string) => {
       } finally {
         setLoading(false);
         setLoadingMore(false);
+        setIsPaginating(false);
       }
     };
 
@@ -109,10 +115,11 @@ export const useCalls = (activeFilter: string) => {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [activeFilter, user, limit]);
+  }, [activeFilter, user, limit, isPaginating]);
 
   const loadMore = () => {
     if (!loading && !loadingMore && hasMore) {
+      setIsPaginating(true);
       setLimit(prev => prev + 15);
     }
   };

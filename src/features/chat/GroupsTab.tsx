@@ -34,7 +34,8 @@ export default function GroupsTab() {
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     const isScrollable = target.scrollHeight > target.clientHeight;
-    if (isScrollable && target.scrollTop > 0 && target.scrollHeight - target.scrollTop <= target.clientHeight + 80) {
+    const closeToBottom = target.scrollHeight - target.scrollTop - target.clientHeight <= 100;
+    if (isScrollable && target.scrollTop > 5 && closeToBottom) {
       if (hasMore && !loadingMore) {
         loadMore();
       }
@@ -53,7 +54,7 @@ export default function GroupsTab() {
         />
 
         {/* Groups & Channels List */}
-        <div className="flex flex-col h-full mt-1">
+        <div className="flex flex-col mt-1">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <Loader2 className="animate-spin text-[#0494f4]" size={24} />

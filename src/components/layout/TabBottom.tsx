@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { MessageCircle, Users, UserCircle, Phone, Search } from 'lucide-react';
+import { MessageCircle, Users, User, Phone, Search } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { motion } from 'motion/react';
+import { LocalDataCache } from '../../services/LocalDataCache';
 
 export default function TabBottom() {
-  const { user: authUser } = useAuth();
+  const { user: authUser, userData } = useAuth();
   const location = useLocation();
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   const [unreadGroupsCount, setUnreadGroupsCount] = useState(0);
@@ -141,6 +142,15 @@ export default function TabBottom() {
         event: '*',
         schema: 'public',
         table: 'follows',
+        filter: `follower_id=eq.${authUser.id}`
+      }, () => {
+        fetchUnread();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'follows',
+        filter: `following_id=eq.${authUser.id}`
       }, () => {
         fetchUnread();
       })
@@ -152,54 +162,116 @@ export default function TabBottom() {
   }, [authUser?.id, triggerFetch]);
 
   useEffect(() => {
-    if (!authUser || !supabase || conversationsList.length === 0) return;
+    if (!authUser) return;
 
-    // Subscribing dynamically to active conversations' messages for instant real-time updates
-    const channels = conversationsList.map(convId => {
-      const channelName = `tab-bottom-msg-${convId}-${Math.random().toString(36).substring(2, 7)}`;
-      const ch = supabase
-        .channel(channelName)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${convId}`
-        }, () => {
-          setTriggerFetch(t => t + 1);
-        })
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'conversations',
-          filter: `id=eq.${convId}`
-        }, () => {
-          setTriggerFetch(t => t + 1);
-        })
-        .subscribe();
-      return ch;
+    // Listen to local cache updates for instant, Zero-Egress count adjustments!
+    const unsubscribeCache = LocalDataCache.subscribe('conversations', (updatedList) => {
+      if (updatedList && Array.isArray(updatedList)) {
+        let chatsUnread = 0;
+        let groupsUnread = 0;
+        updatedList.forEach((conv: any) => {
+          if (conv.unread) {
+            if (conv.type === 'group') {
+              groupsUnread++;
+            } else if (conv.type === 'direct') {
+              chatsUnread++;
+            }
+          }
+        });
+        setUnreadChatsCount(chatsUnread);
+        setUnreadGroupsCount(groupsUnread);
+        
+        const ids = updatedList.map((c: any) => c.id);
+        const isIdentical = conversationsList.length === ids.length && conversationsList.every((id, idx) => id === ids[idx]);
+        if (!isIdentical) {
+          setConversationsList(ids);
+        }
+      }
     });
 
+    // Gentle polling backup (runs every 30s) ONLY when the conversation hook is unmounted
+    // (This guarantees we keep unread sync'd on other screens without holding 20 open websockets!)
+    const pollingInterval = setInterval(() => {
+      const currentTab = window.location.pathname;
+      const isChatTabActive = currentTab.startsWith('/chats') || currentTab.startsWith('/groups');
+      
+      if (!isChatTabActive && document.visibilityState === 'visible' && navigator.onLine) {
+        // Redirection trigger bypass - fetch unread directly
+        const fetchUnread = async () => {
+          try {
+            if (!supabase) return;
+            const { data: participants } = await supabase
+              .from('conversation_participants')
+              .select('conversation_id')
+              .eq('user_id', authUser.id);
+            
+            const myConvIds = (participants || []).map(p => p.conversation_id);
+            if (myConvIds.length === 0) {
+              setUnreadChatsCount(0);
+              setUnreadGroupsCount(0);
+              return;
+            }
+
+            const { data: messages } = await supabase
+              .from('messages')
+              .select('conversation_id')
+              .eq('is_read', false)
+              .neq('sender_id', authUser.id)
+              .in('conversation_id', myConvIds);
+            
+            if (messages) {
+              // Read count details
+              const distinctConversations = Array.from(new Set(messages.map(m => m.conversation_id as string)));
+              let chatsUnread = 0;
+              let groupsUnread = 0;
+              
+              // Map types
+              const { data: convs } = await supabase
+                .from('conversations')
+                .select('id, type')
+                .in('id', myConvIds);
+              
+              const typeMap: Record<string, string> = {};
+              convs?.forEach(c => {
+                typeMap[c.id] = c.type;
+              });
+
+              distinctConversations.forEach((cid: string) => {
+                const type = typeMap[cid];
+                if (type === 'group') {
+                  groupsUnread++;
+                } else {
+                  chatsUnread++;
+                }
+              });
+
+              setUnreadChatsCount(chatsUnread);
+              setUnreadGroupsCount(groupsUnread);
+            }
+          } catch (e) {
+            console.error("TabBottom bg-poll error:", e);
+          }
+        };
+        fetchUnread();
+      }
+    }, 30000);
+
     return () => {
-      channels.forEach(ch => {
-        try {
-          supabase.removeChannel(ch);
-        } catch (e) {
-          console.warn("Error removing tab-bottom channel:", e);
-        }
-      });
+      unsubscribeCache();
+      clearInterval(pollingInterval);
     };
-  }, [conversationsList, authUser?.id]);
+  }, [authUser?.id, conversationsList]);
   
   const navItems = [
     { icon: MessageCircle, path: '/chats', label: 'Chats', badge: unreadChatsCount, activeColor: 'text-[var(--header-text)]' },
     { icon: Users, path: '/groups', label: 'Groups', badge: unreadGroupsCount, activeColor: 'text-[var(--header-text)]' },
     { icon: Search, path: '/search', label: 'Search', activeColor: 'text-[var(--header-text)]' },
     { icon: Phone, path: '/calls', label: 'Calls', activeColor: 'text-[var(--header-text)]' },
-    { icon: UserCircle, path: '/profile', label: 'Profile', activeColor: 'text-[var(--header-text)]' },
+    { icon: User, path: '/profile', label: 'Profile', activeColor: 'text-[var(--header-text)]' },
   ];
 
   return (
-    <div className="w-full bg-[var(--header-bg)] px-2 min-h-[64px] pb-safe flex justify-around items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] shrink-0 border-t border-[var(--border-color)] rounded-t-2xl">
+    <div className="w-full bg-[var(--header-bg)] px-2 min-h-[64px] pb-safe flex justify-around items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] shrink-0 border-t border-[var(--border-color)]">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = location.pathname === item.path || (item.path === '/chats' && (location.pathname === '/' || location.pathname.startsWith('/chat/')));
@@ -213,14 +285,14 @@ export default function TabBottom() {
             <div className="relative flex flex-col items-center">
               <motion.div 
                 animate={{ 
-                  scale: isActive ? 1.15 : 1,
+                  scale: 1.15,
                   y: isActive ? -1 : 0
                 }}
-                className={`transition-colors duration-300 ${isActive ? item.activeColor : 'text-[var(--header-text)]/50 group-hover:text-[var(--header-text)]'}`}
+                className={`transition-colors duration-300 flex items-center justify-center ${isActive ? item.activeColor : 'text-[var(--header-text)]/40'}`}
               >
                 {Icon && <Icon 
                   size={24} 
-                  strokeWidth={isActive ? 2.5 : 2}
+                  strokeWidth={2.5}
                   fill={isActive ? 'currentColor' : 'none'}
                   fillOpacity={isActive ? 0.15 : 0}
                 />}
@@ -237,7 +309,7 @@ export default function TabBottom() {
               )}
             </div>
             
-            <span className={`text-[10px] mt-1 font-bold transition-all duration-300 ${isActive ? 'text-[var(--header-text)] opacity-100' : 'text-[var(--header-text)]/50 opacity-70 group-hover:opacity-100'}`}>
+            <span className={`text-[10px] mt-1 font-bold transition-all duration-300 ${isActive ? 'text-[var(--header-text)] opacity-100' : 'text-[var(--header-text)]/40 opacity-100'}`}>
               {item.label}
             </span>
           </Link>
