@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { useAuth } from '../../../providers/AuthProvider.tsx';
+import { useAuth } from '../../../providers/AuthProvider';
 
 export const useTypingStatus = (chatId: string, receiverId: string) => {
   const [isOtherTyping, setIsOtherTyping] = useState(false);
@@ -11,7 +11,7 @@ export const useTypingStatus = (chatId: string, receiverId: string) => {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!chatId || !supabase || !user) return;
+    if (!user || !supabase || !chatId || !receiverId) return;
 
     // Fast, lightweight broadcast channel for typing events
     const channel = supabase.channel(`typing:${chatId}`);

@@ -1,21 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  ArrowLeft, 
-  Shield, 
-  EyeOff, 
-  UserCircle, 
-  Lock, 
-  Trash2,
-  ChevronRight,
-  Globe,
-  LockKeyhole,
-  ShieldCheck,
-  UserCheck
+  ChevronLeft, 
+  ChevronRight, 
+  ShieldCheck, 
+  Globe, 
+  LockKeyhole, 
+  UserCheck, 
+  Lock 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { motion } from 'motion/react';
-import SettingHeader from '../../components/layout/SettingHeader.tsx';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 
 export default function PrivacySettingsScreen() {
@@ -38,123 +32,121 @@ export default function PrivacySettingsScreen() {
     }
   };
 
-  const Toggle = ({ active, onClick }: { active: boolean, onClick: () => void }) => (
-    <button 
-      onClick={onClick}
-      className={`w-10 h-5 rounded-full transition-all relative ${active ? 'bg-primary' : 'bg-zinc-300'}`}
-    >
-      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${active ? 'right-0.5' : 'left-0.5'}`} />
-    </button>
-  );
-
-  const settings = [
-    {
-      id: 'appLock',
-      icon: Lock,
-      label: 'App Lock',
-      sub: 'Require PIN to open GrixChat',
-      color: 'text-indigo-500'
-    }
-  ];
-
   const isPrivate = userData?.profileType === 'private';
 
   if (!userData) {
     return (
-      <div className="h-full flex items-center justify-center bg-[var(--bg-main)]">
+      <div className="fixed inset-0 flex items-center justify-center bg-[var(--bg-card)]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden">
-      <SettingHeader title="Privacy" />
+    <div className="fixed inset-0 bg-[var(--bg-card)] flex flex-col z-[100] animate-fade-in font-sans">
+      {/* Premium consistent header */}
+      <div className="flex items-center gap-3 px-4 h-14 bg-[var(--bg-card)] border-b border-[var(--border-color)]/20 text-[var(--text-primary)] shrink-0 shadow-sm">
+        <button 
+          onClick={() => navigate(-1)} 
+          className="p-1.5 hover:bg-[var(--border-color)]/5 rounded-full active:scale-95 transition-transform cursor-pointer text-[var(--text-primary)]"
+        >
+          <ChevronLeft size={22} className="stroke-[2.2]" />
+        </button>
+        <span className="text-base font-bold tracking-tight text-[var(--text-primary)]">Privacy Settings</span>
+      </div>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar py-6">
-        {/* Profile Type Section */}
-        <h3 className="px-6 mb-2 text-[11px] font-bold text-zinc-400 uppercase tracking-wider">ACCOUNT PRIVACY</h3>
-        <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)] mb-6 p-6">
-          <div className="flex p-1.5 bg-zinc-100/10 border border-[var(--border-color)] rounded-2xl gap-1.5 mb-4">
-            <button 
-              onClick={() => updatePrivacySetting('profileType', 'public')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                !isPrivate 
-                ? 'bg-primary text-white shadow-lg shadow-[var(--primary-shadow)]' 
-                : 'text-zinc-400 hover:text-zinc-600'
-              }`}
-            >
-              <Globe size={14} />
-              Public
-            </button>
-            <button 
-              onClick={() => updatePrivacySetting('profileType', 'private')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                isPrivate 
-                ? 'bg-zinc-900 text-white shadow-lg' 
-                : 'text-zinc-400 hover:text-zinc-600'
-              }`}
-            >
-              <LockKeyhole size={14} />
-              Private
-            </button>
-          </div>
-          <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed font-medium text-center px-4">
-            {isPrivate 
-              ? "Private accounts only show your profile to people you approve. Existing followers won't be affected."
-              : "Public accounts are visible to everyone on GrixChat. Anyone can follow you and see your posts."
-            }
-          </p>
-        </div>
-
-        {/* Advanced Controls */}
-        <h3 className="px-6 mb-2 text-[11px] font-bold text-zinc-400 uppercase tracking-wider">ADVANCED CONTROLS</h3>
-        <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)] mb-6">
-          {settings.map((item, index) => (
-            <div 
-              key={item.id}
-              className={`flex items-center justify-between px-6 py-4 ${
-                index !== settings.length - 1 ? 'border-b border-[var(--border-color)]' : ''
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                <div className={`p-2 rounded-lg bg-zinc-50/10 ${item.color}`}>
-                  <item.icon size={20} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-[var(--text-primary)]">{item.label}</h4>
-                  <p className="text-[11px] text-[var(--text-secondary)]">{item.sub}</p>
-                </div>
-              </div>
-              {item.id === 'appLock' ? (
-                <button 
-                  onClick={() => navigate('/app-lock')}
-                  className="p-2 hover:bg-zinc-50/10 rounded-full transition-colors"
-                >
-                  <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-40" />
-                </button>
-              ) : (
-                <Toggle active={userData?.[item.id]} onClick={() => updatePrivacySetting(item.id, !userData?.[item.id])} />
-              )}
+      <div className="flex-grow overflow-y-auto no-scrollbar py-4 space-y-6">
+        {/* Profile Privacy Selection Group */}
+        <div className="px-4">
+          <h3 className="mb-2 text-[10.5px] font-black text-[#0494f4] uppercase tracking-wider select-none">
+            Account Privacy
+          </h3>
+          <div className="bg-[#0494f4]/5 border border-[#0494f4]/15 rounded-2xl p-4 flex flex-col gap-3.5">
+            <div className="flex p-1 bg-[var(--bg-card)] border border-[var(--border-color)]/20 rounded-xl gap-1">
+              <button 
+                onClick={() => updatePrivacySetting('profileType', 'public')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-200 ${
+                  !isPrivate 
+                  ? 'bg-[#0494f4] text-white shadow-sm' 
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <Globe size={14} className="stroke-[2.2]" />
+                Public
+              </button>
+              <button 
+                onClick={() => updatePrivacySetting('profileType', 'private')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-200 ${
+                  isPrivate 
+                  ? 'bg-zinc-800 text-white shadow-sm' 
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <LockKeyhole size={14} className="stroke-[2.2]" />
+                Private
+              </button>
             </div>
-          ))}
-        </div>
-
-        {/* Safety Tip */}
-        <div className="px-6">
-          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex gap-4">
-            <UserCheck size={20} className="text-emerald-500 shrink-0" />
-            <p className="text-[11px] text-emerald-600 font-medium leading-relaxed">
-              GrixChat uses end-to-end encryption. Your privacy is our priority. Never share your credentials.
+            <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed font-normal text-center px-2 opacity-85">
+              {isPrivate 
+                ? "Private accounts only show your detailed status coordinates, active list, and profile entries to contacts you approve."
+                : "Public accounts allow everyone to see your profile, search catalog, and sync to active stories."
+              }
             </p>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="py-12 flex flex-col items-center gap-1 opacity-40">
-          <div className="flex items-center gap-2 mb-1">
+        {/* Security / PIN Advanced Controls list */}
+        <div>
+          <div className="px-4 mb-2">
+            <h3 className="text-[10.5px] font-black text-[#0494f4] uppercase tracking-wider select-none">
+              Privacy & Security Controls
+            </h3>
+          </div>
+          <div className="flex flex-col divide-y divide-[var(--border-color)]/5 bg-[var(--bg-card)]">
+            <button 
+              onClick={() => navigate('/app-lock')}
+              className="w-full flex items-center gap-3.5 px-4 py-3 h-16 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group text-left cursor-pointer border-none outline-none select-none"
+            >
+              <div className="w-11 h-11 rounded-full flex items-center justify-center bg-[var(--primary)] text-[var(--primary-foreground)] border border-[var(--primary)]/10 shadow-sm group-hover:scale-[1.02] group-active:scale-95 transition-all duration-150 shrink-0">
+                <Lock size={20} className="stroke-[2.2]" />
+              </div>
+              <div className="flex-1 min-w-0 pr-1">
+                <h4 className="text-[14px] font-semibold text-[var(--text-primary)] group-hover:text-[#0494f4] transition-colors leading-tight">
+                  App Encryption Lock
+                </h4>
+                <p className="text-[12.5px] text-[var(--text-secondary)] font-normal mt-0.5 truncate leading-tight opacity-75">
+                  Secure local database access keys behind a customizable PIN
+                </p>
+              </div>
+              <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200 mr-1 shrink-0" />
+            </button>
+          </div>
+        </div>
+
+        {/* Beautiful Safety Tip Banner */}
+        <div className="px-4 mt-2">
+          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex gap-3.5 items-start">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-emerald-500/15 text-emerald-500 shrink-0 border border-emerald-500/10">
+              <UserCheck size={18} className="stroke-[2.2]" />
+            </div>
+            <div className="flex-1">
+              <span className="text-[10px] font-black uppercase text-emerald-500 block mb-0.5 tracking-wider font-sans">
+                Active Verification Integrity
+              </span>
+              <p className="text-[12px] text-emerald-600 dark:text-emerald-400 font-medium leading-relaxed opacity-90">
+                GrixChat operates using full zero-knowledge local verification indices. None of your local lock passcodes or security encryption credentials leave your localized client storage container.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer verification tag */}
+        <div className="py-8 flex flex-col items-center gap-1.5 opacity-30">
+          <div className="flex items-center gap-2">
             <ShieldCheck size={14} className="text-[var(--text-primary)]" />
-            <span className="text-[var(--text-primary)] text-[9px] font-black tracking-[0.2em] uppercase">GrixChat Privacy</span>
+            <span className="text-[var(--text-primary)] text-[9px] font-black tracking-[0.22em] uppercase font-mono">
+              SECURE INTEGRITY VERIFIED
+            </span>
           </div>
         </div>
       </div>

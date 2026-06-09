@@ -6,7 +6,6 @@ import {
   Timer, 
   Download, 
   Check, 
-  ShieldAlert,
   Sparkles,
   VolumeX,
 } from 'lucide-react';
@@ -32,7 +31,6 @@ export default function PreferencesSubscreen() {
     setSoundHaptic(nextVal);
     storage.setItem('app-sound-haptic', nextVal);
     
-    // Play light click sound on change if enabled
     if (nextVal === 'enabled') {
       try {
         const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -41,7 +39,7 @@ export default function PreferencesSubscreen() {
         oscillator.connect(gainNode);
         gainNode.connect(audioCtx.destination);
         oscillator.type = 'sine';
-        oscillator.frequency.value = 800; // brief tap sound
+        oscillator.frequency.value = 800;
         gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
         oscillator.start();
@@ -84,7 +82,6 @@ export default function PreferencesSubscreen() {
         }
       } catch (_) {}
 
-      // Gather matching client-side messages & rooms indexes
       try {
         const allData: Record<string, any> = {};
         for (let i = 0; i < window.localStorage.length; i++) {
@@ -116,57 +113,71 @@ export default function PreferencesSubscreen() {
 
   return (
     <div className="space-y-6 font-sans">
-      
-      {/* Sound and Haptics Toggle */}
-      <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)]/30 divide-y divide-[var(--border-color)]/20">
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4">
-            <div className={`p-2.5 rounded-xl transition-colors ${soundHaptic === 'enabled' ? 'bg-[#0494f4]/10 text-[#0494f4]' : 'bg-zinc-500/10 text-zinc-400'}`}>
-              {soundHaptic === 'enabled' ? <Volume2 size={18} /> : <VolumeX size={18} />}
+      {/* Sound selection toggle row */}
+      <div>
+        <div className="px-4 mb-2">
+          <h3 className="text-[10.5px] font-black text-[#0494f4] uppercase tracking-wider select-none">
+            Signals & Sound Effects
+          </h3>
+        </div>
+        <div className="flex flex-col bg-[var(--bg-card)] border-y border-[var(--border-color)]/5 divide-y divide-[var(--border-color)]/5">
+          <div className="w-full flex items-center justify-between px-4 py-3 h-16">
+            <div className="flex items-center gap-3.5">
+              <div className={`w-11 h-11 rounded-full flex items-center justify-center bg-[var(--primary)] border border-[var(--primary)]/10 shadow-sm shrink-0 ${
+                soundHaptic === 'enabled' ? 'text-[#0494f4]' : 'text-[var(--text-secondary)] opacity-85'
+              }`}>
+                {soundHaptic === 'enabled' ? <Volume2 size={20} className="stroke-[2.2]" /> : <VolumeX size={20} className="stroke-[2.2]" />}
+              </div>
+              <div className="text-left pr-1 min-w-0">
+                <h4 className="text-[14px] font-semibold text-[var(--text-primary)] leading-tight">Sound Effects</h4>
+                <p className="text-[12.5px] text-[var(--text-secondary)] font-normal mt-0.5 truncate leading-tight opacity-75">Play alert rings on real-time channel events</p>
+              </div>
             </div>
-            <div className="text-left">
-              <h4 className="text-sm font-bold text-[var(--text-primary)]">Sound Effects</h4>
-              <p className="text-[11px] text-[var(--text-secondary)] font-medium">Hear sweet sound notifications on chat events</p>
-            </div>
+            <button 
+              onClick={handleToggleSound}
+              className={`w-11 h-6 rounded-full transition-all duration-200 relative cursor-pointer outline-none border-none shrink-0 ${
+                soundHaptic === 'enabled' ? 'bg-[#0494f4]' : 'bg-zinc-700/60'
+              }`}
+            >
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-200 shadow-sm ${
+                soundHaptic === 'enabled' ? 'left-[22px]' : 'left-1'
+              }`} />
+            </button>
           </div>
-          <button 
-            onClick={handleToggleSound}
-            className={`w-11 h-6 rounded-full transition-all relative cursor-pointer outline-none ${
-              soundHaptic === 'enabled' ? 'bg-[#0494f4]' : 'bg-zinc-200 dark:bg-zinc-700'
-            }`}
-          >
-            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-200 shadow-sm ${
-              soundHaptic === 'enabled' ? 'left-[22px]' : 'left-1'
-            }`} />
-          </button>
         </div>
       </div>
 
-      {/* Auto-Download Media Preferences Group */}
+      {/* Auto-Download selections */}
       <div>
-        <h3 className="px-6 mb-2 text-[11px] font-bold text-zinc-400 uppercase tracking-[0.12em] flex items-center gap-1.5 p-1">
-          <Wifi size={12} className="text-zinc-400" />
-          <span>Auto-Download over Network</span>
-        </h3>
-        <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)]/30 divide-y divide-[var(--border-color)]/25">
+        <div className="px-4 mb-2 flex items-center gap-1.5">
+          <Wifi size={13} className="text-[#0494f4] stroke-[2.2]" />
+          <h3 className="text-[10.5px] font-black text-[#0494f4] uppercase tracking-wider select-none">
+            Network Auto-Download
+          </h3>
+        </div>
+        <div className="flex flex-col bg-[var(--bg-card)] divide-y divide-[var(--border-color)]/5">
           {[
-            { id: 'never', title: 'Never Auto-Download', sub: 'Tap media to download manually' },
-            { id: 'wifi', title: 'Only on Wi-Fi connection', sub: 'Saves your cellular/PWA data bandwidth' },
-            { id: 'all', title: 'Wi-Fi & Mobile Cellular', sub: 'High speed instant download always' }
+            { id: 'never', title: 'Tap to Download', sub: 'Require manual action to download files' },
+            { id: 'wifi', title: 'Wi-Fi Connection Only', sub: 'Preserves cell bandwidth and saves background data' },
+            { id: 'all', title: 'Always Download Media', sub: 'High speed instant download across all networks' }
           ].map((item) => (
             <button
               key={item.id}
               onClick={() => handleAutoDownloadChange(item.id)}
-              className="w-full flex items-center justify-between px-6 py-3.5 hover:bg-[var(--bg-main)]/30 transition-colors cursor-pointer text-left"
+              className="w-full flex items-center justify-between px-4 py-3 h-16 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group text-left cursor-pointer border-none outline-none select-none"
             >
-              <div>
-                <h4 className={`text-sm font-bold ${autoDownload === item.id ? 'text-[#0494f4]' : 'text-[var(--text-primary)]'}`}>
+              <div className="min-w-0 pr-1 flex-1">
+                <h4 className={`text-[14px] font-semibold group-hover:text-[#0494f4] transition-colors leading-tight ${
+                  autoDownload === item.id ? 'text-[#0494f4]' : 'text-[var(--text-primary)]'
+                }`}>
                   {item.title}
                 </h4>
-                <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-0.5">{item.sub}</p>
+                <p className="text-[12.5px] text-[var(--text-secondary)] font-normal mt-0.5 mt-1 truncate leading-tight opacity-75">
+                  {item.sub}
+                </p>
               </div>
               {autoDownload === item.id && (
-                <div className="bg-[#0494f4] p-0.5 rounded-full">
+                <div className="bg-[#0494f4] p-1 rounded-full shadow-sm mr-2 shrink-0">
                   <Check size={11} className="text-white" />
                 </div>
               )}
@@ -175,32 +186,38 @@ export default function PreferencesSubscreen() {
         </div>
       </div>
 
-      {/* App Lock Inactivity Timeout Group */}
+      {/* Lock interval selections */}
       <div>
-        <h3 className="px-6 mb-2 text-[11px] font-bold text-zinc-400 uppercase tracking-[0.12em] flex items-center gap-1.5 p-1">
-          <Timer size={12} className="text-zinc-400" />
-          <span>Security Auto-Lock Interval</span>
-        </h3>
-        <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)]/30 divide-y divide-[var(--border-color)]/25">
+        <div className="px-4 mb-2 flex items-center gap-1.5">
+          <Timer size={13} className="text-[#0494f4] stroke-[2.2]" />
+          <h3 className="text-[10.5px] font-black text-[#0494f4] uppercase tracking-wider select-none">
+            Security Auto-Lock Timeout
+          </h3>
+        </div>
+        <div className="flex flex-col bg-[var(--bg-card)] divide-y divide-[var(--border-color)]/5">
           {[
-            { id: '0', title: 'Immediately', sub: 'Locks whenever you exit or close the tab' },
-            { id: '60', title: 'After 1 minutes of idle', sub: 'Gives you speed if multitasking' },
-            { id: '300', title: 'After 5 minutes of idle', sub: 'Medium protection interval' },
-            { id: 'never', title: 'Session persistence', sub: 'Only lock on manual locking action' }
+            { id: '0', title: 'Immediately', sub: 'Encrypt connection whenever you close or switch browser tabs' },
+            { id: '60', title: 'After 1 Minute of Idle', sub: 'Gives comfortable window if active background chatting' },
+            { id: '300', title: 'After 5 Minutes of Idle', sub: 'Standard medium inactivity screen protection limit' },
+            { id: 'never', title: 'Session Persistence Only', sub: 'Requires manual locking actions to secure access' }
           ].map((item) => (
             <button
               key={item.id}
               onClick={() => handleTimeoutChange(item.id)}
-              className="w-full flex items-center justify-between px-6 py-3.5 hover:bg-[var(--bg-main)]/30 transition-colors cursor-pointer text-left"
+              className="w-full flex items-center justify-between px-4 py-3 h-16 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group text-left cursor-pointer border-none outline-none select-none"
             >
-              <div>
-                <h4 className={`text-sm font-bold ${lockTimeout === item.id ? 'text-[#0494f4]' : 'text-[var(--text-primary)]'}`}>
+              <div className="min-w-0 pr-1 flex-1">
+                <h4 className={`text-[14px] font-semibold group-hover:text-[#0494f4] transition-colors leading-tight ${
+                  lockTimeout === item.id ? 'text-[#0494f4]' : 'text-[var(--text-primary)]'
+                }`}>
                   {item.title}
                 </h4>
-                <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-0.5">{item.sub}</p>
+                <p className="text-[12.5px] text-[var(--text-secondary)] font-normal mt-0.5 mt-1 truncate leading-tight opacity-75">
+                  {item.sub}
+                </p>
               </div>
               {lockTimeout === item.id && (
-                <div className="bg-[#0494f4] p-0.5 rounded-full">
+                <div className="bg-[#0494f4] p-1 rounded-full shadow-sm mr-2 shrink-0">
                   <Check size={11} className="text-white" />
                 </div>
               )}
@@ -209,30 +226,33 @@ export default function PreferencesSubscreen() {
         </div>
       </div>
 
-      {/* Offline Backup Export Section */}
-      <div>
-        <h3 className="px-6 mb-2 text-[11px] font-bold text-zinc-400 uppercase tracking-[0.12em] flex items-center gap-1.5 p-1">
-          <Sparkles size={12} className="text-zinc-400" />
-          <span>Offline Backup Archive</span>
-        </h3>
-        <div className="bg-[var(--bg-card)] border-y border-[var(--border-color)]/30 p-6">
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex gap-4 mb-4">
-            <Smartphone size={20} className="text-[#0494f4] shrink-0" />
-            <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium leading-relaxed text-left">
-              This compiles all localized settings, device-cache profiles, and stored index logs into a compact offline ZIP-JSON format file instantly.
+      {/* Database exports & backup */}
+      <div className="px-4">
+        <div className="mb-2 flex items-center gap-1.5">
+          <Sparkles size={13} className="text-[#0494f4] stroke-[2.2]" />
+          <h3 className="text-[10.5px] font-black text-[#0494f4] uppercase tracking-wider select-none font-sans">
+            Local Ledger Archive
+          </h3>
+        </div>
+        <div className="bg-[#0494f4]/5 border border-[#0494f4]/15 rounded-2xl p-4 flex flex-col gap-4">
+          <div className="flex gap-3 items-start">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-[#0494f4]/10 text-[#0494f4] shrink-0 border border-[#0494f4]/10">
+              <Smartphone size={18} className="stroke-[2.2]" />
+            </div>
+            <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed font-normal opacity-90 text-left">
+              Compiles all localized messages logs indices, customized colors, avatar caches and offline active sessions securely into a physical download-ZIP package instantly.
             </p>
           </div>
           <button 
             disabled={backingUp}
             onClick={handleExportData}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-[#0494f4] text-white hover:bg-[#0494f4]/90 rounded-xl text-xs font-bold shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-3 bg-[#0494f4] text-white hover:bg-[#0494f4]/90 rounded-xl text-xs font-bold leading-none shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer border-none outline-none select-none"
           >
             <Download size={14} className={backingUp ? "animate-pulse" : ""} />
             <span>{backingUp ? 'Compiling Local Ledger...' : 'Backup Chat Logs & Settings'}</span>
           </button>
         </div>
       </div>
-
     </div>
   );
 }

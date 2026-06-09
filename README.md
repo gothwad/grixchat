@@ -1,69 +1,73 @@
-# GrixChat
+# 🌌 GrixChat — Secure Social & Real-Time Messaging Platform
 
-GrixChat is a comprehensive, high-performance social media and real-time messaging application. It combines the features of popular platforms like Instagram and WhatsApp into a single, mobile-first experience.
-
-## 🚀 Key Features
-
-- **Real-time Messaging**: Instant message delivery with read receipts, typing indicators, and message actions (reply, edit, delete).
-- **Social Networking**: User profiles, follow system, posts with images/captions, and short-form video content (Reels).
-- **Stories & Status**: Share temporary updates with your followers.
-- **Advanced Security**: Global App Lock (PIN/Password), privacy settings (hide profile from search, hide photo), and secure authentication.
-- **Admin Dashboard**: Comprehensive management tool for monitoring users, posts, and reports.
-- **Modern UI/UX**: Clean, zinc-based design with emerald accents, optimized for mobile devices with a centered layout.
-- **Presence System**: Real-time online/offline status and "last seen" indicators.
-- **Push Notifications**: Integrated browser notifications for new messages and interactions.
-
-## 🛠 Technology Stack
-
-- **Frontend**: React 19, TypeScript, Tailwind CSS 4.
-- **State Management**: React Hooks & Context API.
-- **Routing**: React Router 7.
-- **Backend**: 
-  - **Firebase Auth**: Secure user authentication.
-  - **Cloud Firestore**: Real-time database for messages, posts, and user data.
-  - **Firebase Realtime Database**: Presence tracking and real-time sync.
-  - **Express**: Node.js server for API extensions and static hosting.
-- **Deployment**: Hosted on **Cloudflare Workers** (https://grixchat.gothwad.workers.dev).
-- **Animations**: Motion (Framer Motion) for fluid transitions.
-- **Icons**: Lucide React.
-
-## 🚀 Firebase Optimization Roadmap
-
-To minimize Firestore reads and improve performance, we are implementing:
-1. **Conversations Collection**: Moving from message-based chat lists to a dedicated `conversations` collection.
-2. **Message Pagination**: Loading only the last 20 messages initially, with "Load More" on scroll.
-3. **Unread Count Aggregation**: Storing unread counts in the user document instead of scanning messages.
-4. **Message Cleanup**: Keeping only the last 50 messages per chat in Firestore to reduce database size and read costs.
-
-## 📁 Project Structure
-
-- `/src`: Core application logic and main entry points.
-- `/screen`: Feature-specific screens (Chat, Reels, Settings, etc.).
-- `/tabs`: Main navigation tabs (Chats, Explore, Profile, Status, Calls).
-- `/components`: Reusable UI components.
-- `/server`: Backend configuration and Express server logic.
-- `/admin`: Admin-specific dashboard and tools.
-- `/user`: Authentication and profile setup screens.
-
-## 📦 Getting Started
-
-1. **Install Dependencies**:
-   ```bash
-   npm install
-   ```
-
-2. **Environment Setup**:
-   Copy `.env.example` to `.env` and fill in your Firebase configuration.
-
-3. **Run Development Server**:
-   ```bash
-   npm run dev
-   ```
-
-4. **Build for Production**:
-   ```bash
-   npm run build
-   ```
+GrixChat is a ultra-modern, high-performance messaging, private calling, and short-form video application designed for lightning-fast speeds and low-cost scalability. Delivering a hybrid visual experience—blending **60% unique Dark Cosmic identity**, **20% Telegram performance micro-animations**, and **20% WhatsApp communication mechanics**—it runs perfectly as a PWA and Google Play TWA.
 
 ---
-Developed with ❤️ by Gothwad Technologies.
+
+## 🏗 Core Architecture Blueprint
+
+* **Backend, Storage & Real-Time Sync**: Driven **100% by Supabase**. Includes custom PostgreSQL procedures, storage buckets, and filtered `postgres_changes` listeners.
+* **Push Notifications**: **Firebase Cloud Messaging (FCM)** is strictly restricted to background mobile notifications so database egress loads remain at exactly zero.
+* **Direct Private Calling**: Peer-to-peer audio/video calling powered by **WebRTC** with automatic 45-second persistent dialing, Web Audio API sound synths, and background conversation survival.
+* **Aesthetic Visual Blend**: Custom display typography of *Space Grotesk* paired with *Inter* and *JetBrains Mono*, complete with WhatsApp-style delivery double-ticks, custom context sliders, and selection highlights.
+
+---
+
+## 💸 Cost-Optimization & 50K Free User Scalability
+
+To support more than 50,000 active users comfortably on Supabase's free tier, database operations obey strict efficiency guidelines:
+1. **Unfiltered Listeners Banned**: All real-time channel listeners are strictly targeted and filtered based on keys (e.g. `receiver_id=eq.${userId}`). We never listen to entire tables globally to protect egress.
+2. **Lightweight WebSocket Broadcasts**: High-frequency, fleeting events—such as typing feedback, read ticks, or calling connection states—are routed via Supabase Broadcast and Presence channels, avoiding heavy relational database queries.
+3. **Optimized Local Caching**: State managers cache local messages and profiles before triggering remote syncs, delivering a persistent offline-first experience.
+4. **Range constraints & Pagination**: Initial list loading feeds only the vital 20-30 conversational records.
+
+---
+
+## 🛠 Feature Profile
+
+- **Background Video/Voice Calling**: Integrated RTC signalling that lives inside the global React Context. You can back out from a call to write messages, and a beautiful WhatsApp-style pulsing green calling line continues to tick beneath the main navigation bar.
+- **Micro-Animations**: Staggered transition arrays and slide-out logout menus engineered via `motion/react` for smooth, native-like user flows.
+- **Interactive Multi-Tab Setup**: Visited views are retained using a custom keep-alive container pattern to prevent visual reloads.
+- **Secure App Lock**: Secure PIN screen and privacy toggles to protect chats.
+
+---
+
+## 📁 System Registry Map
+
+- `/src/providers`: Application context singletons (Supabase `AuthProvider`, global WebRTC `CallProvider`).
+- `/src/features`: Modular screens broken into focus zones (`chat`, `call`, `profile`, `search`, `reels`).
+- `/src/components`: UI layouts, bottom/top navigation components, and global drop-downs.
+- `/sql`: Hardcoded schema upgrades, PostgreSQL functions, row-level security definitions, and indices:
+  - `grixchat_latest_db_updates.sql`: Incremental delta adjustments.
+  - `supabase_schema.sql`: Core baseline tables (users, messages, conversations, calls).
+  - `supabase_posts_schema.sql`: Reels and posts mechanics.
+  - `supabase_support_tickets_schema.sql`: Support logs.
+
+---
+
+## 🚀 Getting Started
+
+### 1. Installation
+```bash
+npm install
+```
+
+### 2. Configure Credentials
+Duplicate `.env.example` as `.env` and configure your API details:
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### 3. Start Hot Dev Server
+```bash
+npm run dev
+```
+
+### 4. Build Stands
+```bash
+npm run build
+```
+
+---
+Crafted under high-precision directives for the GrixChat Mobile Ecosystem. 🌌

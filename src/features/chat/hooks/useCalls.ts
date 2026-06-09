@@ -100,13 +100,22 @@ export const useCalls = (activeFilter: string) => {
 
     fetchCalls();
 
-    // Subscribe to changes in calls table
+    // Subscribe to changes in calls table filtered for this user
     const subscription = supabase
-      .channel('calls-realtime-changes')
+      .channel(`calls-realtime-${user.id}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'calls'
+        table: 'calls',
+        filter: `caller_id=eq.${user.id}`
+      }, () => {
+        fetchCalls();
+      })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'calls',
+        filter: `receiver_id=eq.${user.id}`
       }, () => {
         fetchCalls();
       })
