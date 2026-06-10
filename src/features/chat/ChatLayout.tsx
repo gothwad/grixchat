@@ -16,7 +16,7 @@ export default function ChatLayout() {
           <ChatsTab />
         </div>
       ) : (
-        <div className="flex-1 h-full flex-col bg-[var(--bg-chat)] relative">
+        <div className="flex-1 h-full flex flex-col bg-[var(--bg-chat)] relative">
           <Outlet />
         </div>
       )}

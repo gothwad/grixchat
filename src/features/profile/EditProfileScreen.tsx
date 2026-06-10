@@ -24,6 +24,7 @@ export default function EditProfileScreen() {
   const [username, setUsername] = useState(currentAuthUserData?.username || '');
   const [bio, setBio] = useState(truncateToChars(currentAuthUserData?.bio || 'Available', 100));
   const [photoURL, setPhotoURL] = useState(currentAuthUserData?.photoURL || '');
+  const [phone, setPhone] = useState(currentAuthUserData?.settings?.phone || '');
 
   const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
@@ -33,6 +34,7 @@ export default function EditProfileScreen() {
       setUsername(currentAuthUserData.username || '');
       setBio(truncateToChars(currentAuthUserData.bio || 'Available', 100));
       setPhotoURL(currentAuthUserData.photoURL || DEFAULT_LOGO);
+      setPhone(currentAuthUserData.settings?.phone || '');
     }
   }, [currentAuthUserData]);
 
@@ -75,13 +77,19 @@ export default function EditProfileScreen() {
         }
       }
 
+      const updatedSettings = {
+        ...(currentAuthUserData?.settings || {}),
+        phone: phone.trim()
+      };
+
       const { error: updateError } = await supabase
         .from('users')
         .update({
           full_name: fullName.trim(),
           username: trimmedUsername,
           bio: truncateToChars(bio.trim(), 100) || 'Available',
-          photo_url: photoURL
+          photo_url: photoURL,
+          settings: updatedSettings
         } as any)
         .eq('id', authUser.id);
 
@@ -137,21 +145,29 @@ export default function EditProfileScreen() {
               value={value || ''}
               onChange={(e) => {
                 if (field === 'username') {
-                  const val = e.target.value.toLowerCase().replace(/\s/g, '_').substring(0, 15);
-                  if (/^[a-z0-9_]*$/.test(val)) {
-                    setter(val);
-                  }
+                   const val = e.target.value.toLowerCase().replace(/\s/g, '_').substring(0, 15);
+                   if (/^[a-z0-9_]*$/.test(val)) {
+                     setter(val);
+                   }
+                } else if (field === 'phone') {
+                   const val = e.target.value.replace(/[^0-9+\-\s()]/g, '').substring(0, 20);
+                   setter(val);
                 } else {
                   setter(e.target.value);
                 }
               }}
-              maxLength={field === 'username' ? 15 : undefined}
+              maxLength={field === 'username' ? 15 : field === 'phone' ? 20 : undefined}
               className="w-full px-5 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
-              placeholder={`Enter your ${label.toLowerCase()}`}
+              placeholder={field === 'phone' ? "e.g. +91 99999 88888" : `Enter your ${label.toLowerCase()}`}
             />
             {field === 'username' && (
               <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-1 ml-1 opacity-70">
                 Max 15 characters. Only small letters (a-z), numbers (0-9), and underscores (_) allowed.
+              </p>
+            )}
+            {field === 'phone' && (
+              <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-1 ml-1 opacity-70">
+                Your mobile or telegram phone number. Allows other members to contact you.
               </p>
             )}
           </div>
@@ -239,6 +255,7 @@ export default function EditProfileScreen() {
           <div className="space-y-5">
             {renderField('fullName', 'Name', fullName, setFullName)}
             {renderField('username', 'Username', username, setUsername)}
+            {renderField('phone', 'Phone Number', phone, setPhone)}
             {renderField('bio', 'Bio', bio, setBio, true)}
           </div>
         </div>

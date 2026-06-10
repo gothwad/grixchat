@@ -32,6 +32,7 @@ export interface UserProfile {
     showMenuEntry: boolean;
   };
   settings?: {
+    phone?: string;
     notifications?: {
       conversationTones?: boolean;
       highPriority?: boolean;

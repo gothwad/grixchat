@@ -24,29 +24,36 @@ export default function ChatSettingsSharedAssets({
   return (
     <div className="bg-[var(--bg-card)] rounded-2xl overflow-hidden border border-[var(--border-color)]/50 shadow-sm flex flex-col">
       
-      {/* Premium Segmented Segment Controller */}
-      <div className="flex bg-[var(--bg-main)] p-1 border-b border-[var(--border-color)]/30 gap-1 rounded-t-2xl">
+      {/* Premium Segmented Segment Controller Buttons with icons and solid contours */}
+      <div className="flex bg-zinc-100 dark:bg-zinc-900/40 p-1.5 border-b border-[var(--border-color)]/30 gap-2 rounded-t-2xl">
         {(['media', 'files', 'links'] as const).map((tab) => {
           const active = activeTab === tab;
           const count = tab === 'media' ? mediaCount : tab === 'files' ? filesCount : linksCount;
           
+          const tabIcon = tab === 'media' 
+            ? <ImageIcon size={13} className="shrink-0" /> 
+            : tab === 'files' 
+              ? <FileText size={13} className="shrink-0" /> 
+              : <LinkIcon size={13} className="shrink-0" />;
+
           return (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
               id={`btn_tab_asset_${tab}`}
-              className={`flex-1 py-2 text-[10px] font-extrabold uppercase tracking-wider rounded-xl transition-all duration-200 cursor-pointer ${
+              className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all duration-200 cursor-pointer shadow-xs border ${
                 active 
-                  // Background is now the primary theme color, and text is pure readable white!
-                  ? 'bg-[var(--primary)] text-white shadow-sm'
-                  : 'text-[var(--text-secondary)] opacity-80 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'
+                  // Background is now the solid primary theme color, text is white, and slightly scale-popped
+                  ? 'bg-[var(--primary)] text-white border-blue-400/20 scale-[1.01] font-black shadow-md'
+                  : 'bg-white dark:bg-zinc-800 text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-zinc-50 dark:hover:bg-zinc-800/80 hover:text-[var(--text-primary)]'
               }`}
             >
               <span className="flex items-center justify-center gap-1.5">
-                {tab}
+                {tabIcon}
+                <span className="font-extrabold">{tab}</span>
                 <span className={`text-[9px] px-1.5 py-0.5 font-mono rounded-md ${
-                  active ? 'bg-white/20 text-white' : 'bg-[var(--bg-card)]'
+                  active ? 'bg-white/25 text-white' : 'bg-zinc-150 dark:bg-zinc-700/60 text-[var(--text-secondary)]'
                 }`}>
                   {count}
                 </span>

@@ -49,7 +49,7 @@ export default function ChatSettingsScreen() {
         // 1. Fetch Receiver info
         const { data: recData } = await supabase
           .from('users')
-          .select('*')
+          .select('id, username, full_name, photo_url, bio, settings, email')
           .eq('id', receiverId)
           .single();
         
@@ -59,7 +59,10 @@ export default function ChatSettingsScreen() {
             username: recData.username,
             fullName: recData.full_name,
             photoURL: recData.photo_url,
-            bio: recData.bio || 'Hey there! I am using GrixChat.'
+            bio: recData.bio || 'Hey there! I am using GrixChat.',
+            settings: recData.settings,
+            phone: recData.settings?.phone || '',
+            email: recData.email || ''
           });
         }
 
@@ -77,16 +80,55 @@ export default function ChatSettingsScreen() {
           setIsMuted(settsData.is_muted || false);
         }
 
-        // 3. Fetch shared conversation data & message assets
-        const { data: convId } = await supabase.rpc('get_direct_conversation_id', { 
-          u1: currentUserId, 
-          u2: receiverId 
-        });
+        // 3. Fetch shared conversation data & message assets with robust fallback
+        let convId: string | null = null;
+        try {
+          const { data, error } = await supabase.rpc('get_direct_conversation_id', { 
+            u1: currentUserId, 
+            u2: receiverId 
+          });
+          if (!error && data) {
+            convId = data;
+          }
+        } catch (rpcErr) {
+          console.warn("RPC direct conversation check failed in settings:", rpcErr);
+        }
+
+        // Fallback check if RPC returned null or failed
+        if (!convId) {
+          try {
+            const { data: u1Convs } = await supabase
+              .from('conversation_participants')
+              .select('conversation_id, conversation:conversations(id, type)')
+              .eq('user_id', currentUserId);
+
+            if (u1Convs) {
+              const directConvIds = u1Convs
+                .filter(item => item.conversation && (item.conversation as any).type === 'direct')
+                .map(item => item.conversation_id);
+
+              if (directConvIds.length > 0) {
+                const { data: matched } = await supabase
+                  .from('conversation_participants')
+                  .select('conversation_id')
+                  .in('conversation_id', directConvIds)
+                  .eq('user_id', receiverId)
+                  .limit(1);
+
+                if (matched && matched.length > 0) {
+                  convId = matched[0].conversation_id;
+                }
+              }
+            }
+          } catch (fallbackErr) {
+            console.error("Fallback query for conversation discovery failed:", fallbackErr);
+          }
+        }
         
         if (convId) {
           const { data: messagesData } = await supabase
             .from('messages')
-            .select('text, file_url, created_at')
+            .select('text, media_url, media_type, file_url, type, created_at')
             .eq('conversation_id', convId)
             .order('created_at', { ascending: false });
 
@@ -96,18 +138,34 @@ export default function ChatSettingsScreen() {
             const files: { name: string; size: string; url: string }[] = [];
 
             messagesData.forEach((m: any) => {
-              if (m.file_url) {
-                const lower = m.file_url.toLowerCase();
-                if (lower.match(/\.(jpg|jpeg|png|webp|gif|svg)/)) {
-                  media.push(m.file_url);
+              const rawUrl = m.media_url || m.file_url || m.imageUrl;
+              const rawType = m.media_type || m.type;
+
+              if (rawUrl) {
+                const lower = rawUrl.toLowerCase();
+                const isImage = rawType === 'image' || lower.match(/\.(jpg|jpeg|png|webp|gif|svg)/);
+                const isVideo = rawType === 'video' || lower.match(/\.(mp4|mov|webm|avi|mkv|3gp)/);
+                
+                if (isImage || isVideo) {
+                  media.push(rawUrl);
                 } else {
+                  let fileName = 'Shared Document';
+                  try {
+                    const rawName = rawUrl.split('/').pop();
+                    if (rawName) fileName = decodeURIComponent(rawName);
+                  } catch (decErr) {
+                    fileName = rawUrl.split('/').pop() || 'Shared Document';
+                  }
+
                   files.push({
-                    name: m.file_url.split('/').pop() || 'Shared Document',
-                    size: '2.4 MB',
-                    url: m.file_url
+                    name: fileName,
+                    size: rawType ? rawType.toUpperCase() : 'FILE',
+                    url: rawUrl
                   });
                 }
-              } else if (m.text) {
+              }
+              
+              if (m.text) {
                 const textStr = m.text.trim();
                 const urlRegex = /(https?:\/\/[^\s]+)/g;
                 const matches = textStr.match(urlRegex);
@@ -177,10 +235,41 @@ export default function ChatSettingsScreen() {
   const handleClearHistory = async () => {
     if (!currentUserId || !receiverId || !supabase) return;
     try {
-      const { data: convId } = await supabase.rpc('get_direct_conversation_id', { 
-        u1: currentUserId, 
-        u2: receiverId 
-      });
+      let convId: string | null = null;
+      try {
+        const { data } = await supabase.rpc('get_direct_conversation_id', { 
+          u1: currentUserId, 
+          u2: receiverId 
+        });
+        if (data) convId = data;
+      } catch (_) {}
+
+      if (!convId) {
+        const { data: u1Convs } = await supabase
+          .from('conversation_participants')
+          .select('conversation_id, conversation:conversations(id, type)')
+          .eq('user_id', currentUserId);
+
+        if (u1Convs) {
+          const directConvIds = u1Convs
+            .filter(item => item.conversation && (item.conversation as any).type === 'direct')
+            .map(item => item.conversation_id);
+
+          if (directConvIds.length > 0) {
+            const { data: matched } = await supabase
+              .from('conversation_participants')
+              .select('conversation_id')
+              .in('conversation_id', directConvIds)
+              .eq('user_id', receiverId)
+              .limit(1);
+
+            if (matched && matched.length > 0) {
+              convId = matched[0].conversation_id;
+            }
+          }
+        }
+      }
+
       if (convId) {
         const { error } = await supabase
           .from('messages')
@@ -223,7 +312,8 @@ export default function ChatSettingsScreen() {
 
   const displayName = nickname || receiver?.fullName || 'GrixChat User';
   const displayPhoto = customPhotoUrl || receiver?.photoURL || '';
-  const simulatedPhone = `+91 9${receiverId ? receiverId.replace(/[^0-9]/g, '').slice(0, 9) : '8503'}`.padEnd(14, '0').slice(0, 15);
+  const phone = receiver?.phone || '';
+  const email = receiver?.email || '';
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden font-sans relative select-none">
@@ -255,7 +345,7 @@ export default function ChatSettingsScreen() {
         dropdownRef={dropdownRef}
       />
 
-      <div className="flex-1 overflow-y-auto no-scrollbar pb-24 touch-pan-y overscroll-contain px-4 pt-4 flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto pb-24 px-4 pt-4 flex flex-col gap-4">
         
         {/* Profile Card and Info Details */}
         <ChatSettingsDetails
@@ -263,7 +353,8 @@ export default function ChatSettingsScreen() {
           displayPhoto={displayPhoto}
           username={receiver?.username}
           bio={receiver?.bio}
-          simulatedPhone={simulatedPhone}
+          phone={phone}
+          email={email}
           isMuted={isMuted}
           onPhotoEdit={() => setShowPhotoModal(true)}
           onMessage={() => navigate(`/chat/${receiverId}`)}

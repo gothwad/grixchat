@@ -35,7 +35,7 @@ export default function MainLayout() {
     return `${m}:${s}`;
   };
   
-  const isChatScreen = location.pathname.startsWith('/chat/');
+  const isChatScreen = location.pathname.startsWith('/chat/') && !location.pathname.endsWith('/settings');
   const showBottomNav = TAB_PATHS.includes(location.pathname);
   
   // Paths where TopNav should be visible

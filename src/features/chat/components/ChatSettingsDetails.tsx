@@ -7,6 +7,7 @@ import {
   BellOff, 
   Camera, 
   Smartphone, 
+  Mail,
   Info as InfoIcon,
   MessageSquare
 } from 'lucide-react';
@@ -18,7 +19,8 @@ interface ChatSettingsDetailsProps {
   displayPhoto: string;
   username: string;
   bio: string;
-  simulatedPhone: string;
+  phone: string;
+  email: string;
   isMuted: boolean;
   onPhotoEdit: () => void;
   onMessage: () => void;
@@ -33,7 +35,8 @@ export default function ChatSettingsDetails({
   displayPhoto,
   username,
   bio,
-  simulatedPhone,
+  phone,
+  email,
   isMuted,
   onPhotoEdit,
   onMessage,
@@ -136,23 +139,55 @@ export default function ChatSettingsDetails({
       {/* Info details group */}
       <div className="bg-[var(--bg-card)] rounded-2xl p-4 flex flex-col border border-[var(--border-color)]/50 shadow-sm">
         <span className="text-[10px] font-bold text-[var(--primary)] uppercase tracking-wider mb-2.5 pl-1.5 opacity-90 block">
-          Info Details
+          Contact Details
         </span>
         
         {/* Phone detail */}
-        <div 
-          onClick={() => onCopyToClipboard(simulatedPhone, "Phone number")}
-          id="row_info_phone"
-          className="flex items-start gap-4 py-2.5 hover:bg-[var(--bg-main)]/50 px-2 rounded-xl transition-all duration-150 cursor-pointer group"
-        >
-          <Smartphone size={18} className="text-[var(--text-secondary)] mt-0.5 shrink-0 group-hover:text-[var(--primary)] transition-colors duration-150" />
-          <div className="flex-1 min-w-0 text-left">
-            <p className="text-xs font-semibold text-[var(--text-primary)] tracking-wide">{simulatedPhone}</p>
-            <p className="text-[10px] font-medium text-[var(--text-secondary)] mt-0.5">Phone</p>
+        {phone ? (
+          <div 
+            onClick={() => onCopyToClipboard(phone, "Phone number")}
+            id="row_info_phone"
+            className="flex items-start gap-4 py-2.5 hover:bg-[var(--bg-main)]/50 px-2 rounded-xl transition-all duration-150 cursor-pointer group"
+          >
+            <Smartphone size={18} className="text-[var(--text-secondary)] mt-0.5 shrink-0 group-hover:text-[var(--primary)] transition-colors duration-150" />
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-xs font-semibold text-[var(--text-primary)] tracking-wide">{phone}</p>
+              <p className="text-[10px] font-medium text-[var(--text-secondary)] mt-0.5">Mobile Phone</p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div 
+            id="row_info_phone_none"
+            className="flex items-start gap-4 py-2.5 px-2 rounded-xl text-left select-none"
+          >
+            <Smartphone size={18} className="text-[var(--text-secondary)] opacity-55 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-[var(--text-secondary)] italic">No phone number shared</p>
+              <p className="text-[10px] font-medium text-[var(--text-secondary)] mt-0.5">Mobile Phone</p>
+            </div>
+          </div>
+        )}
 
         <div className="h-px bg-[var(--border-color)]/40 my-1 ml-11" />
+
+        {/* Email detail */}
+        {email && (
+          <>
+            <div 
+              onClick={() => onCopyToClipboard(email, "Email id")}
+              id="row_info_email"
+              className="flex items-start gap-4 py-2.5 hover:bg-[var(--bg-main)]/50 px-2 rounded-xl transition-all duration-150 cursor-pointer group"
+            >
+              <Mail size={18} className="text-[var(--text-secondary)] mt-0.5 shrink-0 group-hover:text-[var(--primary)] transition-colors duration-150" />
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{email}</p>
+                <p className="text-[10px] font-medium text-[var(--text-secondary)] mt-0.5">Email URL</p>
+              </div>
+            </div>
+            
+            <div className="h-px bg-[var(--border-color)]/40 my-1 ml-11" />
+          </>
+        )}
 
         {/* Username detail */}
         <div 

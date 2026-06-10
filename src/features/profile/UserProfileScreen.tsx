@@ -240,7 +240,7 @@ export default function UserProfileScreen() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar pb-24 touch-pan-y overscroll-contain">
+      <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
         <div className="px-4 pt-4">
           {/* Beautiful and Compact Profile Card (Centered Telegram Style) */}
           <div className="flex flex-col items-center text-center bg-[var(--bg-card)] py-5 px-4 rounded-2xl border border-[var(--border-color)]/60 shadow-sm mb-4 relative overflow-hidden">
