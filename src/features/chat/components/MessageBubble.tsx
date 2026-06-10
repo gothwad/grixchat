@@ -312,49 +312,97 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             
             {renderedContent && (
               typeof renderedContent === 'string' ? (
-                <p className={`${isMsgDeleted ? 'italic text-zinc-400 dark:text-zinc-500 font-medium select-none text-[13px] opacity-80' : contentFontClass} break-words whitespace-pre-wrap overflow-visible [word-break:normal]`}>
-                  {renderedContent}
-                </p>
+                !mediaUrl ? (
+                  // Elegant inline WhatsApp/Telegram wrapping
+                  <p className={`${isMsgDeleted ? 'italic text-zinc-400 dark:text-zinc-500 font-medium select-none text-[13px] opacity-80' : contentFontClass} break-words whitespace-pre-wrap overflow-visible [word-break:normal]`}>
+                    {renderedContent}
+                    {(() => {
+                      const isReceiverOnlineNow = receiver && isUserOnline(
+                        receiver.isOnline !== undefined ? receiver.isOnline : receiver.is_online,
+                        receiver.lastSeen !== undefined ? receiver.lastSeen : receiver.last_seen
+                      );
+                      let wasReceiverOnlineAfterMessage = false;
+                      if (receiver && (receiver.lastSeen || receiver.last_seen)) {
+                        try {
+                          const lastSeenTime = new Date(receiver.lastSeen || receiver.last_seen).getTime();
+                          const msgTime = new Date(msg.created_at).getTime();
+                          wasReceiverOnlineAfterMessage = lastSeenTime >= msgTime;
+                        } catch (e) {}
+                      }
+                      const isMessageDelivered = isReceiverOnlineNow || wasReceiverOnlineAfterMessage;
+
+                      return (
+                        <span className="inline-flex items-center gap-1 ml-2.5 select-none pointer-events-none align-bottom h-3.5 translate-y-[2px] leading-none">
+                          <span className={`text-[10px] font-bold tracking-tight whitespace-nowrap ${actualIsMe ? 'text-[var(--bubble-text-own)]/55' : 'text-[var(--bubble-text-other)]/55'}`}>
+                            {formatTime(msg.created_at)}
+                            {msg.is_edited && ' • Ed'}
+                          </span>
+                          {actualIsMe && (
+                            <span className="shrink-0 flex items-center">
+                              {msg.status === 'sending' ? (
+                                <Clock size={11} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/55' : 'text-[var(--bubble-text-other)]/55'} animate-pulse`} />
+                              ) : msg.is_read ? (
+                                <CheckCheck size={14} className="text-[#34b7f1]" strokeWidth={2.8} />
+                              ) : (convType === 'group' || isMessageDelivered) ? (
+                                <CheckCheck size={14} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/40' : 'text-[var(--bubble-text-other)]/40'}`} strokeWidth={2.8} />
+                              ) : (
+                                <Check size={14} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/40' : 'text-[var(--bubble-text-other)]/40'}`} strokeWidth={2.8} />
+                              )}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })()}
+                  </p>
+                ) : (
+                  // With media, show the content normally
+                  <p className={`${isMsgDeleted ? 'italic text-zinc-400 dark:text-zinc-500 font-medium select-none text-[13px] opacity-80' : contentFontClass} break-words whitespace-pre-wrap overflow-visible [word-break:normal]`}>
+                    {renderedContent}
+                  </p>
+                )
               ) : (
                 renderedContent
               )
             )}
             
-            <div className="flex items-center justify-end gap-1.5 mt-0.5 -mr-1">
-              <span className={`text-[10px] font-medium ${actualIsMe ? 'text-[var(--bubble-text-own)]/60' : 'text-[var(--bubble-text-other)]/60'}`}>
-                {formatTime(msg.created_at)}
-                {msg.is_edited && ' • Edited'}
-              </span>
-              {actualIsMe && (() => {
-                const isReceiverOnlineNow = receiver && isUserOnline(
-                  receiver.isOnline !== undefined ? receiver.isOnline : receiver.is_online,
-                  receiver.lastSeen !== undefined ? receiver.lastSeen : receiver.last_seen
-                );
-                let wasReceiverOnlineAfterMessage = false;
-                if (receiver && (receiver.lastSeen || receiver.last_seen)) {
-                  try {
-                    const lastSeenTime = new Date(receiver.lastSeen || receiver.last_seen).getTime();
-                    const msgTime = new Date(msg.created_at).getTime();
-                    wasReceiverOnlineAfterMessage = lastSeenTime >= msgTime;
-                  } catch (e) {}
-                }
-                const isMessageDelivered = isReceiverOnlineNow || wasReceiverOnlineAfterMessage;
+            {/* Show traditional block format metadata if there is a mediaUrl or non-string content */}
+            {((mediaUrl) || typeof renderedContent !== 'string') && (
+              <div className="flex items-center justify-end gap-1.5 mt-1 -mr-1 shadow-none">
+                <span className={`text-[10px] font-medium ${actualIsMe ? 'text-[var(--bubble-text-own)]/60' : 'text-[var(--bubble-text-other)]/60'}`}>
+                  {formatTime(msg.created_at)}
+                  {msg.is_edited && ' • Edited'}
+                </span>
+                {actualIsMe && (() => {
+                  const isReceiverOnlineNow = receiver && isUserOnline(
+                    receiver.isOnline !== undefined ? receiver.isOnline : receiver.is_online,
+                    receiver.lastSeen !== undefined ? receiver.lastSeen : receiver.last_seen
+                  );
+                  let wasReceiverOnlineAfterMessage = false;
+                  if (receiver && (receiver.lastSeen || receiver.last_seen)) {
+                    try {
+                      const lastSeenTime = new Date(receiver.lastSeen || receiver.last_seen).getTime();
+                      const msgTime = new Date(msg.created_at).getTime();
+                      wasReceiverOnlineAfterMessage = lastSeenTime >= msgTime;
+                    } catch (e) {}
+                  }
+                  const isMessageDelivered = isReceiverOnlineNow || wasReceiverOnlineAfterMessage;
 
-                return (
-                  <span className="shrink-0 flex items-center">
-                    {msg.status === 'sending' ? (
-                      <Clock size={11} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/60' : 'text-[var(--bubble-text-other)]/60'} animate-pulse`} />
-                    ) : msg.is_read ? (
-                      <CheckCheck size={14} className="text-[#34b7f1]" strokeWidth={2.5} />
-                    ) : (convType === 'group' || isMessageDelivered) ? (
-                      <CheckCheck size={14} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/40' : 'text-[var(--bubble-text-other)]/40'}`} strokeWidth={2.5} />
-                    ) : (
-                      <Check size={14} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/40' : 'text-[var(--bubble-text-other)]/40'}`} strokeWidth={2.5} />
-                    )}
-                  </span>
-                );
-              })()}
-            </div>
+                  return (
+                    <span className="shrink-0 flex items-center">
+                      {msg.status === 'sending' ? (
+                        <Clock size={11} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/60' : 'text-[var(--bubble-text-other)]/60'} animate-pulse`} />
+                      ) : msg.is_read ? (
+                        <CheckCheck size={14} className="text-[#34b7f1]" strokeWidth={2.5} />
+                      ) : (convType === 'group' || isMessageDelivered) ? (
+                        <CheckCheck size={14} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/40' : 'text-[var(--bubble-text-other)]/40'}`} strokeWidth={2.5} />
+                      ) : (
+                        <Check size={14} className={`${actualIsMe ? 'text-[var(--bubble-text-own)]/40' : 'text-[var(--bubble-text-other)]/40'}`} strokeWidth={2.5} />
+                      )}
+                    </span>
+                  );
+                })()}
+              </div>
+            )}
           </div>
 
           {msg.reactions && Object.keys(msg.reactions).length > 0 && !isMsgDeleted && (

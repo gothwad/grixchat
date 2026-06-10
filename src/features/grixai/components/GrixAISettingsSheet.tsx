@@ -30,7 +30,7 @@ export const GrixAISettingsSheet: React.FC<GrixAISettingsSheetProps> = ({
       transition={{ type: 'tween', duration: 0.25 }}
       className="absolute inset-0 bg-[var(--bg-main)] z-[100] flex flex-col h-full w-full"
     >
-      <div className="shrink-0 flex items-center justify-between px-4 h-14 bg-[var(--header-bg)] border-b border-[var(--border-color)]">
+      <div className="shrink-0 flex items-center justify-between px-4 h-14 bg-[var(--header-bg)] border-b border-[var(--border-color)]/35 shadow-sm rounded-b-2xl">
         <div className="flex items-center gap-3">
           <button 
             onClick={() => setShowOptions(false)} 

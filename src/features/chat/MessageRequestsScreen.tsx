@@ -184,12 +184,12 @@ export default function MessageRequestsScreen() {
   return (
     <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden font-sans">
       {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-4 h-14 bg-[var(--header-bg)] z-55 shadow-sm border-b border-[var(--border-color)]">
+      <div className="shrink-0 flex items-center justify-between px-4 min-h-[56px] pt-safe pb-1.5 bg-[var(--header-bg)] z-55 shadow-sm border-b border-[var(--border-color)]/35 rounded-b-2xl">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="hover:bg-white/10 p-2 rounded-full transition-colors cursor-pointer text-[var(--header-text)]">
             <ArrowLeft size={22} />
           </button>
-          <h1 className="text-[17px] font-black text-[var(--header-text)] tracking-tight">
+          <h1 className="text-xl font-black text-[var(--header-text)] tracking-tight">
             Requests Board
           </h1>
         </div>

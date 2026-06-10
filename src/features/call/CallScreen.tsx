@@ -65,18 +65,48 @@ export default function CallScreen() {
     }
   }, [isReceiver, otherUserId, activeCall, initiateCall, type]);
 
-  // Assign local and remote media streams to video element references
+  // Safe play of local stream with explicit play triggers to bypass browser autoplay blocks
   useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
+    const videoEl = localVideoRef.current;
+    if (videoEl) {
+      if (localStream) {
+        videoEl.srcObject = localStream;
+        videoEl.play().catch(err => {
+          console.warn("[WebRTC] Local stream auto playback blocked:", err);
+        });
+      } else {
+        videoEl.srcObject = null;
+      }
     }
   }, [localStream, localVideoRef.current]);
 
+  // Safe play of remote stream with volume & mute constraint enforcement and explicit play triggers
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
+    const videoEl = remoteVideoRef.current;
+    if (videoEl) {
+      if (remoteStream) {
+        videoEl.srcObject = remoteStream;
+        // Attempt to play explicitly (critical backup for mobile/web autoplay lockouts)
+        videoEl.play().catch(err => {
+          console.warn("[WebRTC] Remote stream auto playback blocked:", err);
+        });
+      } else {
+        videoEl.srcObject = null;
+      }
+
+      // Sync volume & mute levels gracefully matching speakerState (0 = Mute, 1 = earpiece, 2 = loudspeaker)
+      if (speakerState === 0) {
+        videoEl.volume = 0;
+        videoEl.muted = true;
+      } else if (speakerState === 1) {
+        videoEl.volume = 0.25;
+        videoEl.muted = false;
+      } else {
+        videoEl.volume = 1.0;
+        videoEl.muted = false;
+      }
     }
-  }, [remoteStream, remoteVideoRef.current]);
+  }, [remoteStream, remoteVideoRef.current, speakerState]);
 
   const handleBack = () => {
     // Instead of terminating the call on back button, we navigate to /chats.
@@ -110,21 +140,7 @@ export default function CallScreen() {
   const currentStatus = activeCall?.status || 'connecting';
   const partnerUser = activeCall?.receiver || receiver;
 
-  // Regulate remote client's stream volume dynamically based on speakerState
-  useEffect(() => {
-    if (remoteVideoRef.current) {
-      if (speakerState === 0) {
-        remoteVideoRef.current.volume = 0;
-        remoteVideoRef.current.muted = true;
-      } else if (speakerState === 1) {
-        remoteVideoRef.current.volume = 0.25; // low speaker/receiver mode
-        remoteVideoRef.current.muted = false;
-      } else {
-        remoteVideoRef.current.volume = 1.0; // loudspeaker mode
-        remoteVideoRef.current.muted = false;
-      }
-    }
-  }, [speakerState]);
+  // Volume controls are now consolidated under the remote stream handler above
 
   return (
     <div className="absolute inset-0 z-[100] bg-[var(--bg-main)] flex flex-col items-center justify-between text-[var(--text-primary)] font-sans overflow-hidden select-none animate-fade-in">
@@ -136,6 +152,16 @@ export default function CallScreen() {
           isVideoOff={isVideoOff}
           callStatus={currentStatus}
           timer={timer}
+        />
+      )}
+
+      {/* Invisible HTMLMediaElement to handle stream sink for pure voice calls */}
+      {type === 'voice' && (
+        <video
+          ref={remoteVideoRef as any}
+          autoPlay
+          className="pointer-events-none opacity-0 absolute w-[1px] h-[1px] -z-50"
+          playsInline
         />
       )}
 

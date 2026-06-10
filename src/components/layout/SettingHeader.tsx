@@ -26,7 +26,7 @@ export default function SettingHeader({
 
   if (isSearchActive && setSearchTerm) {
     return (
-      <div className="w-full bg-[var(--header-bg)] px-4 h-14 flex items-center z-50 shrink-0 relative border-b border-[var(--border-color)] shadow-sm">
+      <div className="w-full bg-[var(--header-bg)] px-4 min-h-[56px] pt-safe pb-1.5 flex items-center z-50 shrink-0 relative border-b border-[var(--border-color)]/35 shadow-sm rounded-b-2xl">
         <div className="flex-1 flex items-center bg-[var(--bg-main)] rounded-xl px-4 h-[44px] border border-[var(--border-color)]">
           <Search size={18} className="text-[var(--text-secondary)] mr-3 opacity-50" />
           <input 
@@ -60,7 +60,7 @@ export default function SettingHeader({
   }
 
   return (
-    <div className="w-full bg-[var(--header-bg)] px-4 h-14 flex justify-between items-center z-50 shrink-0 relative border-b border-[var(--border-color)] shadow-sm">
+    <div className="w-full bg-[var(--header-bg)] px-4 min-h-[56px] pt-safe pb-1.5 flex justify-between items-center z-50 shrink-0 relative border-b border-[var(--border-color)]/35 shadow-sm rounded-b-2xl">
       <div className="flex items-center gap-3">
         {showBack && (
           <button 
@@ -70,7 +70,7 @@ export default function SettingHeader({
             <ChevronLeft size={24} className="text-[var(--header-text)]" />
           </button>
         )}
-        <h1 className="text-xl font-black text-[var(--header-text)] tracking-tighter">
+        <h1 className="text-xl font-black text-[var(--header-text)] tracking-tight">
           {title}
         </h1>
       </div>

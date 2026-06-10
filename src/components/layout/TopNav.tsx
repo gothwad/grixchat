@@ -8,7 +8,7 @@ export default function TopNav() {
   const { searchTerm, setSearchTerm, isSearchOpen, setIsSearchOpen } = useSearch();
 
   return (
-    <div className="relative z-50 min-h-[56px] pt-safe bg-[var(--header-bg)] border-b border-[var(--border-color)] shadow-sm">
+    <div className="relative z-50 min-h-[56px] pt-safe bg-[var(--header-bg)] border-b border-[var(--border-color)]/35 shadow-sm rounded-b-2xl">
       {isSearchOpen ? (
         <div 
           className="flex items-center px-4 h-[56px] gap-3"

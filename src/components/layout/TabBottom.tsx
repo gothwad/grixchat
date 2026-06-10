@@ -271,7 +271,7 @@ export default function TabBottom() {
   ];
 
   return (
-    <div className="w-full bg-[var(--header-bg)] px-2 min-h-[64px] pb-safe flex justify-around items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] shrink-0 border-t border-[var(--border-color)]">
+    <div className="w-full bg-[var(--header-bg)] px-2 min-h-[64px] pb-safe flex justify-around items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] shrink-0 border-t border-[var(--border-color)] rounded-t-2xl">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = location.pathname === item.path || (item.path === '/chats' && (location.pathname === '/' || location.pathname.startsWith('/chat/')));
@@ -285,14 +285,14 @@ export default function TabBottom() {
             <div className="relative flex flex-col items-center">
               <motion.div 
                 animate={{ 
-                  scale: 1.15,
+                  scale: isActive ? 1.15 : 1,
                   y: isActive ? -1 : 0
                 }}
-                className={`transition-colors duration-300 flex items-center justify-center ${isActive ? item.activeColor : 'text-[var(--header-text)]/40'}`}
+                className={`transition-colors duration-300 flex items-center justify-center ${isActive ? item.activeColor : 'text-[var(--header-text)]/50 group-hover:text-[var(--header-text)]'}`}
               >
                 {Icon && <Icon 
                   size={24} 
-                  strokeWidth={2.5}
+                  strokeWidth={isActive ? 2.5 : 2}
                   fill={isActive ? 'currentColor' : 'none'}
                   fillOpacity={isActive ? 0.15 : 0}
                 />}
@@ -309,7 +309,7 @@ export default function TabBottom() {
               )}
             </div>
             
-            <span className={`text-[10px] mt-1 font-bold transition-all duration-300 ${isActive ? 'text-[var(--header-text)] opacity-100' : 'text-[var(--header-text)]/40 opacity-100'}`}>
+            <span className={`text-[10px] mt-1 font-bold transition-all duration-300 ${isActive ? 'text-[var(--header-text)] opacity-100' : 'text-[var(--header-text)]/50 opacity-75 group-hover:opacity-100'}`}>
               {item.label}
             </span>
           </Link>

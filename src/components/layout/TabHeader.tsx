@@ -143,7 +143,7 @@ export default function TabHeader() {
 
   if (isChatSelectMode && isChatsPage) {
     return (
-      <div className="w-full px-4 min-h-[56px] flex justify-between items-center z-50 shrink-0 relative bg-[var(--bg-main)] border-b border-[var(--border-color)]/35 animate-fade-in select-none">
+      <div className="w-full px-4 min-h-[56px] flex justify-between items-center z-50 shrink-0 relative animate-fade-in select-none">
         <div className="flex items-center gap-3">
           <button 
             type="button" 
@@ -176,7 +176,7 @@ export default function TabHeader() {
                 : 'text-[var(--header-text)]/20 cursor-not-allowed'
             }`}
           >
-            <VolumeX size={20} />
+            <VolumeX size={22} />
           </button>
 
           {/* Archive action */}
@@ -213,7 +213,7 @@ export default function TabHeader() {
                 : 'text-[var(--header-text)]/20 cursor-not-allowed'
             }`}
           >
-            <Archive size={20} />
+            <Archive size={22} />
           </button>
 
           {/* Delete (Hide) action */}
@@ -250,7 +250,7 @@ export default function TabHeader() {
                 : 'text-[var(--header-text)]/20 cursor-not-allowed'
             }`}
           >
-            <Trash size={20} />
+            <Trash size={22} />
           </button>
         </div>
       </div>
@@ -261,7 +261,7 @@ export default function TabHeader() {
     <div className="w-full px-4 min-h-[56px] flex justify-between items-center z-50 shrink-0 relative">
       <div className="flex items-center">
         <Link to="/chats" className="flex items-center gap-2">
-          <h1 className="text-[28px] font-black text-[var(--text-primary)] tracking-tighter">
+          <h1 className="text-[22px] font-bold text-[var(--text-primary)]">
             GrixChat
           </h1>
         </Link>
@@ -270,7 +270,7 @@ export default function TabHeader() {
         {/* Heart Icon - Show on Reels */}
         {isReelsPage && (
           <Link to="/notifications/likes" className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group relative">
-            <Heart size={24} className="text-[var(--header-text)] group-active:scale-110 transition-transform stroke-[2.5]" fill={location.pathname === '/notifications/likes' ? "currentColor" : "none"} />
+            <Heart size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform stroke-[2.5]" fill={location.pathname === '/notifications/likes' ? "currentColor" : "none"} />
             {hasUnreadLikes && (
               <span className="absolute top-2 right-2 w-2 h-2 bg-[#0494f4] rounded-full border-2 border-[var(--header-bg)]" />
             )}
@@ -280,7 +280,7 @@ export default function TabHeader() {
         {/* Bell Icon - Show on Reels */}
         {isReelsPage && (
           <Link to="/notifications" className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer group relative">
-            <Bell size={24} className="text-[var(--header-text)] group-active:scale-110 transition-transform stroke-[2.5]" />
+            <Bell size={22} className="text-[var(--header-text)] group-active:scale-110 transition-transform stroke-[2.5]" />
             {hasUnreadNotifs && (
               <span className="absolute top-2 right-2 w-2 h-2 bg-[#0494f4] rounded-full border-2 border-[var(--header-bg)]" />
             )}
@@ -295,7 +295,7 @@ export default function TabHeader() {
               className="w-12 h-12 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
               id="header-three-dots"
             >
-              <MoreVertical size={24} className="text-[var(--header-text)] stroke-[2.5]" />
+              <MoreVertical size={22} className="text-[var(--header-text)]" />
             </button>
             <AnimatePresence>
               {showMenu && (
@@ -331,7 +331,7 @@ export default function TabHeader() {
               className="w-12 h-12 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
               id="header-three-dots-calls"
             >
-              <MoreVertical size={24} className="text-[var(--header-text)] stroke-[2.5]" />
+              <MoreVertical size={22} className="text-[var(--header-text)]" />
             </button>
             <AnimatePresence>
               {showMenu && (
@@ -368,7 +368,7 @@ export default function TabHeader() {
               className="w-12 h-12 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
               id="header-profile-three-dots"
             >
-              <MoreVertical size={24} className="text-[var(--header-text)] stroke-[2.5]" />
+              <MoreVertical size={22} className="text-[var(--header-text)]" />
             </button>
           </div>
         )}

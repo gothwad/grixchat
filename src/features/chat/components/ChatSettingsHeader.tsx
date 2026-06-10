@@ -24,7 +24,7 @@ export default function ChatSettingsHeader({
   dropdownRef
 }: ChatSettingsHeaderProps) {
   return (
-    <div className="w-full bg-[var(--header-bg)] px-4 h-14 flex justify-between items-center z-50 shrink-0 relative border-b border-[var(--border-color)] shadow-sm">
+    <div className="w-full bg-[var(--header-bg)] px-4 h-14 flex justify-between items-center z-50 shrink-0 relative border-b border-[var(--border-color)]/35 shadow-sm rounded-b-2xl">
       {/* Back button */}
       <button 
         onClick={onBack} 

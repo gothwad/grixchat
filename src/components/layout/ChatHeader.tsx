@@ -122,7 +122,7 @@ export default function ChatHeader({
   };
   
   return (
-    <div className="shrink-0 flex flex-col z-50 w-full bg-[var(--header-bg)] border-b border-[var(--border-color)] shadow-sm">
+    <div className="shrink-0 flex flex-col z-50 w-full bg-[var(--header-bg)] border-b border-[var(--border-color)]/35 shadow-sm rounded-b-2xl">
       {/* Main Bar */}
       <div className="flex items-center justify-between px-4 min-h-[56px] pt-safe w-full min-w-0">
         <div className="flex items-center gap-2 min-w-0">
