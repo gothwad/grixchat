@@ -77,8 +77,15 @@ export const pushNotificationService = {
         })
       });
 
-      const resData = await response.json();
-      console.log('FCM: Push notification service complete, result:', resData);
+      const responseText = await response.text();
+      let resData: any = null;
+      try {
+        resData = responseText ? JSON.parse(responseText) : null;
+      } catch (parseErr) {
+        console.warn(`FCM: Received non-JSON response from server. Status: ${response.status}. Response body: ${responseText.substring(0, 500)}`);
+        throw new Error(`Failed to parse FCM server response: ${responseText.substring(0, 150) || '(empty)'}`);
+      }
+      console.log('FCM: Push notification service response:', resData);
     } catch (err) {
       console.warn('FCM: pushNotificationService exception encountered:', err);
     }

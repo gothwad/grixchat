@@ -31,12 +31,33 @@ export default function NotificationHandler() {
         try {
           const swUrl = `/firebase-messaging-sw.js?apiKey=${encodeURIComponent(apiKey)}&authDomain=${encodeURIComponent(authDomain || '')}&projectId=${encodeURIComponent(projectId)}&storageBucket=${encodeURIComponent(storageBucket || '')}&messagingSenderId=${encodeURIComponent(messagingSenderId)}&appId=${encodeURIComponent(appId)}`;
           
+          console.log('FCM: Registering Service Worker with scope...');
           const reg = await navigator.serviceWorker.register(swUrl, {
             scope: '/firebase-cloud-messaging-push-scope'
           });
           
-          console.log('FCM: Service Worker registered successfully:', reg);
+          console.log('FCM: Service Worker registered successfully:', reg.scope, 'State:', reg.installing ? 'installing' : reg.waiting ? 'waiting' : reg.active ? 'active' : 'unknown');
           registrationRef.current = reg;
+
+          // Crucial: Wait for the Service Worker to become fully active
+          if (reg.installing) {
+            const sw = reg.installing;
+            console.log('FCM: SW is installing, waiting for activation...');
+            await new Promise<void>((resolve) => {
+              sw.addEventListener('statechange', () => {
+                console.log('FCM: SW installing state changed to:', sw.state);
+                if (sw.state === 'activated') {
+                  resolve();
+                }
+              });
+              // Fallback resolve after 3 seconds to avoid blocking indefinitely
+              setTimeout(resolve, 3000);
+            });
+          } else if (reg.waiting) {
+            console.log('FCM: SW is waiting. Attempting to skip waiting...');
+          } else if (reg.active) {
+            console.log('FCM: SW is already active and running.');
+          }
         } catch (swErr) {
           console.warn('FCM: Service Worker registration failed (likely iframe or sandbox restriction):', swErr);
         }
@@ -73,7 +94,7 @@ export default function NotificationHandler() {
         });
 
         if (currentToken) {
-          console.log('FCM: Acquired client token successfully:');
+          console.log('FCM: Acquired client token successfully:', currentToken.substring(0, 15) + '...');
 
           // Sync with profile in Supabase
           const existingTokens = userData?.fcmTokens || [];
@@ -98,8 +119,14 @@ export default function NotificationHandler() {
         } else {
           console.log('FCM: Obtained blank token.');
         }
-      } catch (fcmErr) {
-        console.warn('FCM: Token retrieval failed (expected in sandbox/iframe group):', fcmErr);
+      } catch (fcmErr: any) {
+        console.warn('FCM: Token retrieval failed details:', {
+          message: fcmErr?.message || String(fcmErr),
+          code: fcmErr?.code,
+          name: fcmErr?.name,
+          stack: fcmErr?.stack,
+          full: fcmErr
+        });
       }
     };
 

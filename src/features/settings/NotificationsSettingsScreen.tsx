@@ -110,11 +110,19 @@ export default function NotificationsSettingsScreen() {
         })
       });
 
-      const data = await response.json();
-      if (data.success) {
+      const responseText = await response.text();
+      let data: any = null;
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch (parseErr) {
+        console.warn(`FCM Settings: Non-JSON response received. Status: ${response.status}. Body: ${responseText}`);
+        throw new Error(`Unexpected server response format: ${responseText.substring(0, 100) || '(empty)'}`);
+      }
+
+      if (data && data.success) {
         alert("Test notification dispatched instantly! Check device system tray.");
       } else {
-        throw new Error(data.error || "Failed to send test notification");
+        throw new Error((data && data.error) || "Failed to send test notification");
       }
     } catch (e: any) {
       console.error(e);
