@@ -17,7 +17,7 @@ export default function DesktopSidebar() {
   ];
 
   return (
-    <div className="hidden lg:flex w-16 h-full flex-col items-center py-4 bg-[var(--nav-bg)] border-r border-white/10 shrink-0 z-[60]">
+    <div className="hidden lg:flex w-16 h-full flex-col items-center py-4 bg-[var(--bg-card)] border-r border-[var(--border-color)]/30 shrink-0 z-[60]">
       <div className="flex-1 flex flex-col items-center gap-6">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -27,7 +27,7 @@ export default function DesktopSidebar() {
               key={item.path} 
               to={item.path} 
               title={item.label}
-              className={`p-3 rounded-xl transition-all relative group ${isActive ? 'bg-white text-[var(--nav-bg)] shadow-lg' : 'text-[var(--nav-text)]/60 hover:bg-white/10 hover:text-[var(--nav-text)]'}`}
+              className={`p-3 rounded-xl transition-all relative group ${isActive ? 'bg-[var(--primary)] text-white shadow-lg shadow-[var(--primary)]/20 scale-105' : 'text-[var(--nav-text)]/60 hover:bg-[var(--border-color)]/50 hover:text-[var(--text-primary)]'}`}
             >
               <Icon size={24} />
               {!isActive && (
@@ -43,7 +43,7 @@ export default function DesktopSidebar() {
         <Link 
           to="/notifications" 
           title="Notifications"
-          className={`p-3 rounded-xl transition-all relative group ${location.pathname === '/notifications' ? 'bg-white text-[var(--nav-bg)] shadow-lg' : 'text-[var(--nav-text)]/60 hover:bg-white/10 hover:text-[var(--nav-text)]'}`}
+          className={`p-3 rounded-xl transition-all relative group ${location.pathname === '/notifications' ? 'bg-[var(--primary)] text-white shadow-lg shadow-[var(--primary)]/20 scale-105' : 'text-[var(--nav-text)]/60 hover:bg-[var(--border-color)]/50 hover:text-[var(--text-primary)]'}`}
         >
           <Bell size={24} />
           {location.pathname !== '/notifications' && (
@@ -55,7 +55,7 @@ export default function DesktopSidebar() {
         <Link 
           to="/settings" 
           title="Settings"
-          className={`p-3 rounded-xl transition-all relative group ${location.pathname === '/settings' ? 'bg-white text-[var(--nav-bg)] shadow-lg' : 'text-[var(--nav-text)]/60 hover:bg-white/10 hover:text-[var(--nav-text)]'}`}
+          className={`p-3 rounded-xl transition-all relative group ${location.pathname === '/settings' ? 'bg-[var(--primary)] text-white shadow-lg shadow-[var(--primary)]/20 scale-105' : 'text-[var(--nav-text)]/60 hover:bg-[var(--border-color)]/30 hover:text-[var(--text-primary)]'}`}
         >
           <Settings size={24} />
           {location.pathname !== '/settings' && (

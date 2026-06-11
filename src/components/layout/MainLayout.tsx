@@ -9,17 +9,79 @@ import ResourcesNav, { TabType } from './ResourcesNav.tsx';
 import { useNav } from '../../contexts/NavContext.tsx';
 import PWAInstallPrompt from './PWAInstallPrompt.tsx';
 import { useAuth } from '../../providers/AuthProvider';
+import DesktopSidebar from './DesktopSidebar';
+import DesktopWelcome from './DesktopWelcome';
 
-// Lazy loading our 5 tabs for keep-alive container
+// Lazy loading our tabs for keep-alive container
 const ChatsTab = React.lazy(() => import('../../features/chat/ChatsTab'));
 const GroupsTab = React.lazy(() => import('../../features/chat/GroupsTab'));
 const SearchTab = React.lazy(() => import('../../features/search/SearchTab'));
 const CallsTab = React.lazy(() => import('../../features/call/CallsTab'));
 const ProfileTab = React.lazy(() => import('../../features/profile/ProfileTab'));
+const SettingsMainScreen = React.lazy(() => import('../../features/settings/SettingsMainScreen'));
+const NotificationsScreen = React.lazy(() => import('../../features/notifications/NotificationsScreen'));
 
 // Paths where BottomNav should be visible
 const TAB_PATHS = ['/', '/chats', '/groups', '/search', '/calls', '/profile', '/notifications', '/reels'];
 const MAIN_TABS = ['/', '/chats', '/groups', '/search', '/calls', '/profile'];
+
+const getDesktopParentPane = (pathname: string): 'chats' | 'groups' | 'settings' | 'notifications' | null => {
+  // If exactly on a main list screen, return null to direct-route in middle list pane
+  if (pathname === '/chats' || 
+      pathname === '/groups' || 
+      pathname === '/search' || 
+      pathname === '/calls' || 
+      pathname === '/profile' || 
+      pathname === '/settings' || 
+      pathname === '/notifications') {
+    return null;
+  }
+
+  // Chats details paths
+  if (pathname.startsWith('/chat/') || 
+      pathname.startsWith('/chats/') || 
+      pathname === '/new-group' || 
+      pathname === '/messages') {
+    return 'chats';
+  }
+
+  // Groups details paths
+  if (pathname.startsWith('/group-settings/')) {
+    return 'groups';
+  }
+
+  // Notifications details paths
+  if (pathname.startsWith('/notifications/')) {
+    return 'notifications';
+  }
+
+  // Settings sub-details paths
+  const settingsPaths = [
+    '/edit-profile',
+    '/privacy-settings',
+    '/chat-settings',
+    '/app-preferences',
+    '/account-settings',
+    '/active-sessions',
+    '/app-lock',
+    '/setup-lock',
+    '/verify-lock',
+    '/notifications-settings',
+    '/data-usage',
+    '/help',
+    '/app-info',
+    '/github',
+    '/favorites',
+    '/blocked-accounts',
+    '/muted-accounts',
+    '/user/'
+  ];
+  if (settingsPaths.some(path => pathname.startsWith(path))) {
+    return 'settings';
+  }
+
+  return null;
+};
 
 export default function MainLayout() {
   const location = useLocation();
@@ -28,6 +90,16 @@ export default function MainLayout() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   const { activeCall, endCall, timer } = useCall();
+
+  const [isDesktop, setIsDesktop] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 1024 : false));
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const formatTimer = (sec: number) => {
     const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -40,7 +112,7 @@ export default function MainLayout() {
   
   // Paths where TopNav should be visible
   const showTopNav = TAB_PATHS.includes(location.pathname);
-
+  
   // Keep-Alive state
   const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({});
 
@@ -72,6 +144,87 @@ export default function MainLayout() {
     }
   }, [location.pathname, setIsResourcesNavOpen]);
 
+  // Handle Desktop Rendering path
+  if (isDesktop && user) {
+    const parentType = getDesktopParentPane(location.pathname);
+    const isDesktopDetailActive = !!parentType;
+
+    const renderDesktopParentComponent = () => {
+      switch (parentType) {
+        case 'chats':
+          return <ChatsTab />;
+        case 'groups':
+          return <GroupsTab />;
+        case 'settings':
+          return <SettingsMainScreen />;
+        case 'notifications':
+          return <NotificationsScreen />;
+        default:
+          return null;
+      }
+    };
+
+    return (
+      <div className="h-[100dvh] w-screen flex flex-row overflow-hidden bg-[var(--bg-main)] text-[var(--text-primary)]">
+        {/* Leftmost slim toolbar - WhatsApp Web style */}
+        <DesktopSidebar />
+
+        {/* Middle Column Pane (Sidebar list / menu panel) */}
+        {/* We use [transform:translate(0,0)] so that position:fixed elements are bounded inside this column */}
+        <div className="w-[380px] h-full flex flex-col border-r border-[var(--border-color)]/20 bg-[var(--bg-card)] shrink-0 overflow-hidden relative [transform:translate3d(0,0,0)] z-20">
+          
+          {/* Realtime Call indicator on desktop */}
+          {activeCall && (
+            <div className="bg-emerald-600 text-white px-4 py-2 border-b border-emerald-500/25 flex items-center justify-between z-30 shrink-0">
+              <Link 
+                to={`/call/${activeCall.otherUserId}?type=${activeCall.type}&role=${activeCall.role}&callId=${activeCall.id}`}
+                className="flex-1 text-left"
+              >
+                <p className="text-[10px] font-black tracking-wider uppercase leading-none">📞 Active Call</p>
+                <p className="text-[11px] font-medium leading-none opacity-90 mt-1 truncate">
+                  With {activeCall.receiver?.full_name || 'Grixvibe User'} • {formatTimer(timer)}
+                </p>
+              </Link>
+              <button 
+                onClick={endCall} 
+                className="p-1 px-2 border border-white/20 bg-rose-500/80 hover:bg-rose-600 rounded-lg text-[10px] font-bold"
+              >
+                Hang up
+              </button>
+            </div>
+          )}
+
+          {/* Render active list component with a dynamic Suspense state */}
+          <div className="flex-1 overflow-hidden relative h-full">
+            <Suspense fallback={
+              <div className="h-full flex items-center justify-center bg-[var(--bg-card)]">
+                <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            }>
+              {isDesktopDetailActive ? renderDesktopParentComponent() : <Outlet />}
+            </Suspense>
+          </div>
+        </div>
+
+        {/* Right Column Pane (Detail workspace panel / active ChatScreen / subpage) */}
+        {/* We use [transform:translate(0,0)] so that position:fixed elements are bounded inside this column */}
+        <div className="flex-grow h-full bg-[var(--bg-main)] overflow-hidden relative [transform:translate3d(0,0,0)] z-10 border-l border-[var(--border-color)]/10">
+          <Suspense fallback={
+            <div className="h-full flex items-center justify-center bg-[var(--bg-main)]">
+              <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          }>
+            {isDesktopDetailActive ? <Outlet /> : <DesktopWelcome />}
+          </Suspense>
+        </div>
+
+        {/* Optional background PWA launcher prompt */}
+        <PWAInstallPrompt />
+      </div>
+    );
+  }
+
+  // Mobile Rendering path (keeps original horizontal tab keep-alive system unchanged)
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {showTopNav && <TopNav />}

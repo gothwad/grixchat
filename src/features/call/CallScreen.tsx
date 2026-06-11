@@ -65,48 +65,81 @@ export default function CallScreen() {
     }
   }, [isReceiver, otherUserId, activeCall, initiateCall, type]);
 
-  // Safe play of local stream with explicit play triggers to bypass browser autoplay blocks
+  // Ultra-reliable continuous polling and synchronization safeguard to bypass React parent/child mount delays
   useEffect(() => {
-    const videoEl = localVideoRef.current;
-    if (videoEl) {
-      if (localStream) {
-        videoEl.srcObject = localStream;
-        videoEl.play().catch(err => {
-          console.warn("[WebRTC] Local stream auto playback blocked:", err);
-        });
-      } else {
-        videoEl.srcObject = null;
-      }
-    }
-  }, [localStream, localVideoRef.current]);
+    const syncStreamTracks = () => {
+      const localEl = localVideoRef.current;
+      const remoteEl = remoteVideoRef.current;
 
-  // Safe play of remote stream with volume & mute constraint enforcement and explicit play triggers
-  useEffect(() => {
-    const videoEl = remoteVideoRef.current;
-    if (videoEl) {
-      if (remoteStream) {
-        videoEl.srcObject = remoteStream;
-        // Attempt to play explicitly (critical backup for mobile/web autoplay lockouts)
-        videoEl.play().catch(err => {
-          console.warn("[WebRTC] Remote stream auto playback blocked:", err);
-        });
-      } else {
-        videoEl.srcObject = null;
+      if (localEl && localStream) {
+        if (localEl.srcObject !== localStream) {
+          localEl.srcObject = localStream;
+        }
+        if (localEl.paused) {
+          localEl.play().catch(() => {});
+        }
+      } else if (localEl && !localStream) {
+        localEl.srcObject = null;
       }
 
-      // Sync volume & mute levels gracefully matching speakerState (0 = Mute, 1 = earpiece, 2 = loudspeaker)
-      if (speakerState === 0) {
-        videoEl.volume = 0;
-        videoEl.muted = true;
-      } else if (speakerState === 1) {
-        videoEl.volume = 0.25;
-        videoEl.muted = false;
-      } else {
-        videoEl.volume = 1.0;
-        videoEl.muted = false;
+      if (remoteEl && remoteStream) {
+        if (remoteEl.srcObject !== remoteStream) {
+          remoteEl.srcObject = remoteStream;
+        }
+        if (remoteEl.paused) {
+          remoteEl.play().catch(err => {
+            console.warn("[WebRTC] Remote stream auto playback blocked:", err);
+          });
+        }
+        
+        // Ensure volume matches speakerState cleanly
+        if (speakerState === 0) {
+          remoteEl.volume = 0;
+          remoteEl.muted = true;
+        } else if (speakerState === 1) {
+          remoteEl.volume = 0.25;
+          remoteEl.muted = false;
+        } else {
+          remoteEl.volume = 1.0;
+          remoteEl.muted = false;
+        }
+      } else if (remoteEl && !remoteStream) {
+        remoteEl.srcObject = null;
       }
-    }
-  }, [remoteStream, remoteVideoRef.current, speakerState]);
+    };
+
+    syncStreamTracks();
+    const interval = setInterval(syncStreamTracks, 500);
+    return () => clearInterval(interval);
+  }, [localStream, remoteStream, speakerState]);
+
+  // Global touch & tap recovery listener to bypass modern mobile browser autoplay constraints
+  useEffect(() => {
+    const forcePlayback = () => {
+      console.log("[WebRTC Gesture Recovery] Triggering safe manual play on user interaction...");
+      const localEl = localVideoRef.current;
+      const remoteEl = remoteVideoRef.current;
+
+      if (localEl && localStream && localEl.paused) {
+        localEl.play().catch(() => {});
+      }
+      if (remoteEl && remoteStream && remoteEl.paused) {
+        remoteEl.play().then(() => {
+          console.log("[WebRTC Gesture Recovery] Remote audio/video started successfully!");
+        }).catch(e => console.warn("[WebRTC Gesture Recovery] Remote play failed:", e));
+      }
+    };
+
+    window.addEventListener('click', forcePlayback, { passive: true });
+    window.addEventListener('touchstart', forcePlayback, { passive: true });
+    window.addEventListener('pointerdown', forcePlayback, { passive: true });
+
+    return () => {
+      window.removeEventListener('click', forcePlayback);
+      window.removeEventListener('touchstart', forcePlayback);
+      window.removeEventListener('pointerdown', forcePlayback);
+    };
+  }, [localStream, remoteStream]);
 
   const handleBack = () => {
     // Instead of terminating the call on back button, we navigate to /chats.

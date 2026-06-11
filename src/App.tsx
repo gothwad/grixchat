@@ -518,6 +518,36 @@ export default function App() {
                       </Route>
                       <Route path="/calls" element={user ? <CallsTab /> : <Navigate to="/login" />} />
                       <Route path="/profile" element={user ? <ProfileTab /> : <Navigate to="/login" />} />
+                      
+                      {/* Sub routes nested in MainLayout to support clean split layouts on Desktop */}
+                      <Route path="/notifications" element={user ? <NotificationsScreen /> : <Navigate to="/login" />} />
+                      <Route path="/notifications/likes" element={user ? <LikeNotificationsScreen /> : <Navigate to="/login" />} />
+                      <Route path="/settings" element={user ? <SettingsMainScreen /> : <Navigate to="/login" />} />
+                      <Route path="/edit-profile" element={user ? <EditProfileScreen /> : <Navigate to="/login" />} />
+                      <Route path="/privacy-settings" element={user ? <PrivacySettingsScreen /> : <Navigate to="/login" />} />
+                      <Route path="/chat-settings" element={user ? <ChatSettingsMainScreen /> : <Navigate to="/login" />} />
+                      <Route path="/app-preferences" element={user ? <AppPreferencesScreen /> : <Navigate to="/login" />} />
+                      <Route path="/account-settings" element={user ? <AccountSettingsScreen /> : <Navigate to="/login" />} />
+                      <Route path="/active-sessions" element={user ? <ActiveSessionsScreen /> : <Navigate to="/login" />} />
+                      <Route path="/app-lock" element={user ? <AppLockScreen /> : <Navigate to="/login" />} />
+                      <Route path="/setup-lock/:type" element={user ? <SetupLockScreen /> : <Navigate to="/login" />} />
+                      <Route path="/verify-lock" element={user ? <VerifyLockScreen /> : <Navigate to="/login" />} />
+                      <Route path="/notifications-settings" element={user ? <NotificationsSettingsScreen /> : <Navigate to="/login" />} />
+                      <Route path="/data-usage" element={user ? <DataUsageScreen /> : <Navigate to="/login" />} />
+                      <Route path="/help" element={user ? <HelpScreen /> : <Navigate to="/login" />} />
+                      <Route path="/help/faq" element={user ? <HelpFaqScreen /> : <Navigate to="/login" />} />
+                      <Route path="/help/contact" element={user ? <HelpContactScreen /> : <Navigate to="/login" />} />
+                      <Route path="/app-info" element={user ? <AppInfoScreen /> : <Navigate to="/login" />} />
+                      <Route path="/github" element={user ? <GithubScreen /> : <Navigate to="/login" />} />
+                      <Route path="/favorites" element={user ? <FavoritesScreen /> : <Navigate to="/login" />} />
+                      <Route path="/blocked-accounts" element={user ? <BlockedAccountsScreen /> : <Navigate to="/login" />} />
+                      <Route path="/muted-accounts" element={user ? <MutedAccountsScreen /> : <Navigate to="/login" />} />
+                      <Route path="/new-group" element={user ? <NewGroupScreen /> : <Navigate to="/login" />} />
+                      <Route path="/group-settings/:id" element={user ? <GroupSettingsScreen /> : <Navigate to="/login" />} />
+                      <Route path="/messages" element={user ? <MessagesListScreen /> : <Navigate to="/login" />} />
+                      <Route path="/user/:id" element={user ? <UserProfileScreen /> : <Navigate to="/login" />} />
+                      <Route path="/chat/preview" element={user ? <ImagePreviewScreen /> : <Navigate to="/login" />} />
+                      <Route path="/profile/grix-ai" element={user ? <GrixAIProfile /> : <Navigate to="/login" />} />
                     </Route>
     
                     {/* Other Routes */}
@@ -528,42 +558,14 @@ export default function App() {
                       user && (!userData || !userData.username) ? <CompleteProfileScreen /> : <Navigate to="/chats" replace />
                     } />
                     <Route path="/call/:id" element={user ? <CallScreen /> : <Navigate to="/login" />} />
-                    <Route path="/notifications" element={user ? <NotificationsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/notifications/likes" element={user ? <LikeNotificationsScreen /> : <Navigate to="/login" />} />
                     <Route path="/stories/view/:userId" element={user ? <StoryWatcherScreen /> : <Navigate to="/login" />} />
                     <Route path="/stories/create" element={user ? <StoryCreationScreen /> : <Navigate to="/login" />} />
-                    <Route path="/settings" element={user ? <SettingsMainScreen /> : <Navigate to="/login" />} />
-                    <Route path="/edit-profile" element={user ? <EditProfileScreen /> : <Navigate to="/login" />} />
-                    <Route path="/privacy-settings" element={user ? <PrivacySettingsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/chat-settings" element={user ? <ChatSettingsMainScreen /> : <Navigate to="/login" />} />
-                    <Route path="/app-preferences" element={user ? <AppPreferencesScreen /> : <Navigate to="/login" />} />
-                    <Route path="/account-settings" element={user ? <AccountSettingsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/active-sessions" element={user ? <ActiveSessionsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/app-lock" element={user ? <AppLockScreen /> : <Navigate to="/login" />} />
-                    <Route path="/setup-lock/:type" element={user ? <SetupLockScreen /> : <Navigate to="/login" />} />
-                    <Route path="/verify-lock" element={user ? <VerifyLockScreen /> : <Navigate to="/login" />} />
-                    <Route path="/notifications-settings" element={user ? <NotificationsSettingsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/data-usage" element={user ? <DataUsageScreen /> : <Navigate to="/login" />} />
-                    <Route path="/help" element={user ? <HelpScreen /> : <Navigate to="/login" />} />
-                    <Route path="/help/faq" element={user ? <HelpFaqScreen /> : <Navigate to="/login" />} />
-                    <Route path="/help/contact" element={user ? <HelpContactScreen /> : <Navigate to="/login" />} />
-                    <Route path="/app-info" element={user ? <AppInfoScreen /> : <Navigate to="/login" />} />
-                    <Route path="/github" element={user ? <GithubScreen /> : <Navigate to="/login" />} />
-                    <Route path="/favorites" element={user ? <FavoritesScreen /> : <Navigate to="/login" />} />
-                    <Route path="/blocked-accounts" element={user ? <BlockedAccountsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/muted-accounts" element={user ? <MutedAccountsScreen /> : <Navigate to="/login" />} />
-                    <Route path="/new-group" element={user ? <NewGroupScreen /> : <Navigate to="/login" />} />
-                    <Route path="/group-settings/:id" element={user ? <GroupSettingsScreen /> : <Navigate to="/login" />} />
                     <Route path="/login" element={!user ? <LoginScreen /> : <Navigate to="/chats" replace />} />
                     <Route path="/signup" element={!user ? <SignupScreen /> : <Navigate to="/chats" replace />} />
                     <Route path="/forgot-password" element={!user ? <ForgotPasswordScreen /> : <Navigate to="/chats" replace />} />
                     <Route path="/privacy-policy" element={<PrivacyPolicyScreen />} />
                     <Route path="/terms" element={<TermsAndConditionsScreen />} />
-                    <Route path="/messages" element={user ? <MessagesListScreen /> : <Navigate to="/login" />} />
                     <Route path="/search-user" element={<Navigate to="/profile" replace />} />
-                    <Route path="/user/:id" element={user ? <UserProfileScreen /> : <Navigate to="/login" />} />
-                    <Route path="/chat/preview" element={user ? <ImagePreviewScreen /> : <Navigate to="/login" />} />
-                    <Route path="/profile/grix-ai" element={user ? <GrixAIProfile /> : <Navigate to="/login" />} />
                     <Route path="*" element={<Navigate to="/chats" replace />} />
                   </Routes>
                 </React.Suspense>

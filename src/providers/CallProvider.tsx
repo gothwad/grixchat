@@ -471,10 +471,31 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       pcRef.current.ontrack = (event) => {
         console.log("[WebRTC Receiver] Remote track received:", event.track.kind);
-        const incomingStream = event.streams[0] || new MediaStream();
-        remoteStreamRef.current = incomingStream;
-        setRemoteStream(incomingStream);
-        setActiveCall(prev => prev ? { ...prev, status: 'connected' } : null);
+        
+        let incomingStream = event.streams[0];
+        if (!remoteStreamRef.current) {
+          remoteStreamRef.current = new MediaStream();
+        }
+        
+        if (incomingStream) {
+          incomingStream.getTracks().forEach(track => {
+            if (remoteStreamRef.current && !remoteStreamRef.current.getTracks().some(t => t.id === track.id)) {
+              remoteStreamRef.current.addTrack(track);
+            }
+          });
+        } else {
+          if (!remoteStreamRef.current.getTracks().some(t => t.id === event.track.id)) {
+            remoteStreamRef.current.addTrack(event.track);
+          }
+        }
+        
+        setRemoteStream(new MediaStream(remoteStreamRef.current.getTracks()));
+        setActiveCall(prev => {
+          if (prev && prev.status !== 'connected') {
+            return { ...prev, status: 'connected' };
+          }
+          return prev;
+        });
       };
 
       pcRef.current.oniceconnectionstatechange = () => {
@@ -666,10 +687,31 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         pcRef.current.ontrack = (event) => {
           console.log("[WebRTC Caller] Remote track received:", event.track.kind);
-          const incomingStream = event.streams[0] || new MediaStream();
-          remoteStreamRef.current = incomingStream;
-          setRemoteStream(incomingStream);
-          setActiveCall(prev => prev ? { ...prev, status: 'connected' } : null);
+          
+          let incomingStream = event.streams[0];
+          if (!remoteStreamRef.current) {
+            remoteStreamRef.current = new MediaStream();
+          }
+          
+          if (incomingStream) {
+            incomingStream.getTracks().forEach(track => {
+              if (remoteStreamRef.current && !remoteStreamRef.current.getTracks().some(t => t.id === track.id)) {
+                remoteStreamRef.current.addTrack(track);
+              }
+            });
+          } else {
+            if (!remoteStreamRef.current.getTracks().some(t => t.id === event.track.id)) {
+              remoteStreamRef.current.addTrack(event.track);
+            }
+          }
+          
+          setRemoteStream(new MediaStream(remoteStreamRef.current.getTracks()));
+          setActiveCall(prev => {
+            if (prev && prev.status !== 'connected') {
+              return { ...prev, status: 'connected' };
+            }
+            return prev;
+          });
         };
 
         pcRef.current.oniceconnectionstatechange = () => {
