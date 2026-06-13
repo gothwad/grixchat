@@ -65,9 +65,39 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const navigate = useNavigate();
   const { user } = useAuth();
   const x = useMotionValue(0);
-  const replyIconOpacity = useTransform(x, [0, 45], [0, 1]);
-  const replyIconScale = useTransform(x, [0, 45], [0.5, 1.15]);
-  const replyIconRotate = useTransform(x, [0, 45], [-35, 0]);
+  const [swipeActive, setSwipeActive] = React.useState(false);
+  const hasVibratedRef = React.useRef(false);
+
+  const replyIconOpacity = useTransform(x, [0, 35], [0, 1]);
+  const replyIconScale = useTransform(x, [0, 45], [0.55, 1.15]);
+  const replyIconRotate = useTransform(x, [0, 45], [-45, 0]);
+  const replyIconX = useTransform(x, [0, 45, 75], [-42, 12, 16]);
+
+  React.useEffect(() => {
+    if (!x) return;
+    const handler = (latestValue: number) => {
+      if (latestValue > 42) {
+        setSwipeActive(true);
+        if (!hasVibratedRef.current) {
+          hasVibratedRef.current = true;
+          if (window.navigator && window.navigator.vibrate) {
+            try { window.navigator.vibrate(14); } catch (err) {}
+          }
+        }
+      } else {
+        setSwipeActive(false);
+        if (latestValue < 5) {
+          hasVibratedRef.current = false;
+        }
+      }
+    };
+    if (typeof (x as any).on === 'function') {
+      return (x as any).on("change", handler);
+    } else if (typeof (x as any).onChange === 'function') {
+      return (x as any).onChange(handler);
+    }
+  }, [x]);
+
   const [tick, setTick] = React.useState(0);
 
   const bubbleStyleSetting = storage.getItem('app-chat-bubble-style') || 'whatsapp';
@@ -215,30 +245,41 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         {/* Smooth WhatsApp/Telegram sliding background reply indicator */}
         <motion.div 
           style={{ 
+            x: replyIconX,
             opacity: replyIconOpacity,
             scale: replyIconScale,
             rotate: replyIconRotate,
           }}
-          className="absolute -left-10 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/10 dark:bg-zinc-800/80 border border-white/5 flex items-center justify-center text-teal-400 shadow-md pointer-events-none z-0"
+          className={`absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center shadow-md pointer-events-none z-0 transition-colors duration-100 ${
+            swipeActive 
+              ? 'bg-[var(--primary)] text-neutral-900 scale-110 shadow-lg shadow-[var(--primary)]/30 border-none' 
+              : 'bg-black/10 dark:bg-zinc-800/80 text-teal-400 border border-white/5'
+          }`}
         >
-          <CornerUpRight size={14} className="stroke-[2.8]" />
+          <CornerUpRight size={13} className={`stroke-[3.2] ${swipeActive ? 'scale-110' : ''}`} />
         </motion.div>
 
         <motion.div 
           style={{ x }}
           drag="x"
-          dragConstraints={{ left: 0, right: 110 }}
-          dragElastic={{ left: 0, right: 0.35 }}
-          dragTransition={{ bounceStiffness: 500, bounceDamping: 26 }}
+          dragDirectionLock={true}
+          dragConstraints={{ left: 0, right: 80 }}
+          dragElastic={{ left: 0, right: 0.25 }}
+          dragTransition={{ bounceStiffness: 950, bounceDamping: 25 }}
           dragSnapToOrigin
-          onDragStart={(e) => e.stopPropagation()}
+          onDragStart={(e) => {
+            e.stopPropagation();
+            hasVibratedRef.current = false;
+          }}
           onDragEnd={(_, info) => {
-            if (info.offset.x > 50) {
+            if (swipeActive || info.offset.x > 42) {
               setReplyingTo(msg);
               if (window.navigator && window.navigator.vibrate) {
-                try { window.navigator.vibrate(12); } catch(e){}
+                try { window.navigator.vibrate(10); } catch(e){}
               }
             }
+            setSwipeActive(false);
+            hasVibratedRef.current = false;
           }}
           onClick={(e) => {
             if (isMsgDeleted) return;
@@ -255,7 +296,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             scale: [1, 1.02, 1],
             transition: { duration: 0.5, repeat: 1 }
           } : {}}
-          className={`px-3 pt-2 pb-[19px] ${hasReactions ? 'pb-[27px]' : ''} ${resolvedReplyTo ? 'min-w-[190px]' : 'min-w-[70px]'} shadow-sm border border-neutral-800/10 dark:border-white/5 relative cursor-pointer select-none max-w-full overflow-visible touch-none w-fit transition-all duration-200 ${bubbleShapeClass} ${
+          className={`px-3 pt-2 pb-[19px] ${hasReactions ? 'pb-[27px]' : ''} ${resolvedReplyTo ? 'min-w-[190px]' : 'min-w-[70px]'} shadow-sm border border-neutral-800/10 dark:border-white/5 relative cursor-pointer select-none max-w-full overflow-visible touch-pan-y w-fit transition-colors duration-200 ${bubbleShapeClass} ${
             activeMessageMenu?.id === msg.id ? 'z-50 ring-2.5 ring-[var(--primary)]/45 scale-[1.01] shadow-lg' : 'z-10'
           } ${
             actualIsMe 

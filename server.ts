@@ -470,7 +470,7 @@ function calculateGitHubSha(contentBase64: string): string {
 
 // GitHub Batch Push (Atomic commit for multiple files)
 app.post("/api/github/push-batch", async (req, res) => {
-  const { token, owner, repo, files, message, branch = 'main' } = req.body;
+  const { token, owner, repo, files, message, branch = 'main', isSequential = false } = req.body;
   
   try {
     const headers = { 
@@ -478,7 +478,7 @@ app.post("/api/github/push-batch", async (req, res) => {
       Accept: 'application/vnd.github.v3+json'
     };
 
-    console.log(`Starting smart batch push for ${files.length} files to ${owner}/${repo} on branch ${branch}`);
+    console.log(`Starting smart batch push for ${files.length} files to ${owner}/${repo} on branch ${branch} [isSequential: ${isSequential}]`);
 
     // 1. Get the latest commit SHA of the branch
     const branchRes = await axios.get(`https://api.github.com/repos/${owner}/${repo}/branches/${branch}`, { headers });
@@ -511,6 +511,56 @@ app.post("/api/github/push-batch", async (req, res) => {
         message: "No changes detected. Repository is already up to date.",
         noChanges: true 
       });
+    }
+
+    // If sequential mode is enabled, upload files one-by-one to support safe incrementing
+    if (isSequential) {
+      console.log(`Sequential Sync Mode: Uploading ${modifiedFiles.length} files individually...`);
+      let uploadedCount = 0;
+      
+      try {
+        for (let i = 0; i < modifiedFiles.length; i++) {
+          const file = modifiedFiles[i];
+          const sha = existingFiles.get(file.path);
+          
+          console.log(`Uploading file ${i + 1}/${modifiedFiles.length}: ${file.path} (SHA: ${sha || 'new'})`);
+          
+          await axios.put(`https://api.github.com/repos/${owner}/${repo}/contents/${file.path}`, {
+            message: `${message} - update ${file.path}`,
+            content: file.content,
+            sha: sha || undefined,
+            branch
+          }, { headers });
+
+          uploadedCount++;
+          
+          // Small pause to prevent hitting GitHub's abuse detection rates on continuous fast writes
+          await new Promise(resolve => setTimeout(resolve, 150));
+        }
+
+        return res.json({
+          message: `Successfully uploaded all ${uploadedCount} files sequentially.`,
+          sequential: true,
+          uploadedCount,
+          html_url: `https://github.com/${owner}/${repo}/commits/${branch}`
+        });
+
+      } catch (err: any) {
+        const errorDetail = err.response?.data?.message || err.message;
+        console.error(`Sequential sync error after uploading ${uploadedCount} files:`, err.response?.data || err.message);
+        
+        if (uploadedCount > 0) {
+          return res.json({
+            message: `Uploaded ${uploadedCount} files successfully, but stopped because of GitHub limit.`,
+            sequential: true,
+            uploadedCount,
+            error: errorDetail,
+            html_url: `https://github.com/${owner}/${repo}/commits/${branch}`
+          });
+        } else {
+          throw new Error(`Failed to upload first file ${modifiedFiles[0].path}: ${errorDetail}`);
+        }
+      }
     }
 
     // 4. Create blobs for each modified file with concurrency control

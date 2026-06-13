@@ -28,6 +28,11 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
   const [messageLimit, setMessageLimit] = useState(initialLimit);
   const lastMessageCount = useRef(0);
   const { user, userData, isAuthReady } = useAuth();
+
+  const messagesRef = useRef<any[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   
   const confirmOptimisticMessage = useCallback((tempId: string, dbMessage: any) => {
     if (!dbMessage) return;
@@ -158,6 +163,25 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
     // Instantly clear cached count for zero local UI latency!
     LocalDataCache.clearUnreadCount(user.id, conversationId);
 
+    // Optimize DB write egress: Check if there is actually any unread message from another user in the active message list or cache.
+    // If we have none, skip performing the DB update request to save budget and API traffic!
+    const hasUnreadLocally = messagesRef.current.some(
+      (m: any) => m && m.sender_id !== user.id && !m.is_read
+    );
+
+    let hasUnreadInCache = false;
+    try {
+      const cachedConvs = LocalDataCache.getConversations(user.id);
+      const activeConv = cachedConvs?.find((c: any) => c.id === conversationId);
+      if (activeConv && (activeConv.unread || activeConv.unreadCount > 0)) {
+        hasUnreadInCache = true;
+      }
+    } catch (_) {}
+
+    if (!hasUnreadLocally && !hasUnreadInCache) {
+      return; // No unread messages locally or in cached badge, skip remote DB write!
+    }
+
     try {
       const { error } = await supabase
         .from('messages')
@@ -187,25 +211,6 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
     const isMore = messageLimit > initialLimit;
     fetchMessages(isMore);
   }, [conversationId, messageLimit, initialLimit, isAuthReady]);
-
-  // 2. Hook for background polling synchronizer as absolute failsafe backup
-  useEffect(() => {
-    if (!conversationId || !user || !isAuthReady) return;
-
-    let isActive = true;
-    const intervalId = setInterval(() => {
-      // Only poll gently if the tab is visible and network is active
-      if (isActive && document.visibilityState === 'visible' && navigator.onLine) {
-        fetchMessagesRef.current();
-        markAsReadRef.current();
-      }
-    }, 6000); // Failsafe heart-beat sync every 6 seconds
-
-    return () => {
-      isActive = false;
-      clearInterval(intervalId);
-    };
-  }, [conversationId, user?.id, isAuthReady]);
 
   // 3. Hook for Realtime Postgres Subscription (Bound exclusively to conversation ID)
   useEffect(() => {

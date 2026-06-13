@@ -189,76 +189,8 @@ export default function TabBottom() {
       }
     });
 
-    // Gentle polling backup (runs every 30s) ONLY when the conversation hook is unmounted
-    // (This guarantees we keep unread sync'd on other screens without holding 20 open websockets!)
-    const pollingInterval = setInterval(() => {
-      const currentTab = window.location.pathname;
-      const isChatTabActive = currentTab.startsWith('/chats') || currentTab.startsWith('/groups');
-      
-      if (!isChatTabActive && document.visibilityState === 'visible' && navigator.onLine) {
-        // Redirection trigger bypass - fetch unread directly
-        const fetchUnread = async () => {
-          try {
-            if (!supabase) return;
-            const { data: participants } = await supabase
-              .from('conversation_participants')
-              .select('conversation_id')
-              .eq('user_id', authUser.id);
-            
-            const myConvIds = (participants || []).map(p => p.conversation_id);
-            if (myConvIds.length === 0) {
-              setUnreadChatsCount(0);
-              setUnreadGroupsCount(0);
-              return;
-            }
-
-            const { data: messages } = await supabase
-              .from('messages')
-              .select('conversation_id')
-              .eq('is_read', false)
-              .neq('sender_id', authUser.id)
-              .in('conversation_id', myConvIds);
-            
-            if (messages) {
-              // Read count details
-              const distinctConversations = Array.from(new Set(messages.map(m => m.conversation_id as string)));
-              let chatsUnread = 0;
-              let groupsUnread = 0;
-              
-              // Map types
-              const { data: convs } = await supabase
-                .from('conversations')
-                .select('id, type')
-                .in('id', myConvIds);
-              
-              const typeMap: Record<string, string> = {};
-              convs?.forEach(c => {
-                typeMap[c.id] = c.type;
-              });
-
-              distinctConversations.forEach((cid: string) => {
-                const type = typeMap[cid];
-                if (type === 'group') {
-                  groupsUnread++;
-                } else {
-                  chatsUnread++;
-                }
-              });
-
-              setUnreadChatsCount(chatsUnread);
-              setUnreadGroupsCount(groupsUnread);
-            }
-          } catch (e) {
-            console.error("TabBottom bg-poll error:", e);
-          }
-        };
-        fetchUnread();
-      }
-    }, 30000);
-
     return () => {
       unsubscribeCache();
-      clearInterval(pollingInterval);
     };
   }, [authUser?.id, conversationsList]);
   
