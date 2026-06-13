@@ -109,6 +109,14 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
           m.content = m.text || m.content || '';
         });
         
+        // Mark as read immediately if any unread message from another user was fetched
+        const hasUnreadFromOthers = reversed.some(
+          (m: any) => m && m.sender_id !== user?.id && !m.is_read
+        );
+        if (hasUnreadFromOthers) {
+          markAsReadRef.current(true);
+        }
+        
         setMessages(prev => {
           const mergedMap = new Map();
           prev.forEach(msg => {
@@ -130,7 +138,7 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [conversationId, messageLimit]);
+  }, [conversationId, messageLimit, user?.id]);
 
   // Synchronously sync messages & loading state when conversationId changes
   useEffect(() => {
@@ -157,29 +165,31 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
   }, [fetchMessages]);
 
   // Mark as read function that will be stored in a ref to stay fresh but stable
-  const markAsRead = useCallback(async () => {
+  const markAsRead = useCallback(async (force: boolean = false) => {
     if (!conversationId || !user || !supabase) return;
     
     // Instantly clear cached count for zero local UI latency!
     LocalDataCache.clearUnreadCount(user.id, conversationId);
 
-    // Optimize DB write egress: Check if there is actually any unread message from another user in the active message list or cache.
-    // If we have none, skip performing the DB update request to save budget and API traffic!
-    const hasUnreadLocally = messagesRef.current.some(
-      (m: any) => m && m.sender_id !== user.id && !m.is_read
-    );
+    if (!force) {
+      // Optimize DB write egress: Check if there is actually any unread message from another user in the active message list or cache.
+      // If we have none, skip performing the DB update request to save budget and API traffic!
+      const hasUnreadLocally = messagesRef.current.some(
+        (m: any) => m && m.sender_id !== user.id && !m.is_read
+      );
 
-    let hasUnreadInCache = false;
-    try {
-      const cachedConvs = LocalDataCache.getConversations(user.id);
-      const activeConv = cachedConvs?.find((c: any) => c.id === conversationId);
-      if (activeConv && (activeConv.unread || activeConv.unreadCount > 0)) {
-        hasUnreadInCache = true;
+      let hasUnreadInCache = false;
+      try {
+        const cachedConvs = LocalDataCache.getConversations(user.id);
+        const activeConv = cachedConvs?.find((c: any) => c.id === conversationId);
+        if (activeConv && (activeConv.unread || activeConv.unreadCount > 0)) {
+          hasUnreadInCache = true;
+        }
+      } catch (_) {}
+
+      if (!hasUnreadLocally && !hasUnreadInCache) {
+        return; // No unread messages locally or in cached badge, skip remote DB write!
       }
-    } catch (_) {}
-
-    if (!hasUnreadLocally && !hasUnreadInCache) {
-      return; // No unread messages locally or in cached badge, skip remote DB write!
     }
 
     try {
@@ -319,10 +329,10 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
       });
 
     // Mark as read immediately on active screen entering
-    markAsReadRef.current();
+    markAsReadRef.current(true);
 
     const handleFocus = () => {
-      markAsReadRef.current();
+      markAsReadRef.current(true);
       // Instantly call fetchMessages on focus to capture any updates instantly when returning
       fetchMessagesRef.current();
     };

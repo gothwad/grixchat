@@ -107,7 +107,7 @@ export default function GithubRepoList({ token, onSuccess }: GithubRepoListProps
   }, []);
 
   // Fetch remote SHA hashes when depository details change to establish diffs
-  const fetchRemoteHashes = async (owner: string, repoName: string, targetBranch: string) => {
+  const fetchRemoteHashes = async (owner: string, repoName: string, targetBranch: string): Promise<RemoteFileRef[]> => {
     try {
       const branchRes = await axios.get(`https://api.github.com/repos/${owner}/${repoName}/branches/${targetBranch}`, {
         headers: { Authorization: `token ${token}` }
@@ -121,10 +121,13 @@ export default function GithubRepoList({ token, onSuccess }: GithubRepoListProps
           .filter((n: any) => n.type === 'blob')
           .map((n: any) => ({ path: n.path, sha: n.sha }));
         setRemoteFiles(refs);
+        return refs;
       }
+      return [];
     } catch (e) {
       console.warn('Unable to query remote codebase index tree. Assuming initial push.', e);
       setRemoteFiles([]);
+      return [];
     }
   };
 
@@ -188,7 +191,7 @@ export default function GithubRepoList({ token, onSuccess }: GithubRepoListProps
     setFilesToUpload(0);
     setFilesUploadedCount(0);
     setFilesRemainingCount(0);
-    setCurrentFileTransfer('Preparing directories staging environment...');
+    setCurrentFileTransfer('Setting up local workspace files...');
 
     try {
       if (syncType === 'zip') {
@@ -212,15 +215,20 @@ export default function GithubRepoList({ token, onSuccess }: GithubRepoListProps
         }
       }
 
+      // Query the absolute latest commit file trees and hashes directly before commencing diff comparisons!
+      setStatusMessage('Fetching latest remote repository state...');
+      setCurrentFileTransfer('Retrieving upstream branch state to prevent conflict...');
+      const activeRemoteFiles = await fetchRemoteHashes(selectedRepo.owner.login, selectedRepo.name, branch);
+
       // If sequential mode is enabled, upload files one-by-one to support safe incrementing client-side!
       if (isSequential) {
         setStatusMessage('Filtering unchanged files...');
         setCurrentFileTransfer('Comparing local vs remote hashes to skip duplicates...');
 
-        // Filter files that are actually modified or new
+        // Filter files that are actually modified or new against latest real-world files on GitHub
         const modifiedFiles: { path: string, content: string }[] = [];
         for (const file of finalPayload) {
-          const matchingRemote = remoteFiles.find(rf => rf.path === file.path);
+          const matchingRemote = activeRemoteFiles.find(rf => rf.path === file.path);
           let isModified = true;
 
           if (syncType === 'zip') {
@@ -259,7 +267,7 @@ export default function GithubRepoList({ token, onSuccess }: GithubRepoListProps
 
         for (let i = 0; i < modifiedFiles.length; i++) {
           const file = modifiedFiles[i];
-          const matchingRemote = remoteFiles.find(rf => rf.path === file.path);
+          const matchingRemote = activeRemoteFiles.find(rf => rf.path === file.path);
           const sha = matchingRemote?.sha;
 
           let loc = 0;
@@ -271,18 +279,37 @@ export default function GithubRepoList({ token, onSuccess }: GithubRepoListProps
           setCurrentFileTransfer(`Pushing: ${file.path} (${loc} lines of code)`);
           setStatusMessage(`Uploading file ${i + 1}/${modifiedFiles.length}...`);
 
-          // Execute PUT call directly to GitHub contents API
-          await axios.put(`https://api.github.com/repos/${selectedRepo.owner.login}/${selectedRepo.name}/contents/${file.path}`, {
-            message: `${commitMessage} - update ${file.path}`,
-            content: file.content,
-            sha: sha || undefined,
-            branch
-          }, {
-            headers: {
-              Authorization: `token ${token}`,
-              Accept: 'application/vnd.github.v3+json'
+          try {
+            // Execute PUT call directly to GitHub contents API
+            const putRes = await axios.put(`https://api.github.com/repos/${selectedRepo.owner.login}/${selectedRepo.name}/contents/${file.path}`, {
+              message: `${commitMessage} - update ${file.path}`,
+              content: file.content,
+              sha: sha || undefined,
+              branch
+            }, {
+              headers: {
+                Authorization: `token ${token}`,
+                Accept: 'application/vnd.github.v3+json'
+              }
+            });
+
+            // Dynamically register the file's newly response SHA back to guard sequential retries
+            if (putRes.data && putRes.data.content && putRes.data.content.sha) {
+              const newSha = putRes.data.content.sha;
+              const idx = activeRemoteFiles.findIndex(rf => rf.path === file.path);
+              if (idx > -1) {
+                activeRemoteFiles[idx].sha = newSha;
+              } else {
+                activeRemoteFiles.push({ path: file.path, sha: newSha });
+              }
+              // Set state synchronously so user UI and subsequent files see correct SHA state
+              setRemoteFiles([...activeRemoteFiles]);
             }
-          });
+          } catch (fileErr: any) {
+            const errorDetail = fileErr.response?.data?.message || fileErr.message;
+            console.error(`Error uploading sequential file ${file.path}:`, fileErr.response?.data || fileErr.message);
+            throw new Error(`Stopped at file "${file.path}" due to GitHub: ${errorDetail}. Previous ${i} files were synchronized! You can resume seamlessly by initiating Publish again.`);
+          }
 
           const currentUploaded = i + 1;
           setFilesUploadedCount(currentUploaded);
@@ -305,7 +332,7 @@ export default function GithubRepoList({ token, onSuccess }: GithubRepoListProps
       
       let modifiedCount = 0;
       for (const file of finalPayload) {
-        const matchingRemote = remoteFiles.find(rf => rf.path === file.path);
+        const matchingRemote = activeRemoteFiles.find(rf => rf.path === file.path);
         let isModified = true;
         if (syncType === 'zip') {
           const zf = zipFiles.find(z => z.path === file.path);
