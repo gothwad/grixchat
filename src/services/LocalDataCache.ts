@@ -1,4 +1,5 @@
 import { storage, safeSessionStorage } from './StorageService';
+import { IndexedDBService } from './IndexedDBService';
 
 export interface LocalCacheConfig {
   maxAge: number; // in milliseconds
@@ -12,9 +13,52 @@ class LocalDataCacheService {
   private memoryCache: Record<string, { value: any; timestamp: number }> = {};
   private listeners: Record<string, Set<(payload?: any) => void>> = {};
   private sessionAccessedKeys = new Set<string>();
+  private initPromise: Promise<void> | null = null;
 
   constructor() {
     this.initializeSession();
+    this.initPromise = this.loadAllCachedDataIntoMemory();
+  }
+
+  private getStoreNameForKey(key: string): 'kv_store' | 'conversations' | 'messages' {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey.startsWith('gx_convs_')) {
+      return 'conversations';
+    }
+    if (lowerKey.startsWith('gx_msgs_')) {
+      return 'messages';
+    }
+    return 'kv_store';
+  }
+
+  public async loadAllCachedDataIntoMemory(): Promise<void> {
+    try {
+      console.log('[Cache Control] Initializing Dual-Layer Caching (IndexedDB -> Memory Map)...');
+      const [kv, convs, msgs] = await Promise.all([
+        IndexedDBService.getAll<{ value: any; timestamp: number }>('kv_store'),
+        IndexedDBService.getAll<{ value: any; timestamp: number }>('conversations'),
+        IndexedDBService.getAll<{ value: any; timestamp: number }>('messages'),
+      ]);
+
+      // Populating the synchronous memory layer
+      Object.entries(kv).forEach(([key, item]) => {
+        if (item && item.value !== undefined) this.memoryCache[key] = item;
+      });
+      Object.entries(convs).forEach(([key, item]) => {
+        if (item && item.value !== undefined) this.memoryCache[key] = item;
+      });
+      Object.entries(msgs).forEach(([key, item]) => {
+        if (item && item.value !== undefined) this.memoryCache[key] = item;
+      });
+
+      console.log(`[Cache Control] Prepopulated in-memory layers: ${Object.keys(this.memoryCache).length} active cache streams matched from local disk.`);
+    } catch (err) {
+      console.error('[Cache Control] Dual-Layer Prepopulation crash:', err);
+    }
+  }
+
+  public getInitPromise(): Promise<void> {
+    return this.initPromise || Promise.resolve();
   }
 
   private initializeSession(): void {
@@ -70,9 +114,14 @@ class LocalDataCacheService {
     };
     try {
       this.memoryCache[key] = item;
-      // Completely skip persistent localStorage write block to satisfy user preference
+      
+      // Async background write to IndexedDB
+      const storeName = this.getStoreNameForKey(key);
+      IndexedDBService.set(storeName, key, item).catch((err) => {
+        console.warn(`[Cache Control] Persistent write failed to IndexedDB for key "${key}":`, err);
+      });
     } catch (e) {
-      console.warn(`LocalDataCache write failed for key ${key}. Memory backup used.`, e);
+      console.warn(`LocalDataCache write failed for key ${key}. Memory fallback used.`, e);
     }
   }
 
@@ -101,6 +150,30 @@ class LocalDataCacheService {
   public remove(key: string): void {
     delete this.memoryCache[key];
     storage.removeItem(key);
+    
+    // Async background remove from IndexedDB
+    const storeName = this.getStoreNameForKey(key);
+    IndexedDBService.remove(storeName, key).catch((err) => {
+      console.warn(`[Cache Control] Persistent remove failed from IndexedDB for key "${key}":`, err);
+    });
+  }
+
+  /**
+   * Secure wipe of both the in-memory cache and IndexedDB storage.
+   * Prevents leakage of chats and personal messages between accounts.
+   */
+  public async clearAll(): Promise<void> {
+    try {
+      this.memoryCache = {};
+      await Promise.all([
+        IndexedDBService.clearStore('kv_store'),
+        IndexedDBService.clearStore('conversations'),
+        IndexedDBService.clearStore('messages'),
+      ]);
+      console.log('[Cache Control] Local cache and IndexedDB stores successfully wiped securely.');
+    } catch (err) {
+      console.error('[Cache Control] Error during secure database cache wipe:', err);
+    }
   }
 
   // --- Specific Conveniences for Conversations ---

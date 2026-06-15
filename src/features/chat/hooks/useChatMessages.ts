@@ -81,7 +81,11 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
     if (isMore) setLoadingMore(true);
 
     try {
-      const { data, error } = await supabase
+      // Delta sync check using local database cache
+      const currentCached = LocalDataCache.getMessages(conversationId) || [];
+      const nonOptimistic = currentCached.filter((m: any) => m && m.id && !m.id.startsWith('temp-') && m.created_at);
+
+      let query = supabase
         .from('messages')
         .select(`
           *,
@@ -97,17 +101,40 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
             sender_id
           )
         `)
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: false })
-        .limit(messageLimit);
+        .eq('conversation_id', conversationId);
+
+      if (isMore) {
+        // Fetch older messages for pagination
+        const minCreatedAt = nonOptimistic.length > 0 ? nonOptimistic[0].created_at : null;
+        if (minCreatedAt) {
+          query = query.lt('created_at', minCreatedAt).order('created_at', { ascending: false }).limit(20);
+        } else {
+          query = query.order('created_at', { ascending: false }).limit(messageLimit);
+        }
+      } else {
+        // Fetch only new messages since the latest message in cache (delta sync)
+        const maxCreatedAt = nonOptimistic.length > 0 ? nonOptimistic[nonOptimistic.length - 1].created_at : null;
+        if (maxCreatedAt) {
+          // Subtract a small 1-second safety offset to bypass transaction latency and clock drift
+          const driftOffset = 1000;
+          const checkTimestamp = new Date(new Date(maxCreatedAt).getTime() - driftOffset).toISOString();
+          query = query.gt('created_at', checkTimestamp).order('created_at', { ascending: false });
+        } else {
+          query = query.order('created_at', { ascending: false }).limit(messageLimit);
+        }
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching messages:', error);
       } else {
-        const reversed = (data as any[] || []).reverse();
-        reversed.forEach((m: any) => {
+        const fetchedMsgs = data as any[] || [];
+        fetchedMsgs.forEach((m: any) => {
           m.content = m.text || m.content || '';
         });
+
+        const reversed = [...fetchedMsgs].reverse();
         
         // Mark as read immediately if any unread message from another user was fetched
         const hasUnreadFromOthers = reversed.some(
@@ -119,9 +146,11 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
         
         setMessages(prev => {
           const mergedMap = new Map();
+          // Seed map with existing cached messages
           prev.forEach(msg => {
             if (msg && msg.id) mergedMap.set(msg.id, msg);
           });
+          // Merge newly fetched delta elements, overwriting previous values
           reversed.forEach(msg => {
             if (msg && msg.id) mergedMap.set(msg.id, msg);
           });

@@ -8,8 +8,9 @@ This file contains the strict development, architectural, and design constraints
 * **Backend, Database, Storage, and Sync:** Built **100% on Supabase**. Do not introduce any secondary server-side database stores or standard polling endpoints unless explicit.
 * **Push Notifications:** **Firebase Cloud Messaging (FCM)** is strictly used *only* for native background notification delivery. No other Firebase features (Auth, Firestore, Storage) should be used.
 * **Calling & Streaming:** Web RTC signaling is managed through lightweight Supabase channels. Keep media channels clean.
-* **Platform Delivery:** Deployed primarily as a **Progressive Web App (PWA)** and **Trusted Web Activity (TWA)** on Android. 
-  * The UX must feel native.
+* **Platform Delivery:** Deployed primarily as an **Advanced Native Android WebView wrapper** running bi-directional Javascript Bridges (`AndroidJSInterface`).
+  * Features custom native integrations (custom native splash screen, native FCM background delivery, native permission prompts for camera/mic/WebRTC, and custom offline screens).
+  * The UX must feel completely native.
   * Use safe-area paddings for navigation bars/status headers (`pb-[safe]`, `h-[100dvh]` dynamic viewport sizing to prevent mobile browser scroll bouncing).
   * Hover events must gracefully degrade, and touch targets must be minimum `44px` on mobile wrappers.
 

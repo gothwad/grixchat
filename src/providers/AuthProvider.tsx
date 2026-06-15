@@ -5,6 +5,7 @@ import { UserProfile } from '../types';
 import { storage, safeSessionStorage } from '../services/StorageService';
 import { userProfileService } from '../services/db/userProfileService';
 import { sessionService } from '../services/db/sessionService';
+import { LocalDataCache } from '../services/LocalDataCache';
 
 interface CustomUser extends User {
   uid: string;
@@ -76,6 +77,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (currentUserId) {
             userProfileService.throttledSetStatus(currentUserId, false, true).catch(() => {});
           }
+          // Securely wipe all message and chat histories on logout
+          LocalDataCache.clearAll().catch((err) => {
+            console.error('Failed to wipe local cache on SIGNED_OUT:', err);
+          });
           setUserData(null);
           setUser(null);
           setLoading(false);

@@ -3,7 +3,7 @@ import { APP_CONFIG } from '../../config/appConfig';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
-import { User as UserIcon, AtSign, Lock, Eye, EyeOff, Mail, ArrowRight, Github, HelpCircle, ArrowLeft } from 'lucide-react';
+import { User as UserIcon, AtSign, Lock, Eye, EyeOff, Mail, ArrowRight, Github, HelpCircle, ArrowLeft, Apple, Twitter, Facebook } from 'lucide-react';
 import { authService } from './services/authService.ts';
 
 export default function SignupScreen() {
@@ -14,11 +14,13 @@ export default function SignupScreen() {
   const [username, setUsername] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [agreeTerms, setAgreeTerms] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+  const [twitterLoading, setTwitterLoading] = useState(false);
+  const [facebookLoading, setFacebookLoading] = useState(false);
   const [showSocial, setShowSocial] = useState(false);
   const navigate = useNavigate();
 
@@ -94,7 +96,6 @@ export default function SignupScreen() {
     setError('');
     try {
       await authService.loginWithGoogle();
-      // Supabase OAuth will redirect the page automatically
     } catch (err: any) {
       setError(err.message);
       setGoogleLoading(false);
@@ -106,11 +107,46 @@ export default function SignupScreen() {
     setError('');
     try {
       await authService.loginWithGithub();
-      // Redirection behavior handled by Supabase OAuth
     } catch (err: any) {
       setError(err.message);
     } finally {
       setGithubLoading(false);
+    }
+  };
+
+  const handleAppleSignUp = async () => {
+    setAppleLoading(true);
+    setError('');
+    try {
+      await authService.loginWithApple();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setAppleLoading(false);
+    }
+  };
+
+  const handleTwitterSignUp = async () => {
+    setTwitterLoading(true);
+    setError('');
+    try {
+      await authService.loginWithTwitter();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setTwitterLoading(false);
+    }
+  };
+
+  const handleFacebookSignUp = async () => {
+    setFacebookLoading(true);
+    setError('');
+    try {
+      await authService.loginWithFacebook();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setFacebookLoading(false);
     }
   };
 
@@ -119,13 +155,6 @@ export default function SignupScreen() {
       <div className="w-full px-8 pt-8 pb-12 z-10 flex flex-col items-center min-h-full relative max-w-md mx-auto">
         {/* Header Section */}
         <div className="w-full relative flex items-center justify-center mb-4">
-          <button 
-            onClick={() => navigate(-1)}
-            className="absolute left-0 w-10 h-10 flex items-center justify-center bg-[var(--bg-card)] rounded-full border border-[var(--border-color)] text-[var(--text-primary)] active:scale-95 transition-all"
-          >
-            <ArrowLeft size={20} />
-          </button>
-
           <div className="w-16 h-16 bg-[var(--bg-card)] rounded-[20px] shadow-sm flex items-center justify-center border border-[var(--border-color)] p-0 overflow-hidden">
             <img 
               src="/assets/icon-512-maskable.png" 
@@ -137,11 +166,28 @@ export default function SignupScreen() {
         </div>
 
         {/* Header Area */}
-        <div className="text-center mb-4">
-          <h2 className="text-[26px] font-bold text-[var(--text-primary)] mb-2">Join GrixChat</h2>
-          <p className="text-[var(--text-secondary)] text-xs leading-relaxed max-w-[280px] mx-auto opacity-80">
-            Create your account to start chatting, sharing stories, and connecting with GrixChat.
+        <div className="text-center mb-5">
+          <h2 className="text-[28px] font-bold text-[var(--text-primary)] mb-1">GrixChat</h2>
+          <p className="text-[var(--text-secondary)] text-xs leading-relaxed max-w-[200px] mx-auto opacity-80">
+            Connecting you to your world, one message at a time.
           </p>
+        </div>
+
+        {/* Auth Switcher Tabs */}
+        <div className="w-full bg-[var(--bg-card)] p-1 rounded-xl flex items-center border border-[var(--border-color)] mb-5 max-w-md">
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="flex-1 py-2 text-xs font-bold rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all active:scale-[0.98]"
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            className="flex-1 py-2 text-xs font-bold rounded-lg bg-[var(--primary)] text-white shadow-sm shadow-[var(--primary)]/10 transition-all active:scale-[0.98]"
+          >
+            Sign Up
+          </button>
         </div>
 
         <form onSubmit={handleSignup} className="w-full space-y-3">
@@ -231,31 +277,10 @@ export default function SignupScreen() {
             </button>
           </div>
 
-          <div 
-            onClick={() => setAgreeTerms(!agreeTerms)}
-            className="flex items-start gap-2.5 px-1 py-1 cursor-pointer group select-none"
-          >
-            <div 
-              className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 mt-0.5 ${
-                agreeTerms 
-                  ? 'bg-[var(--primary)] border-[var(--primary)]' 
-                  : 'bg-[var(--bg-card)] border-[var(--border-color)] group-hover:border-[var(--text-secondary)]/50'
-              }`}
-            >
-              {agreeTerms && (
-                <svg className="w-2.5 h-2.5 text-white stroke-[3.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-              )}
-            </div>
-            <span className="text-[11px] font-medium text-[var(--text-secondary)] leading-tight group-hover:text-[var(--text-primary)] transition-colors">
-              I agree to the <span className="font-bold text-[var(--primary)] hover:underline">Terms of Service</span> and <span className="font-bold text-[var(--primary)] hover:underline">Privacy Policy</span>
-            </span>
-          </div>
           
           <button 
             type="submit"
-            disabled={loading || googleLoading || githubLoading || !fullName || !email || !username || password.length < 6 || password !== confirmPassword || !agreeTerms}
+            disabled={loading || googleLoading || githubLoading || appleLoading || twitterLoading || facebookLoading || !fullName || !email || !username || password.length < 6 || password !== confirmPassword}
             className="w-full bg-[var(--primary)] text-white text-sm font-bold py-3.5 rounded-xl transition-all disabled:opacity-75 disabled:cursor-not-allowed active:scale-[0.98] shadow-sm shadow-[var(--primary)]/20 mt-2 flex items-center justify-center gap-2"
           >
             <span>{loading ? 'Creating account...' : 'Sign Up'}</span>
@@ -277,38 +302,45 @@ export default function SignupScreen() {
             <div className="h-[1px] bg-[var(--border-color)] flex-1"></div>
           </div>
 
-          <div className="grid grid-cols-1 gap-2.5">
+          <div className="space-y-3 w-full">
             <button 
               type="button"
               onClick={handleGoogleSignUp}
-              disabled={loading || googleLoading || githubLoading}
-              className="w-full flex items-center justify-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] py-3 rounded-xl text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] transition-all active:scale-[0.98]"
+              disabled={loading || googleLoading || appleLoading || githubLoading}
+              className="w-full flex items-center justify-center gap-2 bg-[var(--bg-card)] border border-[var(--border-color)] py-3.5 rounded-xl text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] hover:border-[var(--text-primary)]/40 transition-all active:scale-[0.98] disabled:opacity-50"
             >
-              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
                 <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z" fill="#FBBC05"/>
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
               </svg>
-              <span>Log in with Google</span>
+              <span>Sign in/Sign up with Google</span>
             </button>
 
-
+            <button 
+              type="button"
+              onClick={handleAppleSignUp}
+              disabled={loading || googleLoading || appleLoading || githubLoading}
+              className="w-full flex items-center justify-center gap-2 bg-[var(--bg-card)] border border-[var(--border-color)] py-3.5 rounded-xl text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] hover:border-[var(--text-primary)]/40 transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              <Apple size={16} className="text-[var(--text-primary)] shrink-0" />
+              <span>Sign in/Sign up with Apple</span>
+            </button>
 
             <button 
               type="button"
               onClick={handleGithubSignUp}
-              disabled={loading || googleLoading || githubLoading}
-              className="w-full flex items-center justify-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] py-3 rounded-xl text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] transition-all active:scale-[0.98]"
+              disabled={loading || googleLoading || appleLoading || githubLoading}
+              className="w-full flex items-center justify-center gap-2 bg-[var(--bg-card)] border border-[var(--border-color)] py-3.5 rounded-xl text-[13px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] hover:border-[var(--text-primary)]/40 transition-all active:scale-[0.98] disabled:opacity-50"
             >
-              <Github size={20} className="text-[var(--text-primary)]" />
-              <span>Log in with GitHub</span>
+              <Github size={16} className="text-[var(--text-primary)] shrink-0" />
+              <span>Sign in/Sign up with GitHub</span>
             </button>
-          </div>
 
-          <div className="text-center pt-4 pb-2">
-            <span className="text-[12px] font-medium text-[var(--text-secondary)]">Already have an account? </span>
-            <Link to="/login" className="text-[12px] font-bold text-[var(--primary)] hover:underline">Login</Link>
+            <p className="text-[10px] text-center text-[var(--text-secondary)]/65 pt-6 leading-normal max-w-[280px] mx-auto select-none">
+              By using GrixChat, you agree to our <span className="font-bold text-[var(--primary)] hover:underline cursor-pointer">Terms of Service</span> & <span className="font-bold text-[var(--primary)] hover:underline cursor-pointer">Privacy Policy</span>.
+            </p>
           </div>
         </form>
       </div>

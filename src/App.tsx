@@ -12,6 +12,7 @@ import { useTheme } from './contexts/ThemeContext';
 import { ErrorBoundary } from 'react-error-boundary';
 import SplashScreen from './components/SplashScreen';
 import DeveloperConsole from './components/DeveloperConsole';
+import { LocalDataCache } from './services/LocalDataCache';
 
 function ErrorFallback({ error }: { error: any }) {
   return (
@@ -409,10 +410,24 @@ export default function App() {
   }, [resolvedTheme]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setSplashLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
+    let active = true;
+    const start = Date.now();
+    
+    LocalDataCache.getInitPromise().then(() => {
+      if (!active) return;
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, 1500 - elapsed);
+      setTimeout(() => {
+        if (active) setSplashLoading(false);
+      }, remaining);
+    }).catch((err) => {
+      console.error('[Splash Loader] Error pre-loading local caches:', err);
+      if (active) setSplashLoading(false);
+    });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Global Back Button Handler for Mobile
@@ -462,7 +477,7 @@ export default function App() {
   // Guard Logic
   const needsVerification = user && !user.email_confirmed_at && !(user.app_metadata?.providers || []).some((p: string) => ['google', 'github'].includes(p));
   const isLocalStorageOffline = !navigator.onLine;
-  const needsProfileCompletion = user && isAuthReady && !isLocalStorageOffline && (!userData || !userData.username);
+  const needsProfileCompletion = false; // Bypassed is complete profile screen setup as requested by user to avoid stuck screen on slow loads.
 
   if (user && isAuthReady) {
     const isPublicRoute = ['/login', '/signup', '/forgot-password', '/privacy-policy', '/terms', '/complete-profile', '/verify-email'].includes(location.pathname);
@@ -555,7 +570,7 @@ export default function App() {
                       user && !user.email_confirmed_at ? <VerifyEmailScreen /> : <Navigate to="/chats" replace />
                     } />
                     <Route path="/complete-profile" element={
-                      user && (!userData || !userData.username) ? <CompleteProfileScreen /> : <Navigate to="/chats" replace />
+                      <Navigate to="/chats" replace />
                     } />
                     <Route path="/call/:id" element={user ? <CallScreen /> : <Navigate to="/login" />} />
                     <Route path="/stories/view/:userId" element={user ? <StoryWatcherScreen /> : <Navigate to="/login" />} />

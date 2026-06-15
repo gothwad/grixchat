@@ -51,7 +51,7 @@ export const useConversations = (activeFilter: string) => {
   const fetchConversations = useCallback(async () => {
     if (!user || activeFilter === 'Calls' || !supabase || !isAuthReady) return;
     const myId = user.id;
-    const cached = LocalDataCache.getConversations(myId);
+    const cached = LocalDataCache.getConversations(myId) || [];
     
     if (isPaginating) {
       setLoadingMore(true);
@@ -83,7 +83,47 @@ export const useConversations = (activeFilter: string) => {
         return;
       }
 
-      // 2. Fetch details for these conversations, ordering by newest activity (updated_at) primarily to ensure live updates bubble to the top
+      // Delta synchronization strategy to bypass massive row scans and network payload limits
+      let maxUpdatedAt = '1970-01-01T00:00:00.000Z';
+      cached.forEach((c: any) => {
+        const updateTime = c.lastMsgAt || c.updated_at || c.created_at;
+        if (updateTime && new Date(updateTime).getTime() > new Date(maxUpdatedAt).getTime()) {
+          maxUpdatedAt = updateTime;
+        }
+      });
+
+      // Offset checkTimestamp by 10s to satisfy active clock drift in Supabase containers
+      const checkTimestamp = new Date(new Date(maxUpdatedAt).getTime() - 10000).toISOString();
+      let changedConvIds: string[] = [];
+      let isDelta = cached && cached.length > 0 && !isPaginating;
+
+      if (isDelta) {
+        const { data: updatedConvs, error: uError } = await supabase
+          .from('conversations')
+          .select('id')
+          .in('id', convIds)
+          .gt('updated_at', checkTimestamp);
+
+        if (!uError && updatedConvs) {
+          changedConvIds = updatedConvs.map(c => c.id);
+        } else if (uError) {
+          console.error('Error fetching delta updates:', uError);
+          isDelta = false; // Fallback to full sync
+        }
+      }
+
+      // If it's delta-sync and NO conversations have updated, complete instantly!
+      if (isDelta && changedConvIds.length === 0) {
+        console.log('[Delta Sync] Zero conversation changes found. Serving instant cached chats.');
+        setLoading(false);
+        setLoadingMore(false);
+        setIsPaginating(false);
+        return;
+      }
+
+      const idsToQuery = isDelta ? changedConvIds : convIds;
+
+      // 2. Fetch details for required conversations, ordering by newest activity (updated_at) primarily to ensure live updates bubble to the top
       const { data: convData, error: cError } = await supabase
         .from('conversations')
         .select(`
@@ -92,10 +132,10 @@ export const useConversations = (activeFilter: string) => {
             user:users (*)
           )
         `)
-        .in('id', convIds)
+        .in('id', idsToQuery)
         .order('updated_at', { ascending: false })
         .order('last_message_at', { ascending: false })
-        .limit(limit + 1);
+        .limit(isDelta ? changedConvIds.length : limit + 1);
 
       if (cError) {
         console.error('Error fetching conversations details:', cError);
@@ -104,11 +144,13 @@ export const useConversations = (activeFilter: string) => {
 
       let hasMoreData = false;
       let queryData = (convData || []).map(conv => ({ conversation: conv }));
-      if (queryData.length > limit) {
+      if (!isDelta && queryData.length > limit) {
         hasMoreData = true;
         queryData = queryData.slice(0, limit);
       }
-      setHasMore(hasMoreData);
+      if (!isDelta) {
+        setHasMore(hasMoreData);
+      }
 
       // Fetch missing hidden or archived chats so they are never lost from local state
       const fetchedIds = new Set(queryData.map((item: any) => item.conversation?.id).filter(Boolean));
@@ -268,9 +310,23 @@ export const useConversations = (activeFilter: string) => {
         })
         .filter(Boolean);
 
+      let finalFormattedList: any[] = [];
+      if (isDelta) {
+        const cacheMap = new Map();
+        cached.forEach((c: any) => {
+          if (c && c.id) cacheMap.set(c.id, c);
+        });
+        rawList.forEach((conv: any) => {
+          if (conv && conv.id) cacheMap.set(conv.id, conv);
+        });
+        finalFormattedList = Array.from(cacheMap.values());
+      } else {
+        finalFormattedList = rawList;
+      }
+
       // De-duplicate direct conversations: Keep only the one with the most recent activity / actual messages
       const seenDict: Record<string, any> = {};
-      rawList.forEach((conv: any) => {
+      finalFormattedList.forEach((conv: any) => {
         if (conv.type !== 'direct') return;
         const existing = seenDict[conv.otherUserId];
         if (!existing) {
@@ -293,7 +349,7 @@ export const useConversations = (activeFilter: string) => {
         }
       });
 
-      const formattedList = rawList
+      const formattedList = finalFormattedList
         .filter((conv: any) => {
           if (conv.type !== 'direct') return true;
           return seenDict[conv.otherUserId]?.id === conv.id;

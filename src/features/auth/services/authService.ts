@@ -46,6 +46,33 @@ export const authService = {
     return data;
   },
 
+  async loginWithApple() {
+    if (!supabase) throw new Error("Supabase is not initialized");
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'apple',
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async loginWithTwitter() {
+    if (!supabase) throw new Error("Supabase is not initialized");
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'twitter',
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async loginWithFacebook() {
+    if (!supabase) throw new Error("Supabase is not initialized");
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+    });
+    if (error) throw error;
+    return data;
+  },
+
   async logout() {
     if (!supabase) return;
     const { error } = await supabase.auth.signOut();
