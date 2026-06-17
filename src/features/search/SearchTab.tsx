@@ -1,16 +1,21 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
   ChevronRight,
   Loader2,
-  Plus
+  User,
+  Heart,
+  UserCheck,
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { supabase } from '../../lib/supabase';
 import { isUserOnline } from '../../utils/presence';
 import Avatar from '../../components/common/Avatar';
 import { CommonSearchBar } from '../../components/common/CommonSearchBar';
+import { LocalDataCache } from '../../services/LocalDataCache';
+import { useCall } from '../../providers/CallProvider';
 
 interface UserProfile {
   uid: string;
@@ -23,12 +28,30 @@ interface UserProfile {
 export default function SearchTab() {
   const navigate = useNavigate();
   const { user: authUser, userData } = useAuth();
+  const { initiateCall } = useCall();
   
   // Tab-specific search state
   const [discoverSearchTerm, setDiscoverSearchTerm] = useState('');
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [userResults, setUserResults] = useState<UserProfile[]>([]);
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>([]);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+
+  // Contacts / friends state
+  const [contacts, setContacts] = useState<UserProfile[]>(() => {
+    if (authUser?.id) {
+      const cached = LocalDataCache.get<any[]>(`gx_calls_contacts_${authUser.id}`);
+      if (cached && Array.isArray(cached)) return cached;
+    }
+    return [];
+  });
+  const [contactsLoading, setContactsLoading] = useState(() => {
+    if (authUser?.id) {
+      const cached = LocalDataCache.get<any[]>(`gx_calls_contacts_${authUser.id}`);
+      if (cached && Array.isArray(cached) && cached.length > 0) return false;
+    }
+    return true;
+  });
 
   // Fetch hidden user IDs
   useEffect(() => {
@@ -54,91 +77,100 @@ export default function SearchTab() {
     fetchHiddenUserIds();
   }, [userData?.hiddenChats, authUser?.id]);
 
-  // Stories integration
-  const [stories, setStories] = useState<any[]>([]);
-  const [storiesLoading, setStoriesLoading] = useState(false);
-
-  const fetchStories = useCallback(async () => {
-    if (!supabase || !authUser?.id) return;
-    setStoriesLoading(true);
+  // Fetch Contacts (mutual followers)
+  const fetchContacts = useCallback(async () => {
+    if (!authUser?.id || !supabase) return;
     try {
-      const { data, error } = await supabase
-        .from('stories')
-        .select('*, users:user_id(username, full_name, photo_url)')
-        .order('created_at', { ascending: false });
+      const cached = LocalDataCache.get<any[]>(`gx_calls_contacts_${authUser.id}`);
+      if (!cached || cached.length === 0) {
+        setContactsLoading(true);
+      }
+      
+      const { data: followRows, error: followError } = await supabase
+        .from('follows')
+        .select('follower_id, following_id')
+        .or(`follower_id.eq.${authUser.id},following_id.eq.${authUser.id}`);
+      
+      if (followError) throw followError;
 
-      if (!error && data) {
-        setStories(data);
+      const IFollow = new Set<string>();
+      const FollowsMe = new Set<string>();
+
+      followRows?.forEach((row: any) => {
+        if (row.follower_id === authUser.id) {
+          IFollow.add(row.following_id);
+        }
+        if (row.following_id === authUser.id) {
+          FollowsMe.add(row.follower_id);
+        }
+      });
+
+      const mutualIds = Array.from(IFollow).filter(id => FollowsMe.has(id));
+      const incomingRequests = Array.from(FollowsMe).filter(id => !IFollow.has(id));
+      setPendingRequestsCount(incomingRequests.length);
+      
+      if (mutualIds.length > 0) {
+        const { data: friendsData, error: friendsError } = await supabase
+          .from('users')
+          .select('id, username, full_name, photo_url, is_online, last_seen')
+          .in('id', mutualIds)
+          .limit(100);
+        
+        if (friendsError) throw friendsError;
+
+        if (friendsData) {
+          const formatted = friendsData.map(f => {
+            const lastSeen = f.last_seen;
+            const isOnline = !!(f.is_online && lastSeen && (new Date().getTime() - new Date(lastSeen).getTime()) < 65000);
+            return {
+              uid: f.id,
+              username: f.username,
+              fullName: f.full_name || f.username,
+              photoURL: f.photo_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+              isOnline
+            };
+          });
+          setContacts(formatted);
+          LocalDataCache.set(`gx_calls_contacts_${authUser.id}`, formatted);
+        }
+      } else {
+        setContacts([]);
+        LocalDataCache.set(`gx_calls_contacts_${authUser.id}`, []);
       }
     } catch (err) {
-      console.error('Error fetching stories for search tab:', err);
+      console.error('Error fetching friends contacts:', err);
     } finally {
-      setStoriesLoading(false);
+      setContactsLoading(false);
     }
   }, [authUser?.id]);
 
   useEffect(() => {
-    fetchStories();
-  }, [fetchStories]);
+    fetchContacts();
 
-  const storiesGroupedByUser = useMemo(() => {
-    const groups: { [key: string]: { userId: string; username: string; fullName: string; photoURL: string; stories: any[] } } = {};
-    
-    stories.forEach((story: any) => {
-      if (hiddenUserIds.includes(story.user_id)) return;
+    if (!supabase || !authUser?.id) return;
 
-      const uid = story.user_id;
-      const userObj = story.users;
-      const username = userObj?.username || 'User';
-      const fullName = userObj?.full_name || username;
-      const photoURL = userObj?.photo_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
-      
-      if (!groups[uid]) {
-        groups[uid] = {
-          userId: uid,
-          username,
-          fullName,
-          photoURL,
-          stories: []
-        };
-      }
-      groups[uid].stories.push(story);
-    });
+    const channel = supabase
+      .channel('search-follows-realtime')
+      .on('postgres_changes', { 
+         event: '*', 
+         schema: 'public', 
+         table: 'follows',
+         filter: `follower_id=eq.${authUser.id}`
+       }, () => fetchContacts())
+      .on('postgres_changes', { 
+         event: '*', 
+         schema: 'public', 
+         table: 'follows',
+         filter: `following_id=eq.${authUser.id}`
+       }, () => fetchContacts())
+      .subscribe();
 
-    return Object.values(groups);
-  }, [stories, hiddenUserIds]);
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [authUser?.id, fetchContacts]);
 
-  const myStoriesGroup = storiesGroupedByUser.find(g => g.userId === authUser?.id);
-  const otherStoriesGroups = storiesGroupedByUser.filter(g => g.userId !== authUser?.id);
-
-  const formatStoryTime = (createdAtString: string) => {
-    if (!createdAtString) return '';
-    const date = new Date(createdAtString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    
-    const isToday = date.toDateString() === now.toDateString();
-    const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
-    
-    if (isToday) {
-      return `Today, ${date.toLocaleTimeString([], options)}`;
-    }
-    
-    const yesterday = new Date();
-    yesterday.setDate(now.getDate() - 1);
-    const isYesterday = date.toDateString() === yesterday.toDateString();
-    if (isYesterday) {
-      return `Yesterday, ${date.toLocaleTimeString([], options)}`;
-    }
-    
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], options);
-  };
-
-  // Handle Discover User Search
+  // Handle Discover User Search (Global searching)
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (discoverSearchTerm.trim()) {
@@ -180,18 +212,24 @@ export default function SearchTab() {
     return () => clearTimeout(delayDebounceFn);
   }, [discoverSearchTerm, authUser?.id]);
 
-  const renderUserRow = (profile: UserProfile) => {
+  // Handle Call Initialization
+  const handleCall = (userId: string, type: 'voice' | 'video') => {
+    if (initiateCall) {
+      initiateCall(userId, type);
+    }
+  };
+
+  const renderUserProfileRow = (profile: UserProfile, isFriend: boolean = false) => {
     return (
       <div 
         key={profile.uid}
-        onClick={() => navigate(`/user/${profile.uid}`)}
+        onClick={() => navigate(`/chat/${profile.uid}`)}
         className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group cursor-pointer select-none"
       >
         <Avatar 
           url={profile.photoURL} 
           type="direct" 
           name={profile.fullName || profile.username || 'GrixUser'} 
-          isOnline={profile.isOnline} 
         />
         
         <div className="flex-1 min-w-0 flex items-center justify-between">
@@ -201,7 +239,26 @@ export default function SearchTab() {
             </h4>
             <p className="text-[12.5px] text-[var(--text-secondary)] opacity-75 font-medium mt-0.5 leading-tight">@{profile.username || 'username'}</p>
           </div>
-          <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-30 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200 shrink-0" />
+          
+          {/* Quick actionable messaging or calls details */}
+          <div className="flex items-center gap-2.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+            {isFriend ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/chat/${profile.uid}`);
+                }}
+                className="px-4 py-1.5 rounded-full flex items-center justify-center gap-1.5 bg-[#0494f4]/10 dark:bg-zinc-800/40 hover:bg-[#0494f4]/15 border border-[#0494f4]/20 active:scale-95 transition-all duration-150 text-[#0494f4] text-xs font-semibold cursor-pointer select-none"
+                title="Send Message"
+              >
+                <MessageSquare size={13} strokeWidth={2.5} />
+                <span>Message</span>
+              </button>
+            ) : (
+              <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-30 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200 shrink-0" />
+            )}
+          </div>
         </div>
       </div>
     );
@@ -210,12 +267,12 @@ export default function SearchTab() {
   const renderInlineHeader = (title: string, count?: number) => {
     return (
       <div className="px-4 py-2 bg-[var(--bg-main)]/30 border-b border-t border-[var(--border-color)]/5 select-none flex items-center justify-between first:border-t-0 font-sans">
-        <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+        <span className="text-[9.5px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-[#0494f4]"></span>
           {title}
         </span>
         {count !== undefined && count > 0 && (
-          <span className="text-[9.5px] font-bold text-[#0494f4] bg-[#0494f4]/15 px-1.5 h-4 rounded-full flex items-center justify-center font-mono">
+          <span className="text-[9px] font-black text-[#0494f4] bg-[#0494f4]/15 px-1.5 h-4.5 rounded-full flex items-center justify-center font-mono">
             {count}
           </span>
         )}
@@ -226,9 +283,10 @@ export default function SearchTab() {
   return (
     <div className="h-full flex flex-col bg-[var(--bg-card)] overflow-hidden animate-fade-in touch-pan-y font-sans">
       <div className="flex-1 overflow-y-auto no-scrollbar pb-32 bg-[var(--bg-card)]">
-        {/* Scrollable Reusable Search Bar */}
+        
+        {/* Search Bar */}
         <CommonSearchBar 
-          placeholder="Search profiles by name or username..."
+          placeholder="Search global profiles, contacts, username..."
           value={discoverSearchTerm}
           onChange={setDiscoverSearchTerm}
           onClear={() => setDiscoverSearchTerm('')}
@@ -238,140 +296,78 @@ export default function SearchTab() {
           {discoverSearchTerm ? (
             /* Search results view and header */
             <div className="flex flex-col bg-[var(--bg-card)] divide-y divide-[var(--border-color)]/5 border-b border-[var(--border-color)]/5">
-              {renderInlineHeader("Global Query Results", userResults.filter(p => !hiddenUserIds.includes(p.uid)).length)}
               
               {discoverLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-2 bg-[var(--bg-card)]">
                   <Loader2 className="animate-spin text-[#0494f4]" size={22} />
-                  <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider">Browsing matches...</p>
+                  <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider">Searching direct entries...</p>
                 </div>
               ) : userResults.filter(p => !hiddenUserIds.includes(p.uid)).length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center px-4 gap-2 bg-[var(--bg-card)]">
                   <Users size={22} className="text-[var(--text-secondary)] opacity-50 shrink-0" />
                   <div>
                     <h4 className="text-[13px] font-bold text-[var(--text-primary)]">No profiles matched</h4>
-                    <p className="text-[11.5px] text-[var(--text-secondary)] px-4 leading-tight mt-0.5">Please check the search spelling, or wait until users register on Grixvibe.</p>
+                    <p className="text-[11px] text-[var(--text-secondary)] px-4 leading-tight mt-0.5">Please check spelling or type correct username references.</p>
                   </div>
                 </div>
               ) : (
-                userResults.filter(p => !hiddenUserIds.includes(p.uid)).map(profile => renderUserRow(profile))
+                userResults.filter(p => !hiddenUserIds.includes(p.uid)).map(profile => {
+                  const isMutual = contacts.some(c => c.uid === profile.uid);
+                  return renderUserProfileRow(profile, isMutual);
+                })
               )}
             </div>
           ) : (
-            /* Default unified top-to-bottom list */
+            /* Default Contacts List View underneath the search bar! */
             <div className="flex flex-col bg-[var(--bg-card)] divide-y divide-[var(--border-color)]/5 border-b border-[var(--border-color)]/5">
               
-              {/* STATUS LIST */}
-              {(() => {
-                return (
-                  <>
-                    {/* MY STATUS TILE */}
-                    <div 
-                      onClick={() => {
-                        if (myStoriesGroup) {
-                          navigate(`/stories/view/${authUser?.id}`);
-                        } else {
-                          navigate('/stories/create');
-                        }
-                      }}
-                      className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group cursor-pointer select-none"
-                    >
-                      {/* Left: Avatar */}
-                      <div className="relative shrink-0">
-                        {myStoriesGroup ? (
-                          <Avatar 
-                            url={userData?.photoURL} 
-                            type="direct" 
-                            name="My Story" 
-                          />
-                        ) : (
-                          <div className="relative">
-                            <Avatar 
-                              url={userData?.photoURL} 
-                              type="direct" 
-                              name="My Story" 
-                            />
-                            <div className="absolute -bottom-0.5 -right-0.5 w-[16px] h-[16px] bg-[#0494f4] text-white rounded-full flex items-center justify-center border-2 border-[var(--bg-card)] shadow-md">
-                              <Plus size={10} strokeWidth={3} />
-                            </div>
-                          </div>
-                        )}
-                      </div>
+              {/* Pending Requests Pinned Shortcut */}
+              <div 
+                onClick={() => navigate('/chats/requests')}
+                className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 group cursor-pointer"
+              >
+                <div className="relative shrink-0 z-10">
+                  <div className="w-12 h-12 rounded-full bg-[#0494f4]/10 dark:bg-zinc-800/60 flex items-center justify-center text-[var(--primary)] group-hover:scale-[1.02] transition-transform border border-[var(--border-color)]/15">
+                    <Users size={19} className="text-[#0494f4]" />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <div className="flex justify-between items-baseline mb-0.5">
+                    <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
+                      Pending Requests
+                    </h3>
+                    <span className="text-[10px] whitespace-nowrap text-[#0494f4] font-semibold tracking-tight bg-[#0494f4]/10 px-2 py-0.5 rounded-full">
+                      {pendingRequestsCount > 0 ? `${pendingRequestsCount} Pending` : 'View'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <p className="text-[12px] truncate text-[var(--text-secondary)] font-medium opacity-75">
+                      Mutual requests and incoming profiles waiting
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-                      {/* Middle: Details */}
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[#0494f4] transition-colors leading-tight">
-                          My Story
-                        </h4>
-                        <p className="text-[12.5px] text-[var(--text-secondary)] opacity-75 mt-0.5 font-medium leading-tight">
-                          {myStoriesGroup 
-                            ? `Last update: ${formatStoryTime(myStoriesGroup.stories[0].created_at)}` 
-                            : 'Tap to add story update'
-                          }
-                        </p>
-                      </div>
-
-                      {/* Right: Plus to add new stories */}
-                      {myStoriesGroup && (
-                        <button 
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate('/stories/create');
-                          }}
-                          className="w-9 h-9 rounded-full flex items-center justify-center bg-transparent text-[#0494f4] hover:bg-[var(--border-color)]/10 active:scale-95 transition-all duration-150 cursor-pointer shrink-0"
-                          title="Add New Story"
-                        >
-                          <Plus size={18} className="stroke-[2.2]" />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* FRIENDS' STATUSES (RECENT UPDATES) */}
-                    {storiesLoading ? (
-                      <div className="flex items-center gap-2 px-4 py-4 justify-center">
-                        <Loader2 className="animate-spin text-[#0494f4]" size={16} />
-                        <span className="text-xs text-[var(--text-secondary)]">Loading stories...</span>
-                      </div>
-                    ) : otherStoriesGroups.length === 0 ? (
-                      <div className="px-5 py-4 text-center">
-                        <p className="text-[11.5px] text-[var(--text-secondary)] italic">No updates from other people yet.</p>
-                      </div>
-                    ) : (
-                      otherStoriesGroups.map(group => (
-                        <div 
-                          key={group.userId}
-                          onClick={() => navigate(`/stories/view/${group.userId}`)}
-                          className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group cursor-pointer select-none"
-                        >
-                          {/* Left: Avatar */}
-                          <div className="relative shrink-0">
-                            <Avatar 
-                              url={group.photoURL} 
-                              type="direct" 
-                              name={group.username} 
-                            />
-                          </div>
-
-                          {/* Middle: Details */}
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[#0494f4] transition-colors leading-tight">
-                              {group.fullName || group.username}
-                            </h4>
-                            <p className="text-[12.5px] text-[var(--text-secondary)] opacity-75 mt-0.5 font-medium leading-tight">
-                              {formatStoryTime(group.stories[0].created_at)}
-                            </p>
-                          </div>
-
-                          {/* Right: navigation chevron */}
-                          <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200 shrink-0" />
-                        </div>
-                      ))
-                    )}
-                  </>
-                );
-              })()}
-
+              {contactsLoading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-2">
+                  <Loader2 className="animate-spin text-[#0494f4]" size={22} />
+                  <p className="text-[9px] font-black uppercase text-[var(--text-secondary)] tracking-wider">Syncing Contacts...</p>
+                </div>
+              ) : contacts.length === 0 ? (
+                <div className="px-5 py-12 text-center bg-[var(--bg-card)] flex flex-col items-center justify-center gap-3 select-none">
+                  <div className="p-3 bg-[var(--bg-main)] rounded-2xl text-[var(--text-secondary)] border border-[var(--border-color)]/10 shadow-sm">
+                    <UserCheck size={28} className="opacity-75" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-[var(--text-primary)] tracking-wider">No contacts synced yet</h4>
+                    <p className="text-[11px] text-[var(--text-secondary)] max-w-xs leading-relaxed mt-1">
+                      Type name keywords above to discover people globally and follow them. Once they follow you back, they will appear here!
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                contacts.map(profile => renderUserProfileRow(profile, true))
+              )}
             </div>
           )}
         </div>

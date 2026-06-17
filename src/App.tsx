@@ -38,7 +38,7 @@ import ProfileTab from './features/profile/ProfileTab';
 
 // Lazy Loading Features & Screens
 const ChatsTab = React.lazy(() => import('./features/chat/ChatsTab'));
-const GroupsTab = React.lazy(() => import('./features/chat/GroupsTab'));
+const StoriesTab = React.lazy(() => import('./features/stories/StoriesTab'));
 const SearchTab = React.lazy(() => import('./features/search/SearchTab'));
 const ChatLayout = React.lazy(() => import('./features/chat/ChatLayout'));
 const ChatScreen = React.lazy(() => import('./features/chat/ChatScreen'));
@@ -50,8 +50,6 @@ const MessageRequestsScreen = React.lazy(() => import('./features/chat/MessageRe
 const SearchUserScreen = React.lazy(() => import('./features/chat/SearchUserScreen'));
 const GrixAIScreen = React.lazy(() => import('./features/grixai/GrixAIScreen'));
 const ChatSettingsScreen = React.lazy(() => import('./features/chat/ChatSettingsScreen'));
-
-const FriendsScreen = React.lazy(() => import('./features/search/FriendsScreen'));
 
 const StoryWatcherScreen = React.lazy(() => import('./features/stories/StoryWatcherScreen'));
 const StoryCreationScreen = React.lazy(() => import('./features/stories/StoryCreationScreen'));
@@ -516,11 +514,10 @@ export default function App() {
                       <Route path="/chats/requests" element={user ? <MessageRequestsScreen /> : <Navigate to="/login" />} />
                       <Route path="/chats/hidden" element={user ? <HideChatScreen /> : <Navigate to="/login" />} />
                       <Route path="/chats/hidden/settings" element={user ? <HideChatSettings /> : <Navigate to="/login" />} />
-                      <Route path="/groups" element={user ? <GroupsTab /> : <Navigate to="/login" />} />
+                       <Route path="/stories" element={user ? <StoriesTab /> : <Navigate to="/login" />} />
                       <Route path="/search" element={user ? <SearchTab /> : <Navigate to="/login" />} />
                       <Route path="/updates" element={<Navigate to="/search" replace />} />
                       <Route path="/channels" element={<Navigate to="/search" replace />} />
-                      <Route path="/profile/friends" element={user ? <FriendsScreen /> : <Navigate to="/login" />} />
                       <Route element={<ChatLayout />}>
                         <Route path="/chat/grix-ai" element={user ? <GrixAIScreen /> : <Navigate to="/login" />} />
                         <Route path="/chat/:id" element={user ? <ChatScreen /> : <Navigate to="/login" />} />

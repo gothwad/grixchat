@@ -96,8 +96,10 @@ export default function ChatsTab() {
     if (isHidden) return false;
     if (isArchived) return false;
 
-    // Apply strict direct-only filter
-    if (c.type === 'group') return false;
+    // Support dynamic WhatsApp/Telegram filters
+    if (chatListFilter === 'direct' && c.type !== 'direct') return false;
+    if (chatListFilter === 'groups' && c.type !== 'group') return false;
+    if (chatListFilter === 'channels' && c.type !== 'group') return false;
 
     // Filter out Message Requests (not yet accepted)
     if (conversations.length > 0 && !storage.getItem('grix_accepted_chats_initialized')) {

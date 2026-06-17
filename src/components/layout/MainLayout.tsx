@@ -14,7 +14,7 @@ import DesktopWelcome from './DesktopWelcome';
 
 // Lazy loading our tabs for keep-alive container
 const ChatsTab = React.lazy(() => import('../../features/chat/ChatsTab'));
-const GroupsTab = React.lazy(() => import('../../features/chat/GroupsTab'));
+const StoriesTab = React.lazy(() => import('../../features/stories/StoriesTab'));
 const SearchTab = React.lazy(() => import('../../features/search/SearchTab'));
 const CallsTab = React.lazy(() => import('../../features/call/CallsTab'));
 const ProfileTab = React.lazy(() => import('../../features/profile/ProfileTab'));
@@ -22,8 +22,8 @@ const SettingsMainScreen = React.lazy(() => import('../../features/settings/Sett
 const NotificationsScreen = React.lazy(() => import('../../features/notifications/NotificationsScreen'));
 
 // Paths where BottomNav should be visible
-const TAB_PATHS = ['/', '/chats', '/groups', '/search', '/calls', '/profile', '/notifications', '/reels'];
-const MAIN_TABS = ['/', '/chats', '/groups', '/search', '/calls', '/profile'];
+const TAB_PATHS = ['/', '/chats', '/stories', '/search', '/calls', '/profile', '/notifications', '/reels'];
+const MAIN_TABS = ['/', '/chats', '/stories', '/search', '/calls', '/profile'];
 
 const getDesktopParentPane = (pathname: string): 'chats' | 'groups' | 'settings' | 'notifications' | null => {
   // If exactly on a main list screen, return null to direct-route in middle list pane
@@ -47,7 +47,7 @@ const getDesktopParentPane = (pathname: string): 'chats' | 'groups' | 'settings'
 
   // Groups details paths
   if (pathname.startsWith('/group-settings/')) {
-    return 'groups';
+    return 'chats';
   }
 
   // Notifications details paths
@@ -153,8 +153,6 @@ export default function MainLayout() {
       switch (parentType) {
         case 'chats':
           return <ChatsTab />;
-        case 'groups':
-          return <GroupsTab />;
         case 'settings':
           return <SettingsMainScreen />;
         case 'notifications':
@@ -297,12 +295,12 @@ export default function MainLayout() {
             </div>
           )}
 
-          {visitedTabs['/groups'] && (
+          {visitedTabs['/stories'] && (
             <div 
-              className={`h-full w-full absolute inset-0 ${location.pathname === '/groups' ? 'visible z-10 pointer-events-auto opacity-100' : 'invisible z-0 pointer-events-none opacity-0'}`}
+              className={`h-full w-full absolute inset-0 ${location.pathname === '/stories' ? 'visible z-10 pointer-events-auto opacity-100' : 'invisible z-0 pointer-events-none opacity-0'}`}
             >
               <Suspense fallback={null}>
-                <GroupsTab />
+                <StoriesTab />
               </Suspense>
             </div>
           )}

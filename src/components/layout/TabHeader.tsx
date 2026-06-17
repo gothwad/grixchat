@@ -34,9 +34,7 @@ import { useSearch } from '../../contexts/SearchContext.tsx';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { useLayout } from '../../contexts/LayoutContext.tsx';
 import { ChatTabDropdown } from '../chat-ui/ChatTabDropdown';
-import { SearchTabDropdown } from '../chat-ui/SearchTabDropdown';
 import { GroupsTabDropdown } from '../chat-ui/GroupsTabDropdown';
-import { CallsTabDropdown } from '../chat-ui/CallsTabDropdown';
 import { authService } from '../../features/auth/services/authService.ts';
 
 export default function TabHeader() {
@@ -134,7 +132,7 @@ export default function TabHeader() {
   ] as const;
 
   const isChatsPage = location.pathname === '/' || location.pathname === '/chats';
-  const isGroupsPage = location.pathname === '/groups';
+  const isStoriesPage = location.pathname === '/stories';
   const isReelsPage = location.pathname === '/reels';
   const isPostsPage = location.pathname === '/posts';
   const isSearchPage = location.pathname === '/search';
@@ -287,8 +285,8 @@ export default function TabHeader() {
           </Link>
         )}
 
-        {/* 3 Dots Menu - Show on Chats, Groups, and Search pages */}
-        {(isChatsPage || isGroupsPage || isSearchPage) && (
+        {/* 3 Dots Menu - Show on Chats tab only */}
+        {isChatsPage && (
           <div className="relative" ref={menuRef}>
             <button 
               onClick={() => setShowMenu(prev => !prev)}
@@ -299,45 +297,12 @@ export default function TabHeader() {
             </button>
             <AnimatePresence>
               {showMenu && (
-                isChatsPage ? (
-                  <ChatTabDropdown 
-                    isOpen={showMenu}
-                    onClose={() => setShowMenu(false)}
-                    chatListFilter={chatListFilter}
-                    setChatListFilter={setChatListFilter}
-                    showHiddenChatsEntry={userData?.hiddenChatSettings?.showMenuEntry !== false}
-                  />
-                ) : isGroupsPage ? (
-                  <GroupsTabDropdown 
-                    isOpen={showMenu}
-                    onClose={() => setShowMenu(false)}
-                  />
-                ) : (
-                  <SearchTabDropdown 
-                    isOpen={showMenu}
-                    onClose={() => setShowMenu(false)}
-                  />
-                )
-              )}
-            </AnimatePresence>
-          </div>
-        )}
-
-        {/* 3 Dots Menu - Show on Calls Tab */}
-        {isCallsPage && (
-          <div className="relative" ref={menuRef}>
-            <button 
-              onClick={() => setShowMenu(prev => !prev)}
-              className="w-12 h-12 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
-              id="header-three-dots-calls"
-            >
-              <MoreVertical size={22} className="text-[var(--header-text)]" />
-            </button>
-            <AnimatePresence>
-              {showMenu && (
-                <CallsTabDropdown 
+                <ChatTabDropdown 
                   isOpen={showMenu}
                   onClose={() => setShowMenu(false)}
+                  chatListFilter={chatListFilter}
+                  setChatListFilter={setChatListFilter}
+                  showHiddenChatsEntry={userData?.hiddenChatSettings?.showMenuEntry !== false}
                 />
               )}
             </AnimatePresence>
