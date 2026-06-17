@@ -5,6 +5,7 @@ import { useAuth } from './AuthProvider';
 import { Phone, PhoneOff, Video, Volume2, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CallStatus, CallType } from '../features/call/types/callTypes';
+import { Room, RoomEvent, Track } from 'livekit-client';
 
 // Highly-polished Web Audio API sound designer for native-like offline-resilient calling sounds
 class PhoneRingtones {
@@ -155,15 +156,6 @@ interface CallContextType {
 
 const CallContext = createContext<CallContextType | undefined>(undefined);
 
-const servers = {
-  iceServers: [
-    {
-      urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'],
-    },
-  ],
-  iceCandidatePoolSize: 10,
-};
-
 export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user: authUser } = useAuth();
   const navigate = useNavigate();
@@ -172,7 +164,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [incomingCall, setIncomingCall] = useState<any>(null);
   const [caller, setCaller] = useState<any>(null);
 
-  // Advanced WebRTC state
+  // Advanced calling state
   const [activeCall, setActiveCall] = useState<ActiveCallState | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
@@ -183,12 +175,10 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
-  // WebRTC internal refs
-  const pcRef = useRef<RTCPeerConnection | null>(null);
+  // LiveKit internal refs
+  const roomRef = useRef<Room | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
-  const screenStreamRef = useRef<MediaStream | null>(null);
-  const pendingCandidatesRef = useRef<any[]>([]);
   const activeCallChannelRef = useRef<any>(null);
   const initiatingCallRef = useRef<boolean>(false);
 
@@ -231,21 +221,21 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     cleanupStaleZombieCalls();
     
     // Periodically sweep every 30 seconds to prevent lingering items on this session
-    const timer = setInterval(cleanupStaleZombieCalls, 30000);
-    return () => clearInterval(timer);
+    const interval = setInterval(cleanupStaleZombieCalls, 30000);
+    return () => clearInterval(interval);
   }, [authUser?.id]);
 
   // Handle active call duration timer
   useEffect(() => {
-    let interval: any;
+    let intervalId: any;
     if (activeCall && activeCall.status === 'connected') {
-      interval = setInterval(() => {
+      intervalId = setInterval(() => {
         setTimer(prev => prev + 1);
       }, 1000);
     } else {
       setTimer(0);
     }
-    return () => clearInterval(interval);
+    return () => clearInterval(intervalId);
   }, [activeCall?.status]);
 
   // Insert chat room logs dynamically
@@ -285,43 +275,39 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Helper local shutdown
-  const handleEndCallLocally = () => {
-    // 1. Stop screensharing
-    if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach(track => {
-        try {
-          track.stop();
-          track.enabled = false;
-        } catch (err) {}
-      });
-      screenStreamRef.current = null;
+  const handleEndCallLocally = async () => {
+    // 1. Terminate and disconnect LiveKit Room
+    if (roomRef.current) {
+      try {
+        roomRef.current.disconnect();
+      } catch (err) {
+        console.warn("[LiveKit] Clean disconnect failed:", err);
+      }
+      roomRef.current = null;
     }
-    setIsScreenSharing(false);
 
-    // 2. Stop local tracks
+    // 2. Tear down streams
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         try {
           track.stop();
-          track.enabled = false;
         } catch (err) {}
       });
       localStreamRef.current = null;
     }
     setLocalStream(null);
 
-    // 3. Clear PeerConnection
-    if (pcRef.current) {
-      if (pcRef.current.signalingState !== 'closed') {
+    if (remoteStreamRef.current) {
+      remoteStreamRef.current.getTracks().forEach(track => {
         try {
-          pcRef.current.close();
+          track.stop();
         } catch (err) {}
-      }
-      pcRef.current = null;
+      });
+      remoteStreamRef.current = null;
     }
     setRemoteStream(null);
 
-    // 4. Remove active real-time channel
+    // 3. Remove active real-time channel
     if (activeCallChannelRef.current) {
       try {
         supabase.removeChannel(activeCallChannelRef.current);
@@ -329,7 +315,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       activeCallChannelRef.current = null;
     }
 
-    pendingCandidatesRef.current = [];
     PhoneRingtones.stop();
     setActiveCall(null);
     setIncomingCall(null);
@@ -338,6 +323,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsMuted(false);
     setIsVideoOff(false);
     setSpeakerState(2);
+    setIsScreenSharing(false);
   };
 
   // Monitor incoming calls for the logged-in user
@@ -397,7 +383,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const currentData = payload.new as any;
 
         if (eventType === 'DELETE') {
-          // If the calling row is strictly deleted, clean up immediately
           setIncomingCall(null);
           setCaller(null);
           PhoneRingtones.stop();
@@ -406,16 +391,13 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (currentData) {
           if (['ended', 'rejected', 'denied', 'accepted'].includes(currentData.status)) {
-            // Strictly close incoming calls if updated to non-ringing status
             setIncomingCall(null);
             setCaller(null);
             PhoneRingtones.stop();
           } else if (currentData.status === 'ringing') {
-            // Trigger rings only when status is strictly ringing
             fetchIncomingCall();
           }
         } else {
-          // Fallback check
           fetchIncomingCall();
         }
       })
@@ -426,6 +408,138 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       PhoneRingtones.stop();
     };
   }, [authUser]);
+
+  // Aggregate tracks helper to maintain backward compatible HTML Video srcObject MediaStreams
+  const updateLocalStreamFromRoom = (room: Room) => {
+    const mediaStream = new MediaStream();
+    const localPart = room.localParticipant;
+    
+    localPart.getTrackPublications().forEach(pub => {
+      const track = pub.track;
+      if (track && track.mediaStreamTrack) {
+        mediaStream.addTrack(track.mediaStreamTrack);
+      }
+    });
+    
+    localStreamRef.current = mediaStream;
+    setLocalStream(mediaStream);
+  };
+
+  const updateRemoteStreamFromRoom = (room: Room) => {
+    const mediaStream = new MediaStream();
+    
+    // Find first active remote participant
+    const remotePart = Array.from(room.remoteParticipants.values())[0];
+    if (remotePart) {
+      remotePart.getTrackPublications().forEach(pub => {
+        const track = pub.track;
+        if (track && track.mediaStreamTrack) {
+          mediaStream.addTrack(track.mediaStreamTrack);
+        }
+      });
+    }
+    
+    remoteStreamRef.current = mediaStream;
+    setRemoteStream(mediaStream);
+  };
+
+  // Helper connection logic
+  const connectToLiveKitSession = async (roomName: string, participantIdentity: string, callType: CallType) => {
+    try {
+      console.log(`[Calling] Fetching secure token from backend for room_id: ${roomName}...`);
+      
+      const res = await fetch("/api/livekit-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomName, participantIdentity })
+      });
+      
+      const payload = await res.json();
+      
+      // Fallback or explicit cloud address
+      const livekitUrl = import.meta.env.VITE_LIVEKIT_URL || "wss://demo.livekit.cloud";
+      
+      let token = payload.token;
+      if (!payload.success) {
+        console.warn(`[Calling] Token request reported missing environment key: ${payload.error || 'Config Required'}. Falling back.`);
+        if (!token) {
+          throw new Error(payload.error || "Failed to generate LiveKit endpoint credentials.");
+        }
+      }
+
+      // Establish Room Client
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+      });
+
+      roomRef.current = room;
+
+      room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        console.log(`[LiveKit] Remote track subscribed: ${track.kind}`);
+        updateRemoteStreamFromRoom(room);
+        setActiveCall(prev => {
+          if (prev && prev.status !== 'connected') {
+            return { ...prev, status: 'connected' };
+          }
+          return prev;
+        });
+      });
+
+      room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+        console.log(`[LiveKit] Remote track unsubscribed: ${track.kind}`);
+        updateRemoteStreamFromRoom(room);
+      });
+
+      room.on(RoomEvent.LocalTrackPublished, (publication, participant) => {
+        console.log(`[LiveKit] Local track published: ${publication.track?.kind}`);
+        updateLocalStreamFromRoom(room);
+      });
+
+      room.on(RoomEvent.LocalTrackUnpublished, (publication, participant) => {
+        console.log(`[LiveKit] Local track unpublished: ${publication.track?.kind}`);
+        updateLocalStreamFromRoom(room);
+      });
+
+      room.on(RoomEvent.ParticipantConnected, (p) => {
+        console.log(`[LiveKit] Peer Participant online:`, p.identity);
+        setActiveCall(prev => {
+          if (prev && prev.status !== 'connected') {
+            return { ...prev, status: 'connected' };
+          }
+          return prev;
+        });
+      });
+
+      room.on(RoomEvent.ParticipantDisconnected, (p) => {
+        console.log(`[LiveKit] Peer Participant offline:`, p.identity);
+        endCall();
+      });
+
+      room.on(RoomEvent.Disconnected, () => {
+        console.log(`[LiveKit] Room disconnected`);
+        handleEndCallLocally();
+      });
+
+      // Joint connection Handshake
+      await room.connect(livekitUrl, token);
+      console.log(`[LiveKit] Connected to SFU gateway seamlessly.`);
+
+      // Enable devices dynamically
+      if (callType === 'video') {
+        await room.localParticipant.setCameraEnabled(true);
+        await room.localParticipant.setMicrophoneEnabled(true);
+      } else {
+        await room.localParticipant.setMicrophoneEnabled(true);
+      }
+
+      updateLocalStreamFromRoom(room);
+
+    } catch (error: any) {
+      console.error("[LiveKit Initialization Error]", error);
+      setActiveCall(prev => prev ? { ...prev, status: 'error' } : null);
+    }
+  };
 
   // RECEIVER accepting call
   const acceptCall = async () => {
@@ -459,135 +573,18 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCaller(null);
     setIsVideoOff(callType === 'voice');
 
-    // Navigate to call screen immediately
+    // Navigate to call screen immediately prior to initialization to prevent media frame blockages
     navigate(`/call/${otherUserId}?type=${callType}&role=receiver&callId=${cid}`);
 
-    // 2. Setup RTCPeerConnection & Media Streams
+    // Update call status database-wise to notify the caller
     try {
-      pcRef.current = new RTCPeerConnection(servers);
-
-      remoteStreamRef.current = new MediaStream();
-      setRemoteStream(remoteStreamRef.current);
-
-      pcRef.current.ontrack = (event) => {
-        console.log("[WebRTC Receiver] Remote track received:", event.track.kind);
-        
-        let incomingStream = event.streams[0];
-        if (!remoteStreamRef.current) {
-          remoteStreamRef.current = new MediaStream();
-        }
-        
-        if (incomingStream) {
-          incomingStream.getTracks().forEach(track => {
-            if (remoteStreamRef.current && !remoteStreamRef.current.getTracks().some(t => t.id === track.id)) {
-              remoteStreamRef.current.addTrack(track);
-            }
-          });
-        } else {
-          if (!remoteStreamRef.current.getTracks().some(t => t.id === event.track.id)) {
-            remoteStreamRef.current.addTrack(event.track);
-          }
-        }
-        
-        setRemoteStream(new MediaStream(remoteStreamRef.current.getTracks()));
-        setActiveCall(prev => {
-          if (prev && prev.status !== 'connected') {
-            return { ...prev, status: 'connected' };
-          }
-          return prev;
-        });
-      };
-
-      pcRef.current.oniceconnectionstatechange = () => {
-        if (!pcRef.current) return;
-        const state = pcRef.current.iceConnectionState;
-        if (state === 'disconnected' || state === 'failed') {
-          handleEndCallLocally();
-        }
-      };
-
-      // Extract native media devices feed
-      let stream: MediaStream | null = null;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: callType === 'video',
-          audio: true,
-        });
-        localStreamRef.current = stream;
-        setLocalStream(stream);
-
-        stream.getTracks().forEach((track) => {
-          pcRef.current?.addTrack(track, stream!);
-        });
-      } catch (err) {
-        console.warn("[WebRTC Receiver] Media capture failed, continuing audio only / empty stream:", err);
-      }
-
-      // Candidate handling
-      pcRef.current.onicecandidate = async (event) => {
-        if (event.candidate && supabase) {
-          try {
-            await supabase.from('call_candidates').insert({
-              call_id: cid,
-              user_id: authUser.id,
-              candidate: event.candidate.toJSON(),
-              type: 'answer'
-            } as any);
-          } catch (e) {
-            console.error("Error creating candidate insertion:", e);
-          }
-        }
-      };
-
-      // Apply incoming offer definition
-      const { data: dbCall } = await supabase.from('calls').select('*').eq('id', cid).single();
-      if (!dbCall || !dbCall.offer) {
-        console.error("[WebRTC Receiver] DB Offer description has not been fully propagated.");
-        setActiveCall(prev => prev ? { ...prev, status: 'error' } : null);
-        return;
-      }
-
-      await pcRef.current.setRemoteDescription(new RTCSessionDescription(dbCall.offer));
-
-      // Generate local answer SDP
-      const answerDescription = await pcRef.current.createAnswer();
-      await pcRef.current.setLocalDescription(answerDescription);
-
-      // Save answer back to signaling table and set accepted
-      await supabase.from('calls').update({
-        answer: { type: answerDescription.type, sdp: answerDescription.sdp },
-        status: 'accepted'
-      } as any).eq('id', cid);
-
+      await supabase.from('calls').update({ status: 'accepted' } as any).eq('id', cid);
       await addLoggingMessage('started', cid, otherUserId, callType);
-      setActiveCall(prev => prev ? { ...prev, status: 'connected' } : null);
+      
+      // Connect to LiveKit Room
+      await connectToLiveKitSession(cid, authUser.id, callType);
 
-      // Fetch pre-existing candidates (offer candidates generated by caller) to avoid race conditions
-      try {
-        const { data: existingCandidates } = await supabase
-          .from('call_candidates')
-          .select('*')
-          .eq('call_id', cid)
-          .neq('user_id', authUser.id);
-
-        if (existingCandidates && existingCandidates.length > 0) {
-          console.log("[WebRTC Receiver] Fetching pre-existing offer candidates:", existingCandidates.length);
-          for (const cand of existingCandidates) {
-            const candidateObj = cand.candidate as RTCIceCandidateInit;
-            try {
-              if (pcRef.current) {
-                await pcRef.current.addIceCandidate(new RTCIceCandidate(candidateObj));
-              }
-            } catch (iceErr) {
-              console.warn("[WebRTC Receiver] Failed to add pre-existing candidate:", iceErr);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn("[WebRTC Receiver] Error fetching pre-existing candidates:", err);
-      }
-
-      // Establish listening channels
+      // Establish real-time listen triggers for termination updates
       const callChannel = supabase
         .channel(`call-active-${cid}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'calls', filter: `id=eq.${cid}` }, (payload) => {
@@ -599,23 +596,11 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
             handleEndCallLocally();
           }
         })
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'call_candidates', filter: `call_id=eq.${cid}` }, (payload) => {
-          const data = payload.new as any;
-          if (data.user_id === authUser.id) return;
-
-          const candidate = data.candidate as RTCIceCandidateInit;
-          if (pcRef.current && pcRef.current.currentRemoteDescription) {
-            pcRef.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error("Error adding remote candidate:", e));
-          } else {
-            pendingCandidatesRef.current.push(candidate);
-          }
-        })
         .subscribe();
 
       activeCallChannelRef.current = callChannel;
-
-    } catch (e) {
-      console.error("[WebRTC Receiver] Setup error:", e);
+    } catch (err) {
+      console.error("[Calling Receiver Accept Fail]", err);
       setActiveCall(prev => prev ? { ...prev, status: 'error' } : null);
     }
   };
@@ -654,8 +639,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     initiatingCallRef.current = true;
     try {
-      // Reset all states
-      handleEndCallLocally();
+      await handleEndCallLocally();
       playOutgoingBeep();
 
       let receiverProfile: any = null;
@@ -678,186 +662,66 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setActiveCall(initialCall);
       setIsVideoOff(callType === 'voice');
 
-      // Setup WebRTC core peer pipeline
-      try {
-        pcRef.current = new RTCPeerConnection(servers);
+      // Create database ringing document
+      const dbType = callType === 'voice' ? 'audio' : callType;
+      const { data: callData, error: callError } = await supabase.from('calls').insert({
+        caller_id: authUser.id,
+        receiver_id: otherUserId,
+        type: dbType,
+        status: 'ringing',
+        offer: {} // dummy offer to satisfy older schema defaults if valid
+      } as any).select().single();
 
-        remoteStreamRef.current = new MediaStream();
-        setRemoteStream(remoteStreamRef.current);
-
-        pcRef.current.ontrack = (event) => {
-          console.log("[WebRTC Caller] Remote track received:", event.track.kind);
-          
-          let incomingStream = event.streams[0];
-          if (!remoteStreamRef.current) {
-            remoteStreamRef.current = new MediaStream();
-          }
-          
-          if (incomingStream) {
-            incomingStream.getTracks().forEach(track => {
-              if (remoteStreamRef.current && !remoteStreamRef.current.getTracks().some(t => t.id === track.id)) {
-                remoteStreamRef.current.addTrack(track);
-              }
-            });
-          } else {
-            if (!remoteStreamRef.current.getTracks().some(t => t.id === event.track.id)) {
-              remoteStreamRef.current.addTrack(event.track);
-            }
-          }
-          
-          setRemoteStream(new MediaStream(remoteStreamRef.current.getTracks()));
-          setActiveCall(prev => {
-            if (prev && prev.status !== 'connected') {
-              return { ...prev, status: 'connected' };
-            }
-            return prev;
-          });
-        };
-
-        pcRef.current.oniceconnectionstatechange = () => {
-          if (!pcRef.current) return;
-          const state = pcRef.current.iceConnectionState;
-          if (state === 'disconnected' || state === 'failed') {
-            handleEndCallLocally();
-          }
-        };
-
-        // Obtain user media
-        let stream: MediaStream | null = null;
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: callType === 'video',
-            audio: true,
-          });
-          localStreamRef.current = stream;
-          setLocalStream(stream);
-
-          stream.getTracks().forEach((track) => {
-            pcRef.current?.addTrack(track, stream!);
-          });
-        } catch (err) {
-          console.warn("[WebRTC Caller] Capturing camera/microphone failed:", err);
-        }
-
-        // Generate local offer description
-        const offerDescription = await pcRef.current.createOffer();
-        await pcRef.current.setLocalDescription(offerDescription);
-
-        setActiveCall(prev => prev ? { ...prev, status: 'ringing' } : null);
-
-        // Create database ringing document
-        const dbType = callType === 'voice' ? 'audio' : callType;
-        const { data: callData, error: callError } = await supabase.from('calls').insert({
-          caller_id: authUser.id,
-          receiver_id: otherUserId,
-          type: dbType,
-          status: 'ringing',
-          offer: { sdp: offerDescription.sdp, type: offerDescription.type }
-        } as any).select().single();
-
-        if (callError || !callData) {
-          console.error("[WebRTC Caller] database registration failed:", callError);
-          setActiveCall(prev => prev ? { ...prev, status: 'error' } : null);
-          PhoneRingtones.stop();
-          return;
-        }
-
-        const realCallId = callData.id;
-        setActiveCall(prev => prev ? { ...prev, id: realCallId } : null);
-
-        pcRef.current.onicecandidate = async (event) => {
-          if (event.candidate && supabase) {
-            try {
-              await supabase.from('call_candidates').insert({
-                call_id: realCallId,
-                user_id: authUser.id,
-                candidate: event.candidate.toJSON(),
-                type: 'offer'
-              } as any);
-            } catch (e) {
-              console.error("Error inserting offer candidate:", e);
-            }
-          }
-        };
-
-        // Subscribe to remote side updates on this specific call (accept, deny, end) and remote candidates
-        const callChannel = supabase
-          .channel(`call-active-${realCallId}`)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'calls', filter: `id=eq.${realCallId}` }, (payload) => {
-            const data = payload.new as any;
-            if (!data) return;
-
-            if (data.status === 'ended' || data.status === 'denied' || data.status === 'rejected') {
-              setActiveCall(prev => prev ? { ...prev, status: data.status as any } : null);
-              handleEndCallLocally();
-            }
-
-            if (data.status === 'accepted') {
-              setActiveCall(prev => prev ? { ...prev, status: 'connected' } : null);
-              PhoneRingtones.stop();
-              if (data.answer && pcRef.current && !pcRef.current.currentRemoteDescription) {
-                const answerDescription = new RTCSessionDescription(data.answer);
-                pcRef.current.setRemoteDescription(answerDescription).then(async () => {
-                  pendingCandidatesRef.current.forEach(candidate => {
-                    pcRef.current?.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error("Error adding queued remote candidate:", e));
-                  });
-                  pendingCandidatesRef.current = [];
-
-                  // Fetch already uploaded candidates directly from table in database (as fallback/completeness)
-                  try {
-                    const { data: existingCandidates } = await supabase
-                      .from('call_candidates')
-                      .select('*')
-                      .eq('call_id', realCallId)
-                      .neq('user_id', authUser.id);
-                    if (existingCandidates && existingCandidates.length > 0) {
-                      console.log("[WebRTC Caller] Fetched pre-existing answer candidates:", existingCandidates.length);
-                      for (const cand of existingCandidates) {
-                        const candidateObj = cand.candidate as RTCIceCandidateInit;
-                        try {
-                          await pcRef.current?.addIceCandidate(new RTCIceCandidate(candidateObj));
-                        } catch (err) {}
-                      }
-                    }
-                  } catch (candErr) {
-                    console.warn("[WebRTC Caller] Error fetching receiver candidates:", candErr);
-                  }
-                });
-              }
-            }
-          })
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'call_candidates', filter: `call_id=eq.${realCallId}` }, (payload) => {
-            const data = payload.new as any;
-            if (data.user_id === authUser.id) return;
-
-            const candidate = data.candidate as RTCIceCandidateInit;
-            if (pcRef.current && pcRef.current.currentRemoteDescription) {
-              pcRef.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error("Error adding remote candidate:", e));
-            } else {
-              pendingCandidatesRef.current.push(candidate);
-            }
-          })
-          .subscribe();
-
-        activeCallChannelRef.current = callChannel;
-
-        // STAGE 45-second Calling timeout (exact specifications from user!)
-        setTimeout(async () => {
-          if (!supabase) return;
-          const { data: snap } = await supabase.from('calls').select('status').eq('id', realCallId).single();
-          if (snap && snap.status === 'ringing') {
-            console.log("[Call Timeout] No answer after 45 seconds, marking as ended/missed...");
-            await supabase.from('calls').update({ status: 'ended', is_missed: true } as any).eq('id', realCallId);
-            await addLoggingMessage('missed', realCallId, otherUserId, callType);
-            setActiveCall(prev => prev ? { ...prev, status: 'ended' } : null);
-            handleEndCallLocally();
-          }
-        }, 45000);
-
-      } catch (e) {
-        console.error("[WebRTC Caller] Setup exception:", e);
+      if (callError || !callData) {
+        console.error("[LiveKit Caller] database registration failed:", callError);
         setActiveCall(prev => prev ? { ...prev, status: 'error' } : null);
+        PhoneRingtones.stop();
+        return;
       }
+
+      const realCallId = callData.id;
+      setActiveCall(prev => prev ? { ...prev, id: realCallId, status: 'ringing' } : null);
+
+      // Join the LiveKit Room immediately
+      await connectToLiveKitSession(realCallId, authUser.id, callType);
+
+      // Listen for remote partner changes (like acceptance or ends)
+      const callChannel = supabase
+        .channel(`call-active-${realCallId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'calls', filter: `id=eq.${realCallId}` }, (payload) => {
+          const data = payload.new as any;
+          if (!data) return;
+
+          if (data.status === 'ended' || data.status === 'denied' || data.status === 'rejected') {
+            setActiveCall(prev => prev ? { ...prev, status: data.status as any } : null);
+            handleEndCallLocally();
+          }
+
+          if (data.status === 'accepted') {
+            setActiveCall(prev => prev ? { ...prev, status: 'connected' } : null);
+            PhoneRingtones.stop();
+          }
+        })
+        .subscribe();
+
+      activeCallChannelRef.current = callChannel;
+
+      // STAGE 45-second Calling timeout
+      setTimeout(async () => {
+        if (!supabase) return;
+        const { data: snap } = await supabase.from('calls').select('status').eq('id', realCallId).single();
+        if (snap && snap.status === 'ringing') {
+          console.log("[Call Timeout] No answer after 45 seconds, marking as ended/missed...");
+          await supabase.from('calls').update({ status: 'ended', is_missed: true } as any).eq('id', realCallId);
+          await addLoggingMessage('missed', realCallId, otherUserId, callType);
+          setActiveCall(prev => prev ? { ...prev, status: 'ended' } : null);
+          await handleEndCallLocally();
+        }
+      }, 45000);
+
+    } catch (e) {
+      console.error("[LiveKit Caller] Setup exception:", e);
+      setActiveCall(prev => prev ? { ...prev, status: 'error' } : null);
     } finally {
       initiatingCallRef.current = false;
     }
@@ -866,7 +730,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Termination handler (either caller or receiver can end active call)
   const endCall = async () => {
     if (!activeCall || !supabase) {
-      handleEndCallLocally();
+      await handleEndCallLocally();
       return;
     }
 
@@ -882,15 +746,15 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn("Error updating active call status to ended in DB:", e);
     }
 
-    handleEndCallLocally();
+    await handleEndCallLocally();
   };
 
   const toggleMute = () => {
     setIsMuted(prev => {
       const nextMuted = !prev;
-      if (localStreamRef.current) {
-        const audioTrack = localStreamRef.current.getAudioTracks()[0];
-        if (audioTrack) audioTrack.enabled = !nextMuted;
+      if (roomRef.current) {
+        roomRef.current.localParticipant.setMicrophoneEnabled(!nextMuted)
+          .catch(err => console.warn("LiveKit mic toggle failed:", err));
       }
       return nextMuted;
     });
@@ -899,22 +763,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const toggleVideo = () => {
     setIsVideoOff(prev => {
       const nextVideoOff = !prev;
-      if (localStreamRef.current) {
-        let videoTrack = localStreamRef.current.getVideoTracks()[0];
-        if (!videoTrack && !nextVideoOff) {
-          navigator.mediaDevices.getUserMedia({ video: true })
-            .then(videoStream => {
-              const newTrack = videoStream.getVideoTracks()[0];
-              if (newTrack && localStreamRef.current) {
-                localStreamRef.current.addTrack(newTrack);
-                newTrack.enabled = true;
-                setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
-              }
-            })
-            .catch(e => console.warn("Could not activate camera track dynamically:", e));
-        } else if (videoTrack) {
-          videoTrack.enabled = !nextVideoOff;
-        }
+      if (roomRef.current) {
+        roomRef.current.localParticipant.setCameraEnabled(!nextVideoOff)
+          .catch(err => console.warn("LiveKit video toggle failed:", err));
       }
       return nextVideoOff;
     });
@@ -925,72 +776,29 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const toggleScreenShare = async () => {
-    if (isScreenSharing) {
-      if (screenStreamRef.current) {
-        screenStreamRef.current.getTracks().forEach(track => {
-          track.stop();
-          track.enabled = false;
-        });
-        screenStreamRef.current = null;
-      }
-      setIsScreenSharing(false);
-      if (localStreamRef.current) {
-        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
-      }
-    } else {
-      try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        screenStreamRef.current = stream;
-        setIsScreenSharing(true);
-        setLocalStream(stream);
-
-        // Listen for browser cancellation
-        stream.getVideoTracks()[0].onended = () => {
-          setIsScreenSharing(false);
-          screenStreamRef.current = null;
-          if (localStreamRef.current) {
-            setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
-          }
-        };
-      } catch (e) {
-        console.warn("Screen sharing failed or cancelled by user:", e);
-      }
+    if (!roomRef.current) return;
+    try {
+      const nextScreenShare = !isScreenSharing;
+      await roomRef.current.localParticipant.setScreenShareEnabled(nextScreenShare);
+      setIsScreenSharing(nextScreenShare);
+      updateLocalStreamFromRoom(roomRef.current);
+    } catch (e) {
+      console.warn("LiveKit screen share toggle failed:", e);
     }
   };
 
   const flipCamera = async () => {
-    if (!localStreamRef.current) return;
+    if (!roomRef.current) return;
     const nextFacing = facingMode === 'user' ? 'environment' : 'user';
     setFacingMode(nextFacing);
-
     try {
-      const videoTrack = localStreamRef.current.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.stop();
-        localStreamRef.current.removeTrack(videoTrack);
-      }
-
-      const freshStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: nextFacing },
-        audio: false,
-      });
-
-      const newTrack = freshStream.getVideoTracks()[0];
-      if (newTrack) {
-        localStreamRef.current.addTrack(newTrack);
-        
-        if (pcRef.current) {
-          const senders = pcRef.current.getSenders();
-          const videoSender = senders.find(s => s.track?.kind === 'video');
-          if (videoSender) {
-            await videoSender.replaceTrack(newTrack);
-          }
-        }
-
-        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+      const videoTrackPubs = Array.from(roomRef.current.localParticipant.videoTrackPublications.values());
+      const videoTrackPub = videoTrackPubs[0];
+      if (videoTrackPub && videoTrackPub.videoTrack) {
+        await (videoTrackPub.videoTrack as any).restart({ facingMode: nextFacing });
       }
     } catch (e) {
-      console.warn("Failed to flip camera device:", e);
+      console.warn("Failed to flip camera device in LiveKit:", e);
     }
   };
 

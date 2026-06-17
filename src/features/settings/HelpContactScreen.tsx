@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import SettingHeader from '../../components/layout/SettingHeader.tsx';
+import { transactionQueue } from '../../services/db/transactionQueueService';
 
 export default function HelpContactScreen() {
   const navigate = useNavigate();
@@ -43,6 +44,27 @@ export default function HelpContactScreen() {
     setLoading(true);
     setErrorMsg(null);
 
+    // If offline, queue the transaction instantly
+    if (!navigator.onLine) {
+      try {
+        await transactionQueue.addTransaction('support_ticket_insert', {
+          userId: user?.id || null,
+          email,
+          category,
+          subject,
+          message
+        });
+        setIsSuccess(true);
+        setSubject('');
+        setMessage('');
+      } catch (err) {
+        setErrorMsg('Offline queue submission failed. Please copy details and mail us directly.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     try {
       if (!supabase) {
         throw new Error('Supabase client connection not initialized.');
@@ -64,18 +86,15 @@ export default function HelpContactScreen() {
       setSubject('');
       setMessage('');
     } catch (err: any) {
-      console.error('Error submitting support ticket:', err);
-      // In case table does not exist or service worker blocks database persistence, gracefully save in localStorage as cache and notify user
+      console.error('Error submitting support ticket via live database, queuing for sync:', err);
       try {
-        const localTickets = JSON.parse(localStorage.getItem('grix_pending_support_tickets') || '[]');
-        localTickets.push({
+        await transactionQueue.addTransaction('support_ticket_insert', {
+          userId: user?.id || null,
           email,
           category,
           subject,
-          message,
-          created_at: new Date().toISOString()
+          message
         });
-        localStorage.setItem('grix_pending_support_tickets', JSON.stringify(localTickets));
         setIsSuccess(true);
         setSubject('');
         setMessage('');

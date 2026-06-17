@@ -331,6 +331,16 @@ class LocalDataCacheService {
   public saveReelsFeed(reels: any[]): void {
     this.set('gx_reels_feed', reels);
   }
+
+  // --- Specific Conveniences for Notifications ---
+
+  public getNotifications(myUserId: string, typeGroup: 'social' | 'activity'): any[] | null {
+    return this.get<any[]>(`gx_notifs_${typeGroup}_${myUserId}`, 1000 * 60 * 60 * 24 * 7); // 7 days cache
+  }
+
+  public saveNotifications(myUserId: string, typeGroup: 'social' | 'activity', notifications: any[]): void {
+    this.set(`gx_notifs_${typeGroup}_${myUserId}`, notifications);
+  }
 }
 
 export const LocalDataCache = new LocalDataCacheService();

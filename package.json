@@ -38,6 +38,8 @@
     "google-auth-library": "^10.6.2",
     "groq-sdk": "^1.1.2",
     "jszip": "^3.10.1",
+    "livekit-client": "^2.19.2",
+    "livekit-server-sdk": "^2.15.4",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "multer": "^2.1.1",
@@ -52,7 +54,5 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
-  },
-  "devDependencies": {
   }
 }

@@ -8,6 +8,7 @@ import fs from "fs";
 import os from "os";
 import { GoogleAuth } from "google-auth-library";
 import { GoogleGenAI } from "@google/genai";
+import { AccessToken } from "livekit-server-sdk";
 
 dotenv.config();
 
@@ -27,6 +28,45 @@ const upload = multer({
 // API routes
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", message: "GrixChat Server is running" });
+});
+
+// LiveKit Token generation endpoint
+app.post("/api/livekit-token", async (req, res) => {
+  try {
+    const { roomName, participantIdentity } = req.body;
+    if (!roomName || !participantIdentity) {
+      return res.status(400).json({ error: "Missing roomName or participantIdentity parameters" });
+    }
+
+    const apiKey = process.env.LIVEKIT_API_KEY;
+    const apiSecret = process.env.LIVEKIT_API_SECRET;
+
+    if (!apiKey || !apiSecret) {
+      console.warn("FCM Server: LIVEKIT_API_KEY or LIVEKIT_API_SECRET is missing. Proceeding with standard sandbox mock tokens.");
+      return res.json({
+        success: false,
+        error: "LiveKit server credentials are not configured. Please define LIVEKIT_API_KEY and LIVEKIT_API_SECRET in settings.",
+        token: "mock-livekit-token-sandbox"
+      });
+    }
+
+    const at = new AccessToken(apiKey, apiSecret, {
+      identity: participantIdentity,
+    });
+
+    at.addGrant({
+      roomJoin: true,
+      room: roomName,
+      canPublish: true,
+      canSubscribe: true,
+    });
+
+    const token = await at.toJwt();
+    return res.json({ success: true, token });
+  } catch (error: any) {
+    console.error("LiveKit token generation exception:", error);
+    return res.status(500).json({ error: error.message || "Failed to generate LiveKit token" });
+  }
 });
 
 // Sitemap route for SEO

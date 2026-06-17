@@ -153,9 +153,9 @@ export default function SignupScreen() {
   return (
     <div className="h-full overflow-y-auto bg-[var(--bg-main)] flex flex-col items-center relative font-sans">
       <div className="w-full px-8 pt-8 pb-12 z-10 flex flex-col items-center min-h-full relative max-w-md mx-auto">
-        {/* Header Section */}
-        <div className="w-full relative flex items-center justify-center mb-4">
-          <div className="w-16 h-16 bg-[var(--bg-card)] rounded-[20px] shadow-sm flex items-center justify-center border border-[var(--border-color)] p-0 overflow-hidden">
+        {/* Header Card */}
+        <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 text-center flex flex-col items-center justify-center mb-5 shadow-sm">
+          <div className="w-16 h-16 bg-[var(--bg-main)] rounded-2xl shadow-inner flex items-center justify-center border border-[var(--border-color)] p-0 overflow-hidden mb-3">
             <img 
               src="/assets/icon-512-maskable.png" 
               alt="Logo" 
@@ -163,12 +163,8 @@ export default function SignupScreen() {
               referrerPolicy="no-referrer"
             />
           </div>
-        </div>
-
-        {/* Header Area */}
-        <div className="text-center mb-5">
-          <h2 className="text-[28px] font-bold text-[var(--text-primary)] mb-1">GrixChat</h2>
-          <p className="text-[var(--text-secondary)] text-xs leading-relaxed max-w-[200px] mx-auto opacity-80">
+          <h2 className="text-[26px] font-black text-[var(--text-primary)] tracking-tight mb-1">GrixChat</h2>
+          <p className="text-[var(--text-secondary)] text-xs leading-relaxed max-w-[240px] mx-auto opacity-80 font-medium">
             Connecting you to your world, one message at a time.
           </p>
         </div>

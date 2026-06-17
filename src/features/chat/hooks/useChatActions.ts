@@ -45,7 +45,46 @@ export const useChatActions = (conversationId: string, receiverId: string) => {
     try {
       const displayContent = text || (mediaData ? `Sent a ${mediaData.type}` : 'Sent a file');
       LocalDataCache.updateLastMessage(user.id, conversationId, displayContent);
-      const dbMessage = await chatService.sendMessage(conversationId, user.id, text, mediaData, replyTo);
+      
+      let dbMessage: any = null;
+      let isOffline = !navigator.onLine;
+
+      if (!isOffline) {
+        try {
+          dbMessage = await chatService.sendMessage(conversationId, user.id, text, mediaData, replyTo);
+        } catch (err) {
+          console.warn('Direct sendMessage failed, fallback to transactionQueue offline path:', err);
+          isOffline = true;
+        }
+      }
+
+      if (isOffline || !dbMessage) {
+        // Create an optimistic local message with pending state
+        const tempId = 'msg_temp_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+        dbMessage = {
+          id: tempId,
+          conversation_id: conversationId,
+          sender_id: user.id,
+          text: text || '',
+          content: text || '',
+          media_url: mediaData?.url || localPreviewUrl || null,
+          media_type: mediaData?.type || (file ? (file.type.startsWith('image/') ? 'image' : 'file') : null),
+          reply_to: replyTo ? (replyTo.id || replyTo) : null,
+          created_at: new Date().toISOString(),
+          status: 'sending' // Displays WhatsApp style clock indicator
+        };
+
+        // Queue message insertion offline transaction
+        const transactionQueueModule = await import('../../../services/db/transactionQueueService');
+        await transactionQueueModule.transactionQueue.addTransaction('message_insert', {
+          roomId: conversationId,
+          senderId: user.id,
+          content: text || '',
+          mediaUrl: mediaData?.url || null,
+          mediaType: mediaData?.type || null,
+          replyToId: replyTo ? (replyTo.id || replyTo) : null
+        }).catch(err => console.warn('transactionQueue addTransaction errored:', err));
+      }
       
       if (dbMessage) {
         dbMessage.content = dbMessage.text || dbMessage.content || '';
@@ -60,45 +99,47 @@ export const useChatActions = (conversationId: string, receiverId: string) => {
           }
         };
 
-        // Dispatch background push alert logic
-        pushNotificationService.sendNotificationForMessage(
-          conversationId,
-          user.id,
-          userData?.fullName || userData?.username || 'GrixChat User',
-          text,
-          mediaData?.type
-        ).catch(err => console.warn('pushNotificationService activation errored:', err));
+        // If online, dispatch background push alert logic
+        if (!isOffline) {
+          pushNotificationService.sendNotificationForMessage(
+            conversationId,
+            user.id,
+            userData?.fullName || userData?.username || 'GrixChat User',
+            text,
+            mediaData?.type
+          ).catch(err => console.warn('pushNotificationService activation errored:', err));
 
-        // Background failsafe auto-pruner to cap Supabase message count in this chat to 60.
-        // If count hits >= 60, we remove the oldest 20 messages so only 40 are left.
-        (async () => {
-          try {
-            const { count, error: countErr } = await supabase
-              .from('messages')
-              .select('*', { count: 'exact', head: true })
-              .eq('conversation_id', conversationId);
-
-            if (!countErr && count && count >= 60) {
-              const { data: oldest, error: selectErr } = await supabase
+          // Background failsafe auto-pruner to cap Supabase message count in this chat to 60.
+          // If count hits >= 60, we remove the oldest 20 messages so only 40 are left.
+          (async () => {
+            try {
+              const { count, error: countErr } = await supabase
                 .from('messages')
-                .select('id')
-                .eq('conversation_id', conversationId)
-                .order('created_at', { ascending: true })
-                .limit(20);
+                .select('*', { count: 'exact', head: true })
+                .eq('conversation_id', conversationId);
 
-              if (!selectErr && oldest && oldest.length > 0) {
-                const idsToDelete = oldest.map(o => o.id);
-                await supabase
+              if (!countErr && count && count >= 60) {
+                const { data: oldest, error: selectErr } = await supabase
                   .from('messages')
-                  .delete()
-                  .in('id', idsToDelete);
-                console.log(`[Message Pruning] Successfully pruned oldest 20 messages in conversation ${conversationId}.`);
+                  .select('id')
+                  .eq('conversation_id', conversationId)
+                  .order('created_at', { ascending: true })
+                  .limit(20);
+
+                if (!selectErr && oldest && oldest.length > 0) {
+                  const idsToDelete = oldest.map(o => o.id);
+                  await supabase
+                    .from('messages')
+                    .delete()
+                    .in('id', idsToDelete);
+                  console.log(`[Message Pruning] Successfully pruned oldest 20 messages in conversation ${conversationId}.`);
+                }
               }
+            } catch (e) {
+              console.error('[Message Pruning] Failsafe error:', e);
             }
-          } catch (e) {
-            console.error('[Message Pruning] Failsafe error:', e);
-          }
-        })();
+          })();
+        }
 
         return stableMessage;
       }

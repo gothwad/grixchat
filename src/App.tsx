@@ -90,7 +90,6 @@ const LoginScreen = React.lazy(() => import('./features/auth/LoginScreen'));
 const SignupScreen = React.lazy(() => import('./features/auth/SignupScreen'));
 const ForgotPasswordScreen = React.lazy(() => import('./features/auth/ForgotPasswordScreen'));
 const VerifyEmailScreen = React.lazy(() => import('./features/auth/VerifyEmailScreen'));
-const CompleteProfileScreen = React.lazy(() => import('./features/auth/CompleteProfileScreen'));
 
 const PrivacyPolicyScreen = React.lazy(() => import('./features/legal/PrivacyPolicyScreen'));
 const TermsAndConditionsScreen = React.lazy(() => import('./features/legal/TermsAndConditionsScreen'));
@@ -477,14 +476,12 @@ export default function App() {
   // Guard Logic
   const needsVerification = user && !user.email_confirmed_at && !(user.app_metadata?.providers || []).some((p: string) => ['google', 'github'].includes(p));
   const isLocalStorageOffline = !navigator.onLine;
-  const needsProfileCompletion = false; // Bypassed is complete profile screen setup as requested by user to avoid stuck screen on slow loads.
 
   if (user && isAuthReady) {
-    const isPublicRoute = ['/login', '/signup', '/forgot-password', '/privacy-policy', '/terms', '/complete-profile', '/verify-email'].includes(location.pathname);
+    const isPublicRoute = ['/login', '/signup', '/forgot-password', '/privacy-policy', '/terms', '/verify-email'].includes(location.pathname);
     
     if (!isPublicRoute) {
       if (needsVerification) return <Navigate to="/verify-email" replace />;
-      if (needsProfileCompletion) return <Navigate to="/complete-profile" replace />;
     }
   }
 
@@ -508,13 +505,11 @@ export default function App() {
                       <Route path="/" element={
                         !user ? <Navigate to="/login" replace /> : 
                         needsVerification ? <Navigate to="/verify-email" replace /> :
-                        needsProfileCompletion ? <Navigate to="/complete-profile" replace /> :
                         <Navigate to="/chats" replace />
                       } />
                       <Route path="/chats" element={
                         !user ? <Navigate to="/login" replace /> : 
                         needsVerification ? <Navigate to="/verify-email" replace /> :
-                        needsProfileCompletion ? <Navigate to="/complete-profile" replace /> :
                         <ChatsTab />
                       } />
                       <Route path="/chats/archived" element={user ? <ArchivedChatScreen /> : <Navigate to="/login" />} />
@@ -568,9 +563,6 @@ export default function App() {
                     {/* Other Routes */}
                     <Route path="/verify-email" element={
                       user && !user.email_confirmed_at ? <VerifyEmailScreen /> : <Navigate to="/chats" replace />
-                    } />
-                    <Route path="/complete-profile" element={
-                      <Navigate to="/chats" replace />
                     } />
                     <Route path="/call/:id" element={user ? <CallScreen /> : <Navigate to="/login" />} />
                     <Route path="/stories/view/:userId" element={user ? <StoryWatcherScreen /> : <Navigate to="/login" />} />

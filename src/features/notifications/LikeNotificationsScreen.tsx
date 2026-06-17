@@ -4,6 +4,7 @@ import { useAuth } from '../../providers/AuthProvider.tsx';
 import { Heart, MessageSquare, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
+import { LocalDataCache } from '../../services/LocalDataCache';
 
 const DEFAULT_LOGO = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
@@ -16,6 +17,13 @@ export default function LikeNotificationsScreen() {
   useEffect(() => {
     if (!authUser || !supabase) return;
 
+    // Load initial offline notifications cache for instantaneous loading
+    const cached = LocalDataCache.getNotifications(authUser.id, 'activity');
+    if (cached) {
+      setNotifications(cached);
+      setLoading(false);
+    }
+
     const fetchNotifications = async () => {
       const { data, error } = await supabase
         .from('notifications')
@@ -25,7 +33,7 @@ export default function LikeNotificationsScreen() {
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        setNotifications(data.map(n => ({
+        const mapped = data.map(n => ({
           ...n,
           fromUserId: n.from_user_id,
           fromUserName: n.from_user?.username || n.from_user?.full_name || 'User',
@@ -33,7 +41,9 @@ export default function LikeNotificationsScreen() {
           createdAt: n.created_at,
           read: n.is_read,
           postId: n.post_id
-        })));
+        }));
+        setNotifications(mapped);
+        LocalDataCache.saveNotifications(authUser.id, 'activity', mapped);
 
         // Mark as read
         const unreadIds = data.filter(n => !n.is_read).map(n => n.id);
