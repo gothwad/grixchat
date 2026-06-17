@@ -240,24 +240,8 @@ export default function SearchTab() {
             <p className="text-[12.5px] text-[var(--text-secondary)] opacity-75 font-medium mt-0.5 leading-tight">@{profile.username || 'username'}</p>
           </div>
           
-          {/* Quick actionable messaging or calls details */}
-          <div className="flex items-center gap-2.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-            {isFriend ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/chat/${profile.uid}`);
-                }}
-                className="px-4 py-1.5 rounded-full flex items-center justify-center gap-1.5 bg-[#0494f4]/10 dark:bg-zinc-800/40 hover:bg-[#0494f4]/15 border border-[#0494f4]/20 active:scale-95 transition-all duration-150 text-[#0494f4] text-xs font-semibold cursor-pointer select-none"
-                title="Send Message"
-              >
-                <MessageSquare size={13} strokeWidth={2.5} />
-                <span>Message</span>
-              </button>
-            ) : (
-              <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-30 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200 shrink-0" />
-            )}
+          <div className="flex items-center gap-2 mr-1 shrink-0">
+            <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200 shrink-0" />
           </div>
         </div>
       </div>
@@ -331,20 +315,23 @@ export default function SearchTab() {
                     <Users size={19} className="text-[#0494f4]" />
                   </div>
                 </div>
-                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                <div className="flex-1 min-w-0 flex flex-col justify-center select-none">
                   <div className="flex justify-between items-baseline mb-0.5">
-                    <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
+                    <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] leading-tight">
                       Pending Requests
                     </h3>
-                    <span className="text-[10px] whitespace-nowrap text-[#0494f4] font-semibold tracking-tight bg-[#0494f4]/10 px-2 py-0.5 rounded-full">
-                      {pendingRequestsCount > 0 ? `${pendingRequestsCount} Pending` : 'View'}
-                    </span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <p className="text-[12px] truncate text-[var(--text-secondary)] font-medium opacity-75">
+                  <div>
+                    <p className="text-[11px] truncate text-[var(--text-secondary)] font-normal opacity-70 leading-normal">
                       Mutual requests and incoming profiles waiting
                     </p>
                   </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[10px] text-[#0494f4] font-black tracking-wider bg-[#0494f4]/10 px-2 py-0.5 rounded-full mr-1">
+                    {pendingRequestsCount > 0 ? `${pendingRequestsCount}` : '0'}
+                  </span>
+                  <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200" />
                 </div>
               </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, 
   Shield, 
@@ -19,11 +19,18 @@ import { useAuth } from '../../../providers/AuthProvider';
 import { CommonSearchBar } from '../../../components/common/CommonSearchBar';
 import Avatar from '../../../components/common/Avatar';
 import { truncateToChars } from '../../../utils/bioHelper';
+import { MultiAccountService, StoredAccount } from '../../../services/MultiAccountService';
 
 export default function ProfileSettingsContent() {
   const { user: authUser, userData } = useAuth();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [switchableAccounts, setSwitchableAccounts] = useState<StoredAccount[]>([]);
+
+  useEffect(() => {
+    const list = MultiAccountService.getAccounts().filter((acc) => acc.userId !== authUser?.id);
+    setSwitchableAccounts(list);
+  }, [authUser]);
 
   const settingsItems = [
     { icon: Users, label: 'Account Settings', sub: 'Change email, password, delete account', onClick: () => navigate('/account-settings') },
@@ -104,6 +111,34 @@ export default function ProfileSettingsContent() {
                   <ChevronRightIcon size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200 mr-1 shrink-0" />
                 </div>
               )}
+
+              {/* Other registered accounts list modeled precisely after standard settings button styling */}
+              {switchableAccounts.map((acc) => (
+                <button 
+                  key={acc.userId}
+                  onClick={() => MultiAccountService.switchAccount(acc.userId)}
+                  className="w-full flex items-center gap-3.5 px-4 py-3 h-16 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group text-left cursor-pointer select-none border-none outline-none bg-transparent"
+                >
+                  <div className="w-11 h-11 rounded-full overflow-hidden border border-[var(--border-color)]/20 shadow-sm shrink-0 group-hover:scale-[1.02] group-active:scale-95 transition-all duration-150">
+                    <img 
+                      src={acc.photoURL} 
+                      alt={acc.fullName} 
+                      className="w-full h-full object-cover" 
+                      referrerPolicy="no-referrer" 
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 pr-1">
+                    <h4 className="text-[14.5px] font-semibold text-[var(--text-primary)] group-hover:text-[#0494f4] transition-colors leading-tight">
+                      Switch Profile
+                    </h4>
+                    <p className="text-[13px] text-[var(--text-secondary)] font-normal mt-0.5 truncate leading-tight opacity-75">
+                      @{acc.username}
+                    </p>
+                  </div>
+                  <ChevronRightIcon size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200 mr-1 shrink-0" />
+                </button>
+              ))}
+
             </>
           )}
 

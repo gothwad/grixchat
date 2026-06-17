@@ -11,7 +11,7 @@ import { useAuth } from './providers/AuthProvider';
 import { useTheme } from './contexts/ThemeContext';
 import { ErrorBoundary } from 'react-error-boundary';
 import SplashScreen from './components/SplashScreen';
-import DeveloperConsole from './components/DeveloperConsole';
+import DeveloperConsole from './features/console/DeveloperConsole';
 import { LocalDataCache } from './services/LocalDataCache';
 
 function ErrorFallback({ error }: { error: any }) {
@@ -86,7 +86,6 @@ const GroupSettingsScreen = React.lazy(() => import('./features/chat/GroupSettin
 
 const LoginScreen = React.lazy(() => import('./features/auth/LoginScreen'));
 const SignupScreen = React.lazy(() => import('./features/auth/SignupScreen'));
-const ForgotPasswordScreen = React.lazy(() => import('./features/auth/ForgotPasswordScreen'));
 const VerifyEmailScreen = React.lazy(() => import('./features/auth/VerifyEmailScreen'));
 
 const PrivacyPolicyScreen = React.lazy(() => import('./features/legal/PrivacyPolicyScreen'));
@@ -564,9 +563,9 @@ export default function App() {
                     <Route path="/call/:id" element={user ? <CallScreen /> : <Navigate to="/login" />} />
                     <Route path="/stories/view/:userId" element={user ? <StoryWatcherScreen /> : <Navigate to="/login" />} />
                     <Route path="/stories/create" element={user ? <StoryCreationScreen /> : <Navigate to="/login" />} />
-                    <Route path="/login" element={!user ? <LoginScreen /> : <Navigate to="/chats" replace />} />
-                    <Route path="/signup" element={!user ? <SignupScreen /> : <Navigate to="/chats" replace />} />
-                    <Route path="/forgot-password" element={!user ? <ForgotPasswordScreen /> : <Navigate to="/chats" replace />} />
+                    <Route path="/login" element={(!user || storage.getItem('grix_adding_account') === 'true') ? <LoginScreen /> : <Navigate to="/chats" replace />} />
+                    <Route path="/signup" element={(!user || storage.getItem('grix_adding_account') === 'true') ? <SignupScreen /> : <Navigate to="/chats" replace />} />
+                    <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
                     <Route path="/privacy-policy" element={<PrivacyPolicyScreen />} />
                     <Route path="/terms" element={<TermsAndConditionsScreen />} />
                     <Route path="/search-user" element={<Navigate to="/profile" replace />} />

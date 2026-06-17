@@ -35,6 +35,7 @@ import { useAuth } from '../../providers/AuthProvider.tsx';
 import { useLayout } from '../../contexts/LayoutContext.tsx';
 import { ChatTabDropdown } from '../chat-ui/ChatTabDropdown';
 import { GroupsTabDropdown } from '../chat-ui/GroupsTabDropdown';
+import { ProfileTabDropdown } from '../chat-ui/ProfileTabDropdown';
 import { authService } from '../../features/auth/services/authService.ts';
 
 export default function TabHeader() {
@@ -49,15 +50,6 @@ export default function TabHeader() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
-
-  const handleProfileLogout = async () => {
-    try {
-      await authService.logout();
-      navigate('/login');
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
-  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -309,25 +301,9 @@ export default function TabHeader() {
           </div>
         )}
 
-        {/* 3 Dots Menu - Show on Profile Tab with direct slide-out Logout action */}
+        {/* 3 Dots Menu - Show on Profile Tab */}
         {isProfilePage && (
-          <div className="relative flex items-center gap-2" ref={profileMenuRef}>
-            <AnimatePresence>
-              {showProfileMenu && (
-                <motion.button
-                  initial={{ opacity: 0, x: 8, scale: 0.95 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: 8, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  onClick={handleProfileLogout}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500 hover:bg-rose-600 active:scale-95 text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer select-none"
-                  id="btn_header_logout"
-                >
-                  <LogOut size={13} strokeWidth={2.5} />
-                  <span>Logout</span>
-                </motion.button>
-              )}
-            </AnimatePresence>
+          <div className="relative" ref={profileMenuRef}>
             <button 
               onClick={() => setShowProfileMenu(prev => !prev)}
               className="w-12 h-12 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
@@ -335,6 +311,14 @@ export default function TabHeader() {
             >
               <MoreVertical size={22} className="text-[var(--header-text)]" />
             </button>
+            <AnimatePresence>
+              {showProfileMenu && (
+                <ProfileTabDropdown 
+                  isOpen={showProfileMenu}
+                  onClose={() => setShowProfileMenu(false)}
+                />
+              )}
+            </AnimatePresence>
           </div>
         )}
 

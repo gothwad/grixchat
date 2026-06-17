@@ -14,10 +14,33 @@ class LocalDataCacheService {
   private listeners: Record<string, Set<(payload?: any) => void>> = {};
   private sessionAccessedKeys = new Set<string>();
   private initPromise: Promise<void> | null = null;
+  private currentUserId: string | null = null;
 
   constructor() {
     this.initializeSession();
     this.initPromise = this.loadAllCachedDataIntoMemory();
+  }
+
+  public setCurrentUserId(userId: string | null): void {
+    this.currentUserId = userId;
+    console.log(`[Cache Control] Switched active cache partition to: ${userId || 'guest'}`);
+  }
+
+  public getPartitionedKey(key: string): string {
+    if (!this.currentUserId) return key;
+    const lowerKey = key.toLowerCase();
+    if (
+      lowerKey.startsWith('grix_auth_') ||
+      lowerKey.startsWith('grix_multi_') ||
+      lowerKey === 'grix_active_account_id' ||
+      lowerKey === 'app_lock_pin' ||
+      lowerKey === 'app_lock_enabled' ||
+      lowerKey === 'lock_state' ||
+      lowerKey === 'grix_cached_user'
+    ) {
+      return key;
+    }
+    return `${this.currentUserId}_${key}`;
   }
 
   private getStoreNameForKey(key: string): 'kv_store' | 'conversations' | 'messages' {
@@ -108,17 +131,18 @@ class LocalDataCacheService {
    * Handles memory fallback automatically through StorageService.
    */
   public set(key: string, value: any): void {
+    const partitionedKey = this.getPartitionedKey(key);
     const item = {
       value,
       timestamp: Date.now(),
     };
     try {
-      this.memoryCache[key] = item;
+      this.memoryCache[partitionedKey] = item;
       
       // Async background write to IndexedDB
       const storeName = this.getStoreNameForKey(key);
-      IndexedDBService.set(storeName, key, item).catch((err) => {
-        console.warn(`[Cache Control] Persistent write failed to IndexedDB for key "${key}":`, err);
+      IndexedDBService.set(storeName, partitionedKey, item).catch((err) => {
+        console.warn(`[Cache Control] Persistent write failed to IndexedDB for key "${partitionedKey}":`, err);
       });
     } catch (e) {
       console.warn(`LocalDataCache write failed for key ${key}. Memory fallback used.`, e);
@@ -131,7 +155,8 @@ class LocalDataCacheService {
    */
   public get<T>(key: string, maxAge = DEFAULT_CONFIG.maxAge): T | null {
     try {
-      const item = this.memoryCache[key];
+      const partitionedKey = this.getPartitionedKey(key);
+      const item = this.memoryCache[partitionedKey];
       if (item) {
         const age = Date.now() - item.timestamp;
         if (age < maxAge) {
@@ -148,14 +173,41 @@ class LocalDataCacheService {
    * Explicitly invalidate a cache key.
    */
   public remove(key: string): void {
-    delete this.memoryCache[key];
-    storage.removeItem(key);
+    const partitionedKey = this.getPartitionedKey(key);
+    delete this.memoryCache[partitionedKey];
+    storage.removeItem(partitionedKey);
     
     // Async background remove from IndexedDB
     const storeName = this.getStoreNameForKey(key);
-    IndexedDBService.remove(storeName, key).catch((err) => {
-      console.warn(`[Cache Control] Persistent remove failed from IndexedDB for key "${key}":`, err);
+    IndexedDBService.remove(storeName, partitionedKey).catch((err) => {
+      console.warn(`[Cache Control] Persistent remove failed from IndexedDB for key "${partitionedKey}":`, err);
     });
+  }
+
+  /**
+   * Clears all cached items for a specific user ID.
+   */
+  public async clearAccountCache(userId: string): Promise<void> {
+    try {
+      const keysToWipe = Object.keys(this.memoryCache).filter((k) => k.startsWith(`${userId}_`));
+      keysToWipe.forEach((key) => {
+        delete this.memoryCache[key];
+        storage.removeItem(key);
+      });
+
+      const stores: ('kv_store' | 'conversations' | 'messages')[] = ['kv_store', 'conversations', 'messages'];
+      for (const storeName of stores) {
+        const items = await IndexedDBService.getAll<any>(storeName);
+        for (const [key] of Object.entries(items)) {
+          if (key.startsWith(`${userId}_`)) {
+            await IndexedDBService.remove(storeName, key);
+          }
+        }
+      }
+      console.log(`[Cache Control] Cleared all partitioned cache contents for user: ${userId}`);
+    } catch (err) {
+      console.error('[Cache Control] Failed to wipe partitioned user cache:', err);
+    }
   }
 
   /**
@@ -340,6 +392,20 @@ class LocalDataCacheService {
 
   public saveNotifications(myUserId: string, typeGroup: 'social' | 'activity', notifications: any[]): void {
     this.set(`gx_notifs_${typeGroup}_${myUserId}`, notifications);
+  }
+
+  public getMemoryCacheKeys(): { key: string; size: number; timestamp: number }[] {
+    return Object.entries(this.memoryCache).map(([key, item]) => {
+      let size = 0;
+      try {
+        size = JSON.stringify(item.value).length;
+      } catch (_) {}
+      return {
+        key,
+        size,
+        timestamp: item.timestamp
+      };
+    });
   }
 }
 

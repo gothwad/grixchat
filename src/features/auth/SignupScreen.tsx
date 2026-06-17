@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { User as UserIcon, AtSign, Lock, Eye, EyeOff, Mail, ArrowRight, Github, HelpCircle, ArrowLeft, Apple, Twitter, Facebook } from 'lucide-react';
 import { authService } from './services/authService.ts';
+import { storage } from '../../services/StorageService';
 
 export default function SignupScreen() {
   const [email, setEmail] = useState('');
@@ -152,6 +153,19 @@ export default function SignupScreen() {
 
   return (
     <div className="h-full overflow-y-auto bg-[var(--bg-main)] flex flex-col items-center relative font-sans">
+      {/* Cancel button for account-adding mode */}
+      {storage.getItem('grix_adding_account') === 'true' && (
+        <button
+          type="button"
+          onClick={() => {
+            storage.removeItem('grix_adding_account');
+            navigate('/chats');
+          }}
+          className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 text-xs font-black uppercase tracking-wider rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] cursor-pointer hover:bg-[var(--border-color)]/10 active:scale-95 transition-all z-20 shadow-sm"
+        >
+          Cancel
+        </button>
+      )}
       <div className="w-full px-8 pt-8 pb-12 z-10 flex flex-col items-center min-h-full relative max-w-md mx-auto">
         {/* Header Card */}
         <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 text-center flex flex-col items-center justify-center mb-5 shadow-sm">
@@ -170,17 +184,17 @@ export default function SignupScreen() {
         </div>
 
         {/* Auth Switcher Tabs */}
-        <div className="w-full bg-[var(--bg-card)] p-1 rounded-xl flex items-center border border-[var(--border-color)] mb-5 max-w-md">
+        <div className="w-full flex p-1 gap-2 select-none mb-5 max-w-md">
           <button
             type="button"
             onClick={() => navigate('/login')}
-            className="flex-1 py-2 text-xs font-bold rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all active:scale-[0.98]"
+            className="flex-1 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-main)]/50"
           >
             Sign In
           </button>
           <button
             type="button"
-            className="flex-1 py-2 text-xs font-bold rounded-lg bg-[var(--primary)] text-white shadow-sm shadow-[var(--primary)]/10 transition-all active:scale-[0.98]"
+            className="flex-1 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 bg-[#0494f4] text-white shadow-md shadow-[#0494f4]/15"
           >
             Sign Up
           </button>

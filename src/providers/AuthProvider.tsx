@@ -6,6 +6,7 @@ import { storage, safeSessionStorage } from '../services/StorageService';
 import { userProfileService } from '../services/db/userProfileService';
 import { sessionService } from '../services/db/sessionService';
 import { LocalDataCache } from '../services/LocalDataCache';
+import { MultiAccountService } from '../services/MultiAccountService';
 
 interface CustomUser extends User {
   uid: string;
@@ -26,7 +27,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<CustomUser | null>(() => {
     try {
       const cached = storage.getItem('grix_cached_user');
-      return cached ? JSON.parse(cached) : null;
+      const u = cached ? JSON.parse(cached) : null;
+      if (u) {
+        LocalDataCache.setCurrentUserId(u.id);
+      }
+      return u;
     } catch (_) { return null; }
   });
 
@@ -43,6 +48,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     userRef.current = user;
+    if (user) {
+      LocalDataCache.setCurrentUserId(user.id);
+    } else {
+      LocalDataCache.setCurrentUserId(null);
+    }
   }, [user]);
 
   const fetchProfileData = async (currentUserId: string, email: string, meta: any) => {
@@ -50,6 +60,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (profileData) {
       setUserData(profileData);
       setFollowingIds(following);
+      
+      // Update multi-account storage with up-to-date details
+      MultiAccountService.addOrUpdateAccount(
+        currentUserId,
+        email,
+        profileData.username || '',
+        profileData.fullName || '',
+        profileData.photoURL || ''
+      ).catch(console.error);
     }
   };
 
@@ -71,6 +90,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const supabaseUser = session?.user ?? null;
         const currentUser = supabaseUser ? { ...supabaseUser, uid: supabaseUser.id } as CustomUser : null;
+
+        if (supabaseUser && session) {
+          MultiAccountService.updateSession(supabaseUser.id, {
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+          });
+        }
         
         if (event === 'SIGNED_OUT') {
           const currentUserId = userRef.current?.id;
@@ -86,6 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLoading(false);
           setIsAuthReady(true);
         } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || (event as string) === 'USER_UPDATED') {
+          storage.removeItem('grix_adding_account');
           if (supabaseUser) {
             userProfileService.throttledSetStatus(supabaseUser.id, true, true).catch(() => {});
             // Fetch profile data in the background
