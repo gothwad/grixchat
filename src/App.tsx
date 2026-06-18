@@ -65,7 +65,6 @@ const GrixAIProfile = React.lazy(() => import('./features/grixai/GrixAIProfile')
 const CallsTab = React.lazy(() => import('./features/call/CallsTab'));
 
 const PrivacySettingsScreen = React.lazy(() => import('./features/settings/PrivacySettingsScreen'));
-const SettingsMainScreen = React.lazy(() => import('./features/settings/SettingsMainScreen'));
 const AppPreferencesScreen = React.lazy(() => import('./features/settings/AppPreferencesScreen'));
 const ChatSettingsMainScreen = React.lazy(() => import('./features/settings/ChatSettingsMainScreen'));
 // SettingsScreen directly imported above
@@ -528,7 +527,7 @@ export default function App() {
                       {/* Sub routes nested in MainLayout to support clean split layouts on Desktop */}
                       <Route path="/notifications" element={user ? <NotificationsScreen /> : <Navigate to="/login" />} />
                       <Route path="/notifications/likes" element={user ? <LikeNotificationsScreen /> : <Navigate to="/login" />} />
-                      <Route path="/settings" element={user ? <SettingsMainScreen /> : <Navigate to="/login" />} />
+                      <Route path="/settings" element={<Navigate to="/profile" replace />} />
                       <Route path="/edit-profile" element={user ? <EditProfileScreen /> : <Navigate to="/login" />} />
                       <Route path="/privacy-settings" element={user ? <PrivacySettingsScreen /> : <Navigate to="/login" />} />
                       <Route path="/chat-settings" element={user ? <ChatSettingsMainScreen /> : <Navigate to="/login" />} />

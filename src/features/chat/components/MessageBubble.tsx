@@ -99,6 +99,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   }, [x]);
 
   const [tick, setTick] = React.useState(0);
+  const [customBubble, setCustomBubble] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const contactId = receiver?.id || receiver?.uid || (isMe ? msg.receiver_id : msg.sender_id);
+    if (!contactId) return;
+    
+    const loadCustom = () => {
+      setCustomBubble(localStorage.getItem(`app-chat-bubble-${contactId}`));
+    };
+    loadCustom();
+    window.addEventListener(`chat-customization-changed-${contactId}`, loadCustom);
+    return () => {
+      window.removeEventListener(`chat-customization-changed-${contactId}`, loadCustom);
+    };
+  }, [receiver, msg, isMe]);
 
   const bubbleStyleSetting = storage.getItem('app-chat-bubble-style') || 'whatsapp';
   const fontSizeSetting = storage.getItem('app-chat-font-size') || 'medium';
@@ -299,10 +314,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           className={`px-3 pt-2 pb-[19px] ${hasReactions ? 'pb-[27px]' : ''} ${resolvedReplyTo ? 'min-w-[190px]' : 'min-w-[70px]'} shadow-sm border border-neutral-800/10 dark:border-white/5 relative cursor-pointer select-none max-w-full overflow-visible touch-pan-y w-fit transition-colors duration-200 ${bubbleShapeClass} ${
             activeMessageMenu?.id === msg.id ? 'z-50 ring-2.5 ring-[var(--primary)]/45 scale-[1.01] shadow-lg' : 'z-10'
           } ${
-            actualIsMe 
-              ? 'bg-gradient-to-b from-[var(--bubble-own)] to-[var(--bubble-own)]/98 text-[var(--bubble-text-own)] ml-auto border-r-0 font-light' 
-              : 'bg-gradient-to-b from-[var(--bubble-other)] to-[var(--bubble-other)]/98 text-[var(--bubble-text-other)] mr-auto border-l-0 font-light'
-          } ${isSelected ? 'ring-3 ring-[#0494f4]/80 bg-[#0494f4]/20 scale-[1.02] shadow-cyan-500/10' : ''} hover:brightness-[1.02]`}
+            isSelected 
+              ? 'ring-3 ring-[#0494f4]/80 bg-[#0494f4]/20 scale-[1.02] shadow-cyan-500/10' 
+              : !actualIsMe 
+                ? 'bg-gradient-to-b from-[var(--bubble-other)] to-[var(--bubble-other)]/98 text-[var(--bubble-text-other)] mr-auto border-l-0 font-light' 
+                : customBubble === 'ocean-indigo'
+                  ? 'bg-gradient-to-br from-teal-400 to-indigo-600 text-white ml-auto border-r-0 font-light shadow-md'
+                  : customBubble === 'forest-magic'
+                    ? 'bg-gradient-to-br from-emerald-400 to-teal-600 text-white ml-auto border-r-0 font-light shadow-md'
+                    : customBubble === 'crimson-fire'
+                      ? 'bg-gradient-to-br from-rose-400 to-orange-600 text-white ml-auto border-r-0 font-light shadow-md'
+                      : customBubble === 'sunset-violet'
+                        ? 'bg-gradient-to-br from-violet-600 to-purple-800 text-white ml-auto border-r-0 font-light shadow-md'
+                        : 'bg-gradient-to-b from-[var(--bubble-own)] to-[var(--bubble-own)]/98 text-[var(--bubble-text-own)] ml-auto border-r-0 font-light'
+          } hover:brightness-[1.02]`}
         >
           {isForwardedMany ? (
             <p className="text-[9px] text-sky-400 font-extrabold italic mb-1 flex items-center gap-1 select-none tracking-wide">
@@ -359,6 +384,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               isMe={isMe} 
               receiver={receiver} 
               fileName={msg.file_name} 
+              isSending={msg.status === 'sending'}
             />
             
             {renderedContent && (

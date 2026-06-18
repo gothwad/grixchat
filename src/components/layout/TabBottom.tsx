@@ -194,6 +194,12 @@ export default function TabBottom() {
     };
   }, [authUser?.id, conversationsList]);
   
+  const handleItemClick = () => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(15);
+    }
+  };
+
   const navItems = [
     { icon: MessageCircle, path: '/chats', label: 'Chats', badge: unreadChatsCount + unreadGroupsCount, activeColor: 'text-[var(--header-text)]' },
     { icon: Camera, path: '/stories', label: 'Stories', activeColor: 'text-[var(--header-text)]' },
@@ -212,6 +218,7 @@ export default function TabBottom() {
           <Link 
             key={item.path} 
             to={item.path} 
+            onClick={handleItemClick}
             className="relative flex flex-col items-center justify-center h-full min-w-[64px] transition-all duration-300 group"
           >
             <div className="relative flex flex-col items-center">

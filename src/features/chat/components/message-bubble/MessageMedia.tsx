@@ -10,6 +10,7 @@ interface MessageMediaProps {
   isMe: boolean;
   receiver: any;
   fileName?: string;
+  isSending?: boolean;
 }
 
 export const MessageMedia: React.FC<MessageMediaProps> = ({
@@ -18,6 +19,7 @@ export const MessageMedia: React.FC<MessageMediaProps> = ({
   isMe,
   receiver,
   fileName,
+  isSending = false,
 }) => {
   const navigate = useNavigate();
 
@@ -29,6 +31,7 @@ export const MessageMedia: React.FC<MessageMediaProps> = ({
         className="mb-1 rounded-xl overflow-hidden border border-white/5 dark:border-white/10 shadow-md cursor-pointer relative group-hover:scale-[1.01] transition-transform duration-250"
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
+          if (isSending) return;
           e.stopPropagation();
           navigate('/chat/preview', { 
             state: { 
@@ -45,6 +48,15 @@ export const MessageMedia: React.FC<MessageMediaProps> = ({
           referrerPolicy="no-referrer"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent pointer-events-none" />
+        
+        {isSending && (
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-[1.5px] flex flex-col items-center justify-center gap-1.5 z-20">
+            <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-[var(--primary)] animate-spin" />
+            <span className="text-[8.5px] font-extrabold tracking-widest text-[#0494f4] uppercase animate-pulse select-none">
+              Uploading
+            </span>
+          </div>
+        )}
       </motion.div>
     );
   }
@@ -56,8 +68,16 @@ export const MessageMedia: React.FC<MessageMediaProps> = ({
           src={mediaUrl} 
           className="w-full h-full object-cover opacity-90 group-hover/video:opacity-100 transition-opacity"
           playsInline
-          controls
+          controls={!isSending}
         />
+        {isSending && (
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-[1.5px] flex flex-col items-center justify-center gap-1.5 z-20">
+            <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-[var(--primary)] animate-spin" />
+            <span className="text-[8.5px] font-extrabold tracking-widest text-[#0494f4] uppercase animate-pulse select-none">
+              Uploading
+            </span>
+          </div>
+        )}
       </div>
     );
   }
@@ -66,6 +86,14 @@ export const MessageMedia: React.FC<MessageMediaProps> = ({
     return (
       <div className="mb-1 w-full flex justify-center relative">
         <VoiceMessage fileUrl={mediaUrl} isMe={isMe} />
+        {isSending && (
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px] rounded-xl flex items-center justify-center gap-2 z-20 px-4">
+            <div className="w-4 h-4 rounded-full border border-white/20 border-t-[var(--primary)] animate-spin" />
+            <span className="text-[8px] font-black text-[#0494f4] uppercase tracking-widest animate-pulse">
+              sending...
+            </span>
+          </div>
+        )}
       </div>
     );
   }
@@ -84,15 +112,21 @@ export const MessageMedia: React.FC<MessageMediaProps> = ({
             {mediaUrl.split('.').pop()?.toUpperCase() || 'FILE'} • DOCUMENT
           </p>
         </div>
-        <a 
-          href={mediaUrl} 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          className="p-1.5 bg-white/10 hover:bg-white/15 rounded-full text-white transition-all active:scale-90 flex items-center justify-center shadow whitespace-nowrap shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Download size={11} className="stroke-[2.5]" />
-        </a>
+        {isSending ? (
+          <div className="p-1.5 rounded-full text-white flex items-center justify-center shrink-0">
+            <div className="w-4 h-4 rounded-full border border-white/20 border-t-[var(--primary)] animate-spin" />
+          </div>
+        ) : (
+          <a 
+            href={mediaUrl} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="p-1.5 bg-white/10 hover:bg-white/15 rounded-full text-white transition-all active:scale-90 flex items-center justify-center shadow whitespace-nowrap shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Download size={11} className="stroke-[2.5]" />
+          </a>
+        )}
       </div>
     );
   }

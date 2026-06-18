@@ -18,7 +18,6 @@ const StoriesTab = React.lazy(() => import('../../features/stories/StoriesTab'))
 const SearchTab = React.lazy(() => import('../../features/search/SearchTab'));
 const CallsTab = React.lazy(() => import('../../features/call/CallsTab'));
 const ProfileTab = React.lazy(() => import('../../features/profile/ProfileTab'));
-const SettingsMainScreen = React.lazy(() => import('../../features/settings/SettingsMainScreen'));
 const NotificationsScreen = React.lazy(() => import('../../features/notifications/NotificationsScreen'));
 
 // Paths where BottomNav should be visible
@@ -32,7 +31,6 @@ const getDesktopParentPane = (pathname: string): 'chats' | 'groups' | 'settings'
       pathname === '/search' || 
       pathname === '/calls' || 
       pathname === '/profile' || 
-      pathname === '/settings' || 
       pathname === '/notifications') {
     return null;
   }
@@ -92,6 +90,19 @@ export default function MainLayout() {
   const { activeCall, endCall, timer } = useCall();
 
   const [isDesktop, setIsDesktop] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 1024 : false));
+  const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -154,7 +165,7 @@ export default function MainLayout() {
         case 'chats':
           return <ChatsTab />;
         case 'settings':
-          return <SettingsMainScreen />;
+          return <ProfileTab />;
         case 'notifications':
           return <NotificationsScreen />;
         default:
@@ -171,6 +182,20 @@ export default function MainLayout() {
         {/* We use [transform:translate(0,0)] so that position:fixed elements are bounded inside this column */}
         <div className="w-[380px] h-full flex flex-col border-r border-[var(--border-color)]/20 bg-[var(--bg-card)] shrink-0 overflow-hidden relative [transform:translate3d(0,0,0)] z-20">
           
+          <AnimatePresence>
+            {isOffline && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="bg-amber-600 text-white text-center py-1.5 px-4 text-[10px] font-bold font-mono tracking-tight flex items-center justify-center gap-1.5 z-40 border-b border-amber-500/30 shrink-0 select-none"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                <span>Operating in Offline Cache Mode</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Realtime Call indicator on desktop */}
           {activeCall && (
             <div className="bg-emerald-600 text-white px-4 py-2 border-b border-emerald-500/25 flex items-center justify-between z-30 shrink-0">
@@ -226,6 +251,20 @@ export default function MainLayout() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {showTopNav && <TopNav />}
+
+      <AnimatePresence>
+        {isOffline && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-amber-600 text-white text-center py-1.5 px-4 text-xs font-bold font-mono tracking-tight flex items-center justify-center gap-1.5 z-40 border-b border-amber-500/30 shrink-0 select-none"
+          >
+            <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+            <span>Operating in Offline Cache Mode</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* Active Call Floating Bar (WhatsApp-Style) */}
       <AnimatePresence>

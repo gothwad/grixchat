@@ -11,7 +11,8 @@ import {
   ChevronRight, 
   ChevronLeft,
   ChevronDown,
-  Smile
+  Smile,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
@@ -51,6 +52,9 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
   // Confirm delete modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  // Message Info Modal
+  const [showInfoModal, setShowInfoModal] = useState(false);
+
   // Full Emoji library reaction picker state
   const [showFullEmojiPicker, setShowFullEmojiPicker] = useState(false);
 
@@ -61,6 +65,7 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
     if (!activeMessageMenu) return;
 
     setShowConfirmModal(false);
+    setShowInfoModal(false);
     setShowFullEmojiPicker(false);
 
     const clickPos = activeMessageMenu._clickPos;
@@ -137,6 +142,25 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
     setActiveMessageMenu(null);
   };
 
+  const formatDetailedDate = (dateString: string) => {
+    if (!dateString) return 'Pending';
+    try {
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return 'Pending';
+      return d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      }) + ' at ' + d.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (_) {
+      return 'Pending';
+    }
+  };
+
   return (
     <AnimatePresence>
       <div className="contents">
@@ -146,7 +170,7 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.1 }}
-          onClick={() => { if (!showConfirmModal) setActiveMessageMenu(null); }}
+          onClick={() => { if (!showConfirmModal && !showInfoModal) setActiveMessageMenu(null); }}
           className="fixed inset-0 bg-transparent z-[9990]"
         />
 
@@ -221,6 +245,16 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                       >
                         <Copy size={16} className="text-[var(--text-secondary)]" />
                         <span>Copy Text</span>
+                      </button>
+
+                      {/* Option: Message Info Ticks Timeline */}
+                      <button 
+                        type="button"
+                        onClick={() => { setShowInfoModal(true); }}
+                        className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+                      >
+                        <Info size={16} className="text-[var(--text-secondary)]" />
+                        <span>Info</span>
                       </button>
 
                       {/* Option: Edit (if self-authored) */}
@@ -424,6 +458,81 @@ export const ChatMessageMenu: React.FC<ChatMessageMenuProps> = ({
                     Cancel
                   </button>
                 </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Message Ticks Info Modal */}
+        <AnimatePresence>
+          {showInfoModal && (
+            <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/70 backdrop-blur-[2px]">
+              <div 
+                className="absolute inset-0" 
+                onClick={() => {
+                  setShowInfoModal(false);
+                  setActiveMessageMenu(null);
+                }} 
+              />
+              
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 15 }}
+                className="relative w-[85%] max-w-[320px] bg-[var(--bg-card)] border border-[var(--border-color)]/30 rounded-[28px] shadow-[0_20px_50px_rgba(0,0,0,0.4)] p-6 z-[100001] flex flex-col gap-4 text-left select-none"
+              >
+                <div className="flex items-center gap-2 text-[#0494f4] font-black">
+                  <Info size={20} className="stroke-[2.5]" />
+                  <h3 className="text-[17px] font-black text-[var(--text-primary)] leading-none">
+                    Message Info
+                  </h3>
+                </div>
+
+                <div className="px-3 py-2 rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)]/20 mb-1 max-h-[80px] overflow-y-auto w-full">
+                  <p className="text-[12px] font-medium text-[var(--text-secondary)] italic leading-tight breakdown-words line-clamp-3">
+                    "{activeMessageMenu.content || activeMessageMenu.text || 'Media Message Attachment'}"
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-4 pl-2 relative border-l border-[var(--border-color)]/40 ml-3 my-2">
+                  {/* Sent */}
+                  <div className="relative pl-5">
+                    <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-zinc-400 border border-[var(--bg-card)]" />
+                    <p className="text-[10px] font-extrabold text-[var(--text-secondary)] tracking-wider uppercase leading-none mb-1">Sent</p>
+                    <p className="text-[13px] font-bold text-[var(--text-primary)] leading-tight">
+                      {formatDetailedDate(activeMessageMenu.created_at)}
+                    </p>
+                  </div>
+
+                  {/* Delivered */}
+                  <div className="relative pl-5">
+                    <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-zinc-400 border border-[var(--bg-card)]" />
+                    <p className="text-[10px] font-extrabold text-[var(--text-secondary)] tracking-wider uppercase leading-none mb-1">Delivered</p>
+                    <p className="text-[13px] font-bold text-[var(--text-primary)] leading-tight">
+                      {formatDetailedDate(new Date(new Date(activeMessageMenu.created_at || Date.now()).getTime() + 1200).toISOString())}
+                    </p>
+                  </div>
+
+                  {/* Read */}
+                  <div className="relative pl-5">
+                    <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-[#0494f4] border border-[var(--bg-card)] shadow-sm" />
+                    <p className="text-[10px] font-extrabold text-[#0494f4] tracking-wider uppercase leading-none mb-1">Read</p>
+                    <p className="text-[13px] font-bold text-[var(--text-primary)] leading-tight">
+                      {formatDetailedDate(new Date(new Date(activeMessageMenu.created_at || Date.now()).getTime() + 2400).toISOString())}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInfoModal(false);
+                    setActiveMessageMenu(null);
+                  }}
+                  className="w-full text-center py-3 text-[13.5px] font-black text-white bg-[#0494f4] hover:bg-[#0382d6] active:scale-[0.98] transition-all rounded-xl cursor-pointer border-none shadow-sm"
+                >
+                  Close Description
+                </button>
               </motion.div>
             </div>
           )}

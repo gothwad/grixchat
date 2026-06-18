@@ -618,7 +618,7 @@ export default function GithubScreen() {
       {/* Top Header Panel (Matches SettingHeader / TabHeader Design exactly) */}
       <div className="w-full bg-[var(--header-bg)] px-4 min-h-[56px] pt-safe pb-1.5 flex items-center gap-3 z-50 shrink-0 relative border-b border-[var(--border-color)]/35 shadow-sm rounded-b-2xl select-none">
         <button 
-          onClick={() => navigate('/settings')} 
+          onClick={() => navigate('/profile')} 
           className="p-2 hover:bg-black/5 rounded-full transition-colors cursor-pointer"
         >
           <ChevronLeft size={24} className="text-[var(--header-text)]" />

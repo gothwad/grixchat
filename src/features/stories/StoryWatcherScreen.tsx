@@ -14,7 +14,11 @@ export default function StoryWatcherScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   
+  const [isPaused, setIsPaused] = useState(false);
+  const [progress, setProgress] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const pressTimerRef = useRef<any>(null);
+  const isLongPressRef = useRef(false);
 
   useEffect(() => {
     if (!userId || !supabase) return;
@@ -84,19 +88,34 @@ export default function StoryWatcherScreen() {
     };
   }, [currentIndex, stories]);
 
+  // Handle pausing of audio playback
   useEffect(() => {
-    // Logic for tracking viewers could be added here if needed in Supabase
-  }, [currentIndex, stories]);
-
-  // Auto-advance
-  useEffect(() => {
-    if (stories.length > 0) {
-      const timer = setTimeout(() => {
-        handleNext();
-      }, 5000);
-      return () => clearTimeout(timer);
+    if (!audioRef.current) return;
+    if (isPaused) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play().catch(() => {});
     }
-  }, [currentIndex, stories]);
+  }, [isPaused]);
+
+  // Auto-advance tracking with granular 50ms pauseable frame steps
+  useEffect(() => {
+    if (stories.length === 0 || isPaused) return;
+
+    setProgress(0);
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          handleNext();
+          return 100;
+        }
+        return prev + 1;
+      });
+    }, 50); // 50ms * 100 = 5000ms (5s duration per story item)
+
+    return () => clearInterval(interval);
+  }, [currentIndex, stories, isPaused]);
 
   const handleNext = () => {
     if (currentIndex < stories.length - 1) {
@@ -109,6 +128,29 @@ export default function StoryWatcherScreen() {
   const handlePrev = () => {
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
+    }
+  };
+
+  const handlePointerDown = () => {
+    isLongPressRef.current = false;
+    setIsPaused(true);
+    pressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(20);
+      }
+    }, 250);
+  };
+
+  const handlePointerUp = (action: 'prev' | 'next') => {
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+    setIsPaused(false);
+    if (!isLongPressRef.current) {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(10);
+      }
+      if (action === 'prev') handlePrev();
+      else handleNext();
     }
   };
 
@@ -126,14 +168,23 @@ export default function StoryWatcherScreen() {
     <div className="fixed inset-0 bg-black z-50 flex flex-col font-sans select-none">
       {/* Progress Bars */}
       <div className="absolute top-4 left-0 right-0 px-2 flex gap-1 z-20">
-        {stories.map((_, idx) => (
-          <div key={idx} className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
-            <div 
-              className={`h-full bg-white transition-all duration-[5000ms] ease-linear ${idx < currentIndex ? 'w-full' : idx === currentIndex ? 'w-full' : 'w-0'}`}
-              style={{ transitionDuration: idx === currentIndex ? '5000ms' : '0ms' }}
-            />
-          </div>
-        ))}
+        {stories.map((_, idx) => {
+          let barWidth = '0%';
+          if (idx < currentIndex) barWidth = '100%';
+          else if (idx === currentIndex) barWidth = `${progress}%`;
+
+          return (
+            <div key={idx} className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-white transition-all ease-linear"
+                style={{ 
+                  width: barWidth,
+                  transitionDuration: idx === currentIndex ? '50ms' : '0ms'
+                }}
+              />
+            </div>
+          );
+        })}
       </div>
 
       {/* Header */}
@@ -178,21 +229,41 @@ export default function StoryWatcherScreen() {
 
         {/* Music Indicator Layer */}
         {currentStory?.music_title && (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-md rounded-full py-1.5 px-4 flex items-center gap-2 border border-white/10 z-30 max-w-[280px]">
-            <Music size={12} className="text-[#0494f4] animate-spin" />
-            <span className="text-[10px] font-extrabold text-white truncate max-w-[150px]">
-              {currentStory.music_title}
-            </span>
-            <span className="text-[9px] text-zinc-400 truncate">
-              • {currentStory.music_artist}
-            </span>
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md rounded-full py-2 px-5 flex items-center gap-2.5 border border-white/20 z-30 max-w-[300px] shadow-lg select-none">
+            <Volume2 size={13} className="text-emerald-400 animate-pulse shrink-0" />
+            
+            {/* Equalizer wave micro-animations */}
+            <div className="flex items-end gap-[2px] h-3 w-5 shrink-0 select-none mr-0.5">
+              <span className="w-[2px] bg-emerald-400 rounded-full h-full animate-bounce" style={{ animationDuration: '0.6s' }} />
+              <span className="w-[2px] bg-emerald-400 rounded-full h-2/3 animate-bounce" style={{ animationDuration: '0.8s', animationDelay: '0.1s' }} />
+              <span className="w-[2px] bg-emerald-400 rounded-full h-1/2 animate-bounce" style={{ animationDuration: '0.5s', animationDelay: '0.2s' }} />
+            </div>
+
+            <div className="min-w-0 flex flex-col">
+              <span className="text-[10px] font-black tracking-tight text-white truncate max-w-[140px] leading-none">
+                {currentStory.music_title}
+              </span>
+              <span className="text-[8px] text-zinc-400 truncate max-w-[140px] leading-none mt-0.5">
+                {currentStory.music_artist || 'Ambient Soundtrack'}
+              </span>
+            </div>
           </div>
         )}
 
         {/* Navigation Overlays */}
         <div className="absolute inset-0 flex">
-          <div className="flex-1" onClick={handlePrev} />
-          <div className="flex-1" onClick={handleNext} />
+          <div 
+            className="flex-1 cursor-w-resize" 
+            onPointerDown={handlePointerDown}
+            onPointerUp={() => handlePointerUp('prev')}
+            onPointerLeave={() => setIsPaused(false)}
+          />
+          <div 
+            className="flex-1 cursor-e-resize" 
+            onPointerDown={handlePointerDown}
+            onPointerUp={() => handlePointerUp('next')}
+            onPointerLeave={() => setIsPaused(false)}
+          />
         </div>
       </div>
     </div>

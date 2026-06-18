@@ -131,6 +131,8 @@ export default function StoriesTab() {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], options);
   };
 
+  const myStoryName = userData?.fullName || authUser?.email?.split('@')[0] || "My Story";
+
   return (
     <div className="h-full flex flex-col bg-[var(--bg-card)] overflow-hidden animate-fade-in touch-pan-y font-sans relative">
       <div className="flex-1 overflow-y-auto no-scrollbar pb-32 bg-[var(--bg-card)]">
@@ -157,25 +159,22 @@ export default function StoriesTab() {
             }}
             className="flex items-center gap-3.5 px-4 py-3 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group cursor-pointer select-none"
           >
-            {/* Left: Avatar with Plus Overlay */}
+            {/* Left: Avatar with dynamic Ring or Plus Overlay */}
             <div className="relative shrink-0">
               {myStoriesGroup ? (
-                <div className="relative">
+                <div className="relative p-[2px] rounded-full ring-2 ring-[var(--primary)]">
                   <Avatar 
                     url={userData?.photoURL} 
                     type="direct" 
-                    name="My Story" 
+                    name={myStoryName} 
                   />
-                  <div className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] bg-emerald-500 rounded-full flex items-center justify-center border-2 border-[var(--bg-card)] shadow-md">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
-                  </div>
                 </div>
               ) : (
                 <div className="relative">
                   <Avatar 
                     url={userData?.photoURL} 
                     type="direct" 
-                    name="My Story" 
+                    name={myStoryName} 
                   />
                   <div className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] bg-[#0494f4] text-white rounded-full flex items-center justify-center border-2 border-[var(--bg-card)] shadow-md">
                     <Plus size={11} strokeWidth={3.5} />
@@ -187,7 +186,7 @@ export default function StoriesTab() {
             {/* Middle: Details */}
             <div className="flex-1 min-w-0">
               <h4 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[#0494f4] transition-colors leading-tight">
-                My Story
+                {myStoryName}
               </h4>
               <p className="text-[12.5px] text-[var(--text-secondary)] opacity-75 mt-0.5 font-medium leading-tight">
                 {myStoriesGroup 
@@ -197,20 +196,8 @@ export default function StoriesTab() {
               </p>
             </div>
 
-            {/* Right: Plus to add new stories */}
-            {myStoriesGroup && (
-              <button 
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate('/stories/create');
-                }}
-                className="w-10 h-10 rounded-full flex items-center justify-center bg-transparent text-[#0494f4] hover:bg-[var(--border-color)]/10 active:scale-95 transition-all duration-150 cursor-pointer shrink-0"
-                title="Add New Story"
-              >
-                <Plus size={20} className="stroke-[2.5]" />
-              </button>
-            )}
+            {/* Right: navigation chevron */}
+            <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200 shrink-0" />
           </div>
 
           {/* FRIENDS' STATUSES (RECENT UPDATES) */}
@@ -230,8 +217,8 @@ export default function StoriesTab() {
                 onClick={() => navigate(`/stories/view/${group.userId}`)}
                 className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group cursor-pointer select-none"
               >
-                {/* Left: Avatar */}
-                <div className="relative shrink-0">
+                {/* Left: Avatar with brand themed ring */}
+                <div className="relative shrink-0 p-[2px] rounded-full ring-2 ring-[var(--primary)]">
                   <Avatar 
                     url={group.photoURL} 
                     type="direct" 

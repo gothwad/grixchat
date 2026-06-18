@@ -53,12 +53,12 @@ export default function DesktopSidebar() {
           )}
         </Link>
         <Link 
-          to="/settings" 
+          to="/profile" 
           title="Settings"
-          className={`p-3 rounded-xl transition-all relative group ${location.pathname === '/settings' ? 'bg-[var(--primary)] text-white shadow-lg shadow-[var(--primary)]/20 scale-105' : 'text-[var(--nav-text)]/60 hover:bg-[var(--border-color)]/30 hover:text-[var(--text-primary)]'}`}
+          className={`p-3 rounded-xl transition-all relative group ${location.pathname === '/profile' ? 'bg-[var(--primary)] text-white shadow-lg shadow-[var(--primary)]/20 scale-105' : 'text-[var(--nav-text)]/60 hover:bg-[var(--border-color)]/30 hover:text-[var(--text-primary)]'}`}
         >
           <Settings size={24} />
-          {location.pathname !== '/settings' && (
+          {location.pathname !== '/profile' && (
             <div className="absolute left-full ml-2 px-2 py-1 bg-zinc-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
               Settings
             </div>

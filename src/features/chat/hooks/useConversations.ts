@@ -244,6 +244,28 @@ export const useConversations = (activeFilter: string) => {
         });
       }
 
+      // Fetch custom chat settings (nickname, custom avatar) to override globally
+      let chatSettingsData: any[] = [];
+      try {
+        const { data: cSettings } = await supabase
+          .from('chat_settings')
+          .select('receiver_id, nickname, custom_photo_url')
+          .eq('user_id', myId);
+        chatSettingsData = cSettings || [];
+      } catch (settingsError) {
+        console.warn("Error fetching all chat_settings:", settingsError);
+      }
+
+      const settingsMap: Record<string, { nickname?: string; customPhotoUrl?: string }> = {};
+      chatSettingsData.forEach((s: any) => {
+        if (s.receiver_id) {
+          settingsMap[s.receiver_id] = {
+            nickname: s.nickname || undefined,
+            customPhotoUrl: s.custom_photo_url || undefined,
+          };
+        }
+      });
+
       const rawList = queryData
         .map((item: any) => {
           const conv = item.conversation;
@@ -289,19 +311,24 @@ export const useConversations = (activeFilter: string) => {
             lastMsgStatusVal = lastMsgSenderId === myId ? 'Sent' : 'Received';
           }
 
+          // Apply nickname overrides
+          const customSetts = isGroup ? null : settingsMap[firstOther.id];
+          const dynamicName = customSetts?.nickname || (isGroup ? (conv.name || 'Group') : (firstOther.full_name || firstOther.username || 'Unknown'));
+          const dynamicAvatar = isGroup 
+            ? (conv.photo_url || `https://cdn-icons-png.flaticon.com/512/166/166258.png`)
+            : (customSetts?.customPhotoUrl || firstOther?.photo_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`);
+
           return {
             id: conv.id,
             type: conv.type,
             otherUserId: isGroup ? conv.id : firstOther.id,
-            user: isGroup ? (conv.name || 'Group') : (firstOther.full_name || firstOther.username || 'Unknown'),
+            user: dynamicName,
             username: isGroup ? 'group' : firstOther?.username,
-            fullName: isGroup ? conv.name : firstOther?.full_name,
+            fullName: dynamicName,
             lastMsg: lastMsgVal,
             lastMsgAt: lastMsgAtVal,
             time: formatTime(new Date(lastMsgAtVal)),
-            avatar: isGroup 
-              ? (conv.photo_url || `https://cdn-icons-png.flaticon.com/512/166/166258.png`)
-              : (firstOther?.photo_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`),
+            avatar: dynamicAvatar,
             unread: unreadCount > 0,
             unreadCount: unreadCount,
             isOnline: isGroup ? false : isUserOnline(firstOther?.is_online, firstOther?.last_seen),

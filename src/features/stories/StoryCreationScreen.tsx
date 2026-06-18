@@ -9,14 +9,14 @@ import MusicSearchSheet from './components/MusicSearchSheet';
 import { Track } from './utils/musicData';
 
 const PRESET_BG_COLORS = [
-  'linear-gradient(135deg, #1f1c2c 0%, #928dab 100%)', // Midnight Sunset
-  'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)', // Oceanic
-  'linear-gradient(135deg, #8a2387 0%, #e94057 50%, #f27121 100%)', // Aurora Orange
-  'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', // Emerald Green
-  'linear-gradient(135deg, #2c3e50 0%, #000000 100%)', // Obsidian Gray
-  '#0a0f18', // Cyber Slate Deep
-  '#e94560', // Neon Crimson
-  '#7209b7', // Velvet Purple
+  'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', // Deep Space Dark
+  'linear-gradient(135deg, #701a75 0%, #4c0519 100%)', // Velvet Wine Dark
+  'linear-gradient(135deg, #064e3b 0%, #022c22 100%)', // Forest Midnight Glow
+  'linear-gradient(135deg, #115e59 0%, #111827 100%)', // Deep Emerald Sea
+  'linear-gradient(135deg, #b91c1c 0%, #3f0712 100%)', // Cyber Neon Crimson
+  'linear-gradient(135deg, #4338ca 0%, #1e1b4b 100%)', // Synthwave Midnight Purple
+  'linear-gradient(135deg, #2a0845 0%, #6441a5 100%)', // Cosmic Cyberpunk Blue
+  'linear-gradient(135deg, #d97706 0%, #1c0d02 100%)', // Cyber Amber Sunset
 ];
 
 const FILTERS = [

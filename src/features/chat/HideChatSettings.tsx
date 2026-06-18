@@ -1,8 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Lock, Trash2, Eye, EyeOff, Save, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Lock, Trash2, Eye, EyeOff, Save, ShieldCheck, Unlock } from 'lucide-react';
 import { useAuth } from '../../providers/AuthProvider';
 import { supabase } from '../../lib/supabase';
+import { motion } from 'motion/react';
+
+// Safe Session Storage Wrapper for sandboxed iframe environments
+const safeSessionStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      return sessionStorage.getItem(key);
+    } catch (e) {
+      // Fallback to window global memory if denied
+      return (window as any)[`__grix_${key}`] || null;
+    }
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      sessionStorage.setItem(key, value);
+    } catch (e) {
+      // Fallback to window global memory if denied
+      (window as any)[`__grix_${key}`] = value;
+    }
+  },
+  removeItem: (key: string): void => {
+    try {
+      sessionStorage.removeItem(key);
+    } catch (e) {
+      // Fallback to window global memory if denied
+      delete (window as any)[`__grix_${key}`];
+    }
+  }
+};
 
 export default function HideChatSettings() {
   const navigate = useNavigate();
@@ -12,6 +41,47 @@ export default function HideChatSettings() {
   const [showMenuEntry, setShowMenuEntry] = useState(userData?.hiddenChatSettings?.showMenuEntry !== false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  // Lock state for direct Settings URL navigation
+  const originalSecretCode = userData?.hiddenChatSettings?.secretCode || '';
+  const [isUnlocked, setIsUnlocked] = useState(() => {
+    if (!userData?.hiddenChatSettings?.secretCode) return true;
+    return safeSessionStorage.getItem('grix_hidden_unlocked') === 'true';
+  });
+  const [inputCode, setInputCode] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Sync state if userData changes
+  useEffect(() => {
+    if (!originalSecretCode) {
+      setIsUnlocked(true);
+    } else {
+      const alreadyUnlocked = safeSessionStorage.getItem('grix_hidden_unlocked') === 'true';
+      setIsUnlocked(alreadyUnlocked);
+    }
+  }, [originalSecretCode]);
+
+  // Handle local state sync when profile loading completes
+  useEffect(() => {
+     if (userData?.hiddenChatSettings) {
+       setSecretCode(userData.hiddenChatSettings.secretCode || '');
+       setShowMenuEntry(userData.hiddenChatSettings.showMenuEntry !== false);
+     }
+  }, [userData]);
+
+  const handleUnlock = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!originalSecretCode) return;
+
+    if (inputCode.trim() === originalSecretCode.trim()) {
+      safeSessionStorage.setItem('grix_hidden_unlocked', 'true');
+      setIsUnlocked(true);
+      setErrorMsg('');
+    } else {
+      setErrorMsg('Incorrect Secret Code');
+      setInputCode('');
+    }
+  };
 
   const handleSave = async () => {
     if (!user || !supabase) return;
@@ -60,12 +130,93 @@ export default function HideChatSettings() {
     }
   };
 
+  // Render Lock Screen if there is a configured secret code and we are locked
+  if (!isUnlocked && originalSecretCode) {
+    return (
+      <div className="h-full flex flex-col bg-[var(--bg-xs)] justify-between overflow-hidden font-sans select-none">
+        {/* Header with back */}
+        <div className="shrink-0 flex items-center px-4 min-h-[56px] pt-safe pb-1.5 bg-[var(--header-bg)] border-b border-[var(--border-color)]/35 shadow-sm rounded-b-2xl">
+          <button 
+            onClick={() => navigate('/profile')} 
+            className="w-12 h-12 flex items-center justify-center hover:bg-black/5 rounded-full transition-colors"
+          >
+            <ArrowLeft size={22} className="text-[var(--header-text)]" />
+          </button>
+          <span className="text-sm font-bold text-[var(--header-text)]/60 uppercase tracking-widest ml-2">Secure Unlock</span>
+        </div>
+
+        {/* Lock Body */}
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-full max-w-[340px] bg-[var(--bg-card)] border border-[var(--border-color)]/55 rounded-3xl p-6 shadow-[0_15px_40px_rgba(0,0,0,0.15)] flex flex-col items-center text-center space-y-6"
+          >
+            {/* Pulsing Shield Icon Container */}
+            <div className="relative w-16 h-16 bg-rose-500/10 text-rose-500 rounded-2xl flex items-center justify-center border border-rose-500/15">
+              <Lock size={28} className="animate-pulse" />
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-[var(--bg-card)]" />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-lg font-black text-[var(--text-primary)] tracking-tight uppercase">
+                Hidden Settings Locked
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)]/80 leading-relaxed font-medium">
+                Please enter your Grix Secret Code to modify hidden settings.
+              </p>
+            </div>
+
+            <form onSubmit={handleUnlock} className="w-full space-y-4">
+              <div className="relative">
+                <input 
+                  type="password"
+                  placeholder="Enter secret code (e.g. #786)"
+                  value={inputCode}
+                  onChange={(e) => {
+                    setErrorMsg('');
+                    setInputCode(e.target.value);
+                  }}
+                  autoFocus
+                  className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-3.5 text-center text-base font-black tracking-widest text-[var(--text-primary)] outline-none focus:border-[var(--primary)] transition-all shadow-sm"
+                />
+              </div>
+
+              {errorMsg && (
+                <motion.p 
+                  initial={{ y: -5, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  className="text-xs font-bold text-rose-500 text-center animate-bounce"
+                >
+                  {errorMsg}
+                </motion.p>
+              )}
+
+              <button
+                type="submit"
+                disabled={!inputCode.trim()}
+                className="w-full py-3 bg-[var(--primary)] text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-[var(--primary)]/15 hover:shadow-[var(--primary)]/25 flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-40 select-none cursor-pointer"
+              >
+                <Unlock size={14} />
+                Confirm Unlock
+              </button>
+            </form>
+          </motion.div>
+        </div>
+
+        <div className="pb-8 text-center text-[9px] font-bold text-[var(--text-secondary)]/50 uppercase tracking-[0.22em] select-none">
+          Grix Cryptographic Bridge
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden font-sans">
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between px-4 min-h-[56px] pt-safe pb-1.5 bg-[var(--header-bg)] z-50 shadow-sm border-b border-[var(--border-color)]/35 rounded-b-2xl">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="hover:bg-white/10 p-2 rounded-full transition-colors">
+          <button onClick={() => navigate('/chats/hidden')} className="hover:bg-white/10 p-2 rounded-full transition-colors">
             <ArrowLeft size={22} className="text-[var(--header-text)]" />
           </button>
           <h1 className="text-xl font-black text-[var(--header-text)] tracking-tight">

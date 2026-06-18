@@ -141,6 +141,59 @@ export function useChatSync(receiverId: string | undefined, chatId: string, conv
   }, [chatId, user?.id]);
 
   useEffect(() => {
+    if (!user || !receiverId || !supabase) {
+      setChatSettings(null);
+      return;
+    }
+    
+    const fetchChatSettings = async () => {
+      const { data } = await supabase
+        .from('chat_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('receiver_id', receiverId)
+        .maybeSingle();
+      
+      if (data) {
+        setChatSettings({
+          nickname: data.nickname,
+          customPhotoUrl: data.custom_photo_url,
+          isMuted: data.is_muted
+        });
+      } else {
+        setChatSettings(null);
+      }
+    };
+    
+    fetchChatSettings();
+
+    const channel = supabase
+      .channel(`chat_settings_sync:${receiverId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_settings',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        const newData = payload.new as any;
+        if (newData && newData.receiver_id === receiverId) {
+          setChatSettings({
+            nickname: newData.nickname,
+            customPhotoUrl: newData.custom_photo_url,
+            isMuted: newData.is_muted
+          });
+        } else {
+          fetchChatSettings();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, receiverId]);
+
+  useEffect(() => {
     if (authUser) setCurrentUserData(authUser);
   }, [authUser]);
 

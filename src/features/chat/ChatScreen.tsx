@@ -2,12 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
-import { X, Forward, Trash } from 'lucide-react';
+import { X, Forward, Trash, Palette } from 'lucide-react';
 import { ChatForwardOverlay } from '../../components/chat-ui/ChatForwardOverlay';
 import { chatService } from './services/chatService';
 import { LocalDataCache } from '../../services/LocalDataCache';
 
-import { AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useChatMessages } from './hooks/useChatMessages';
 import { useChatActions } from './hooks/useChatActions';
 import { useTypingStatus } from './hooks/useTypingStatus';
@@ -76,6 +76,8 @@ export default function ChatScreen() {
     handleScroll,
     scrollToBottom
   } = useChatScroll(messages, loading, user?.id, loadingMore, loadMore);
+
+  const [showCustomizerModal, setShowCustomizerModal] = useState(false);
 
   const {
     showOptions,
@@ -334,7 +336,24 @@ export default function ChatScreen() {
     if (!isArchived) navigate('/chats');
   };
 
-  const { chatBackground } = useTheme();
+  const { chatBackground: globalChatBackground } = useTheme();
+  const [customBg, setCustomBg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!receiverId) return;
+    const loadCustomBg = () => {
+      setCustomBg(localStorage.getItem(`app-chat-background-${receiverId}`));
+    };
+    loadCustomBg();
+    
+    window.addEventListener(`chat-customization-changed-${receiverId}`, loadCustomBg);
+    return () => {
+      window.removeEventListener(`chat-customization-changed-${receiverId}`, loadCustomBg);
+    };
+  }, [receiverId]);
+
+  const activeChatBackground = customBg || globalChatBackground;
+  
   const isHidden = Array.isArray(currentUserData?.hiddenChats) && currentUserData.hiddenChats.includes(chatId);
   const isArchived = Array.isArray(currentUserData?.archivedChats) && currentUserData.archivedChats.includes(chatId);
 
@@ -462,7 +481,7 @@ export default function ChatScreen() {
         scrollContainerRef={scrollContainerRef}
         messagesEndRef={messagesEndRef}
         handleScroll={handleScroll}
-        chatBackground={chatBackground}
+        chatBackground={activeChatBackground}
         loadingMore={loadingMore}
         loading={loading}
         messages={filteredMessages}
@@ -534,7 +553,125 @@ export default function ChatScreen() {
         hideChat={hideChat}
         setIsMuted={setIsMuted}
         deleteChat={deleteChat}
+        onCustomizeClick={() => {
+          setShowOptions(false);
+          setShowCustomizerModal(true);
+        }}
       />
+
+      {/* Customizer modal component for Chat-Specific Wallpapers and Bubble Colors */}
+      <AnimatePresence>
+        {showCustomizerModal && (
+          <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/75 backdrop-blur-[2px]">
+            {/* Backdrop to cancel */}
+            <div className="absolute inset-0" onClick={() => setShowCustomizerModal(false)} />
+            
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-[90%] max-w-[340px] bg-[var(--bg-card)] border border-[var(--border-color)]/30 rounded-[28px] shadow-[0_20px_50px_rgba(0,0,0,0.45)] p-5 z-[100001] flex flex-col gap-4 text-left select-none"
+            >
+              <div className="flex items-center gap-2 text-[#0494f4] font-black">
+                <Palette size={20} className="stroke-[2.5]" />
+                <h3 className="text-[16px] font-black text-[var(--text-primary)] leading-none">
+                  Customize Chat Room
+                </h3>
+              </div>
+
+              <p className="text-[12px] font-semibold text-[var(--text-secondary)] opacity-85 leading-normal -mt-1">
+                Personalize background style and chat bubble gradients specifically for {receiver?.full_name || 'this friend'}.
+              </p>
+
+              {/* SECTION: BACKGROUND WALLPAPER */}
+              <div className="flex flex-col gap-1.5">
+                <h4 className="text-[10px] font-black uppercase text-[#0494f4] tracking-wider">Background Wallpaper</h4>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { id: '', label: 'Default Solid' },
+                    { id: 'bg-gradient-to-br from-[#121214] via-[#1a1226] to-[#0d0912]', label: 'Cosmic Dusk', preview: 'bg-gradient-to-br from-[#121214] via-[#1a1226] to-[#0d0912]' },
+                    { id: 'bg-gradient-to-br from-[#0c1612] via-[#092218] to-[#04100c]', label: 'Minty Herb', preview: 'bg-gradient-to-br from-[#0c1612] via-[#092218] to-[#04100c]' },
+                    { id: 'bg-gradient-to-br from-[#091522] via-[#040e1a] to-[#02060c]', label: 'Deep Ocean', preview: 'bg-gradient-to-br from-[#091522] via-[#040e1a] to-[#02060c]' },
+                    { id: 'bg-gradient-to-br from-[#121212] via-[#1a1a1a] to-[#0d0d0d]', label: 'Charcoal Night', preview: 'bg-gradient-to-br from-[#121212] via-[#1a1a1a] to-[#0d0d0d]' },
+                  ].map((bgItem) => {
+                    const isSelected = (customBg || '') === bgItem.id;
+                    return (
+                      <button
+                        key={bgItem.label}
+                        type="button"
+                        onClick={() => {
+                          if (bgItem.id === '') {
+                            localStorage.removeItem(`app-chat-background-${receiverId}`);
+                          } else {
+                            localStorage.setItem(`app-chat-background-${receiverId}`, bgItem.id);
+                          }
+                          setCustomBg(bgItem.id || null);
+                          window.dispatchEvent(new Event(`chat-customization-changed-${receiverId}`));
+                        }}
+                        className={`p-1.5 rounded-xl text-left border cursor-pointer select-none transition-all flex flex-col gap-1 w-full bg-transparent ${
+                          isSelected ? 'border-[#0494f4] bg-[#0494f4]/5' : 'border-[var(--border-color)]/20 hover:bg-white/5'
+                        }`}
+                      >
+                        <div className={`h-5 w-full rounded-md border border-white/5 ${bgItem.preview || 'bg-[var(--bg-main)]'}`} />
+                        <span className={`text-[9.5px] font-bold leading-normal truncate ${isSelected ? 'text-[#0494f4]' : 'text-[var(--text-primary)]'}`}>
+                          {bgItem.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* SECTION: BUBBLE GRADIENT */}
+              <div className="flex flex-col gap-1.5 mt-0.5">
+                <h4 className="text-[10px] font-black uppercase text-[#0494f4] tracking-wider">Self Bubble Gradient</h4>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { id: '', label: 'Default Glow', preview: 'bg-indigo-600' },
+                    { id: 'ocean-indigo', label: 'Ocean Indigo', preview: 'bg-gradient-to-br from-teal-400 to-indigo-600' },
+                    { id: 'forest-magic', label: 'Forest Magic', preview: 'bg-gradient-to-br from-emerald-400 to-teal-600' },
+                    { id: 'crimson-fire', label: 'Crimson Fire', preview: 'bg-gradient-to-br from-rose-400 to-orange-600' },
+                    { id: 'sunset-violet', label: 'Sunset Violet', preview: 'bg-gradient-to-br from-violet-600 to-purple-800' },
+                  ].map((bubItem) => {
+                    const localBub = localStorage.getItem(`app-chat-bubble-${receiverId}`) || '';
+                    const isSelected = localBub === bubItem.id;
+                    return (
+                      <button
+                        key={bubItem.label}
+                        type="button"
+                        onClick={() => {
+                          if (bubItem.id === '') {
+                            localStorage.removeItem(`app-chat-bubble-${receiverId}`);
+                          } else {
+                            localStorage.setItem(`app-chat-bubble-${receiverId}`, bubItem.id);
+                          }
+                          window.dispatchEvent(new Event(`chat-customization-changed-${receiverId}`));
+                        }}
+                        className={`p-1.5 rounded-xl text-left border cursor-pointer select-none transition-all flex flex-col gap-1 w-full bg-transparent ${
+                          isSelected ? 'border-[#0494f4] bg-[#0494f4]/5' : 'border-[var(--border-color)]/20 hover:bg-white/5'
+                        }`}
+                      >
+                        <div className={`h-5 w-full rounded-md border border-white/5 ${bubItem.preview}`} />
+                        <span className={`text-[9.5px] font-bold leading-normal truncate ${isSelected ? 'text-[#0494f4]' : 'text-[var(--text-primary)]'}`}>
+                          {bubItem.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowCustomizerModal(false)}
+                className="w-full text-center py-2.5 text-[13px] font-black text-white bg-[#0494f4] hover:bg-[#0382d6] active:scale-[0.98] transition-all rounded-xl cursor-pointer border-none shadow-sm mt-1"
+              >
+                Apply Customs
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* WhatsApp Full Screen Forward UI */}
       <ChatForwardOverlay 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, Lock, Archive, Check, ArrowDownLeft, ArrowUpRight, Trash, VolumeX } from 'lucide-react';
+import { MessageCircle, Lock, Archive, Check, ArrowDownLeft, ArrowUpRight, Trash, VolumeX, Pin } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../../../providers/AuthProvider.tsx';
 import { supabase } from '../../../lib/supabase';
@@ -36,6 +36,7 @@ const ChatItemRow: React.FC<{
   chat: ChatItem;
   isChatSelectMode: boolean;
   isSelected: boolean;
+  isPinned?: boolean;
   onToggleSelect: (chatId: string) => void;
   setChatSelectMode: (val: boolean) => void;
   setSelectedChatIds: React.Dispatch<React.SetStateAction<string[]>>;
@@ -43,6 +44,7 @@ const ChatItemRow: React.FC<{
   chat,
   isChatSelectMode,
   isSelected,
+  isPinned = false,
   onToggleSelect,
   setChatSelectMode,
   setSelectedChatIds
@@ -52,6 +54,34 @@ const ChatItemRow: React.FC<{
   const startXRef = React.useRef<number>(0);
   const startYRef = React.useRef<number>(0);
   const isLongPressActiveRef = React.useRef<boolean>(false);
+  const [isTyping, setIsTyping] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!supabase || !chat.id || !chat.otherUserId) return;
+    
+    const channel = supabase.channel(`typing:${chat.id}`);
+    let timeoutId: any = null;
+
+    channel
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        if (payload && payload.userId === chat.otherUserId) {
+          setIsTyping(payload.isTyping);
+          
+          if (timeoutId) clearTimeout(timeoutId);
+          if (payload.isTyping) {
+            timeoutId = setTimeout(() => {
+              setIsTyping(false);
+            }, 6000);
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      supabase.removeChannel(channel);
+    };
+  }, [chat.id, chat.otherUserId]);
 
   const startPress = (e: any) => {
     isLongPressActiveRef.current = false;
@@ -121,17 +151,31 @@ const ChatItemRow: React.FC<{
       <Avatar url={chat.avatar} type={chat.type} name={chat.user} isOnline={chat.isOnline} />
       <div className="flex-1 min-w-0 flex flex-col justify-center">
         <div className="flex justify-between items-baseline mb-0.5">
-          <h3 className={`text-[14.5px] truncate font-semibold text-[var(--text-primary)] transition-colors ${chat.unread ? 'font-bold' : ''}`}>
-            {chat.user}
+          <h3 className={`text-[14.5px] truncate font-semibold text-[var(--text-primary)] transition-colors flex items-center gap-1.5 ${chat.unread ? 'font-bold' : ''}`}>
+            {isPinned && <Pin size={13} className="text-[#0494f4] fill-[#0494f4] shrink-0" />}
+            <span>{chat.user}</span>
           </h3>
           <span className={`text-[10.5px] whitespace-nowrap ${chat.unread ? 'text-[var(--primary)] font-semibold' : 'text-[var(--text-secondary)] opacity-60'}`}>
             {chat.time}
           </span>
         </div>
         <div className="flex justify-between items-center gap-2">
-          <p className={`text-[13px] truncate flex-1 leading-snug p-0 m-0 ${chat.unread ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-secondary)] opacity-75'}`}>
-            {chat.lastMsg}
-          </p>
+          <div className="flex-1 min-w-0">
+            {isTyping ? (
+              <span className="text-[var(--primary)] font-bold animate-pulse flex items-center gap-1.5 select-none text-[13px]">
+                <span>typing</span>
+                <span className="inline-flex gap-[2px]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] animate-bounce" />
+                </span>
+              </span>
+            ) : (
+              <p className={`text-[13px] truncate flex-1 leading-snug p-0 m-0 ${chat.unread ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-secondary)] opacity-75'}`}>
+                {chat.lastMsg}
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2 shrink-0">
             {chat.unread ? (
               <div className="min-w-[18px] h-[18px] px-1.5 bg-[var(--primary)] rounded-full flex items-center justify-center shadow-sm">
@@ -187,6 +231,57 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
   const navigate = useNavigate();
   const { isChatSelectMode, setChatSelectMode, selectedChatIds, setSelectedChatIds } = useLayout();
   const { user: authUser, userData, refreshUserData } = useAuth();
+  const [settingsMap, setSettingsMap] = useState<Record<string, { nickname?: string; customPhotoUrl?: string }>>({});
+  const [pinnedChatIds, setPinnedChatIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const loadPinned = () => {
+      try {
+        const pinned = JSON.parse(localStorage.getItem('app-pinned-chats') || '[]');
+        setPinnedChatIds(pinned);
+      } catch (_) {}
+    };
+
+    loadPinned();
+    window.addEventListener('pinned-chats-changed', loadPinned);
+    return () => window.removeEventListener('pinned-chats-changed', loadPinned);
+  }, []);
+
+  const sortedConversations = React.useMemo(() => {
+    return [...conversations].sort((a, b) => {
+      const aPinned = pinnedChatIds.includes(a.id);
+      const bPinned = pinnedChatIds.includes(b.id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return 0; // retain original order
+    });
+  }, [conversations, pinnedChatIds]);
+
+  useEffect(() => {
+    if (!authUser?.id || !supabase) return;
+    const fetchSettings = async () => {
+      try {
+        const { data } = await supabase
+          .from('chat_settings')
+          .select('receiver_id, nickname, custom_photo_url')
+          .eq('user_id', authUser.id);
+        
+        const mapping: Record<string, { nickname?: string; customPhotoUrl?: string }> = {};
+        (data || []).forEach((item: any) => {
+          if (item.receiver_id) {
+            mapping[item.receiver_id] = {
+              nickname: item.nickname || undefined,
+              customPhotoUrl: item.custom_photo_url || undefined,
+            };
+          }
+        });
+        setSettingsMap(mapping);
+      } catch (err) {
+        console.warn("Failed to load chat settings map:", err);
+      }
+    };
+    fetchSettings();
+  }, [authUser?.id]);
 
   const handleSwipeArchive = async (chatId: string) => {
     if (userData && authUser) {
@@ -252,17 +347,21 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
   };
 
   const renderOtherUser = (user: OtherUser) => {
+    const customSetts = settingsMap[user.uid];
+    const finalName = customSetts?.nickname || user.fullName || user.username;
+    const finalPhoto = customSetts?.customPhotoUrl || user.photoURL;
+
     return (
       <Link 
         to={`/chat/${user.uid}`} 
         key={user.uid} 
         className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 last:border-0 group"
       >
-        <Avatar url={user.photoURL} type="direct" name={user.fullName || user.username} isOnline={user.isOnline} />
+        <Avatar url={finalPhoto} type="direct" name={finalName} isOnline={user.isOnline} />
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="flex justify-between items-baseline mb-0.5">
             <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
-              {user.fullName || user.username}
+              {finalName}
             </h3>
             <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] uppercase font-semibold tracking-tight opacity-40">
               Suggested
@@ -424,14 +523,15 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       )}
 
       {/* Conversations List */}
-      {conversations.length > 0 && (
+      {sortedConversations.length > 0 && (
         <div className="flex flex-col">
-          {conversations.map(chat => (
+          {sortedConversations.map(chat => (
             <ChatItemRow
               key={chat.id}
               chat={chat}
               isChatSelectMode={isChatSelectMode}
               isSelected={selectedChatIds.includes(chat.id)}
+              isPinned={pinnedChatIds.includes(chat.id)}
               onToggleSelect={handleToggleSelect}
               setChatSelectMode={setChatSelectMode}
               setSelectedChatIds={setSelectedChatIds}

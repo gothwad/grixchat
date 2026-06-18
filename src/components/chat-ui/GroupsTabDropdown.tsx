@@ -28,7 +28,7 @@ export const GroupsTabDropdown: React.FC<GroupsTabDropdownProps> = ({
   const menuOptions = [
     { label: 'New group', icon: Users, path: '/new-group?type=group' },
     { label: 'New channel', icon: Radio, path: '/new-group?type=channel' },
-    { label: 'Settings', icon: Settings, path: '/settings' },
+    { label: 'Settings', icon: Settings, path: '/profile' },
   ];
 
   return (

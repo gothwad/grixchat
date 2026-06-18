@@ -57,7 +57,7 @@ export const ChatTabDropdown: React.FC<ChatTabDropdownProps> = ({
     },
     { label: 'New group', icon: Users, onClick: () => handleNavigation('/new-group?type=group') },
     { label: 'New channel', icon: Radio, onClick: () => handleNavigation('/new-group?type=channel') },
-    { label: 'Settings', icon: Settings, onClick: () => handleNavigation('/settings') },
+    { label: 'Settings', icon: Settings, onClick: () => handleNavigation('/profile') },
   ];
 
   const filterOptions = [

@@ -148,8 +148,19 @@ export default function ChatHeader({
               <h2 className="text-[14px] font-black text-[var(--header-text)] leading-tight truncate">
                 {isGroup ? (receiver?.name || 'Group') : (receiver?.fullName || (receiverId === 'gx-ai' || receiverId === 'flow-ai' || receiverId === 'grix-ai' ? 'Grix AI' : 'GrixChat User'))}
               </h2>
-              <span className="text-[10px] text-[var(--header-text)] opacity-80 font-bold tracking-tight truncate">
-                {getStatusText()}
+              <span className="text-[10px] text-[var(--header-text)] opacity-80 font-bold tracking-tight truncate flex items-center gap-1 h-4">
+                {isTyping ? (
+                  <span className="flex items-center gap-1 text-[var(--primary)] animate-pulse">
+                    <span>typing</span>
+                    <span className="flex gap-0.5 items-center pb-0.5">
+                      <motion.span animate={{ y: [0, -2, 0] }} transition={{ duration: 0.5, repeat: Infinity, ease: 'easeInOut' }} className="w-1 h-1 bg-[var(--primary)] rounded-full" />
+                      <motion.span animate={{ y: [0, -2, 0] }} transition={{ duration: 0.5, repeat: Infinity, ease: 'easeInOut', delay: 0.15 }} className="w-1 h-1 bg-[var(--primary)] rounded-full" />
+                      <motion.span animate={{ y: [0, -2, 0] }} transition={{ duration: 0.5, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }} className="w-1 h-1 bg-[var(--primary)] rounded-full" />
+                    </span>
+                  </span>
+                ) : (
+                  getStatusText()
+                )}
               </span>
             </div>
           </div>

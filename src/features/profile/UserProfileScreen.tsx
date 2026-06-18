@@ -39,6 +39,7 @@ export default function UserProfileScreen() {
   const navigate = useNavigate();
   const { user: authUser, userData: myUserData } = useAuth();
   const [user, setUser] = useState<any>(null);
+  const [chatSettings, setChatSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isBlocked, setIsBlocked] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -168,9 +169,30 @@ export default function UserProfileScreen() {
       }
     };
 
+    const fetchChatSettings = async () => {
+      if (!authUser?.id || !userId || !supabase) return;
+      try {
+        const { data } = await supabase
+          .from('chat_settings')
+          .select('nickname, custom_photo_url')
+          .eq('user_id', authUser.id)
+          .eq('receiver_id', userId)
+          .maybeSingle();
+        if (data) {
+          setChatSettings({
+            nickname: data.nickname || '',
+            customPhotoUrl: data.custom_photo_url || ''
+          });
+        }
+      } catch (err) {
+        console.warn("Error loading chat settings in profile view:", err);
+      }
+    };
+
     fetchUser();
     checkFriendship();
     checkStories();
+    fetchChatSettings();
 
     // Sync isBlocked
     if (myUserData) {
@@ -215,6 +237,9 @@ export default function UserProfileScreen() {
     );
   }
 
+  const displayName = chatSettings?.nickname || user?.fullName || 'GrixChat User';
+  const displayPhoto = user?.hidePhoto ? DEFAULT_LOGO : (chatSettings?.customPhotoUrl || user?.photoURL || DEFAULT_LOGO);
+
   return (
     <div className="h-full flex flex-col bg-[var(--bg-main)] overflow-hidden font-sans">
       {/* Header */}
@@ -224,7 +249,7 @@ export default function UserProfileScreen() {
             <ArrowLeft size={22} className="text-[var(--header-text)]" />
           </button>
           <div className="flex flex-col">
-            <h1 className="text-lg font-bold text-[var(--header-text)] tracking-tight">{user.fullName || 'GrixChat User'}</h1>
+            <h1 className="text-lg font-bold text-[var(--header-text)] tracking-tight">{displayName}</h1>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -251,7 +276,7 @@ export default function UserProfileScreen() {
               >
                 <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-[var(--bg-main)]">
                   <img 
-                    src={user.hidePhoto ? DEFAULT_LOGO : (user.photoURL || DEFAULT_LOGO)} 
+                    src={displayPhoto} 
                     className="w-full h-full object-cover shrink-0"
                     referrerPolicy="no-referrer"
                     alt="Profile"
@@ -350,7 +375,7 @@ export default function UserProfileScreen() {
             </div>
 
             <h2 className="text-base font-black tracking-tight text-[var(--text-primary)] leading-tight">
-              {user.fullName || 'GrixChat User'}
+              {displayName}
             </h2>
             <span className="text-[10px] text-[#0494f4] font-semibold font-mono tracking-wide mt-1.5 px-2.5 py-0.5 bg-[#0494f4]/10 rounded-full select-none">
               @{user.username || 'username'}

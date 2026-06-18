@@ -9,6 +9,7 @@ import os from "os";
 import { GoogleAuth } from "google-auth-library";
 import { GoogleGenAI } from "@google/genai";
 import { AccessToken } from "livekit-server-sdk";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
@@ -107,6 +108,47 @@ app.get("/.well-known/assetlinks.json", (req, res) => {
   }
 });
 
+// Helper to remove invalid/expired FCM tokens from the user profile database
+async function removeInvalidFcmToken(badTokenStr: string) {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    console.warn("FCM Server Cleanup: Unable to initialize Supabase client for FCM token cleanup (missing credentials).");
+    return;
+  }
+  
+  try {
+    const supabaseServer = createClient(supabaseUrl, supabaseKey);
+    
+    // Find all users who have this token in their fcm_tokens array and remove it
+    const { data: users, error: fetchErr } = await supabaseServer
+      .from("users")
+      .select("id, fcm_tokens");
+      
+    if (fetchErr || !users) {
+      console.warn("FCM Server Cleanup: Failed to fetch users for token pruning:", fetchErr);
+      return;
+    }
+
+    for (const u of users) {
+      if (Array.isArray(u.fcm_tokens) && u.fcm_tokens.includes(badTokenStr)) {
+        const filtered = u.fcm_tokens.filter((t: string) => t !== badTokenStr);
+        console.log(`FCM Server Cleanup: Removing stale/invalid FCM token from user ${u.id}`);
+        const { error: updateErr } = await supabaseServer
+          .from("users")
+          .update({ fcm_tokens: filtered })
+          .eq("id", u.id);
+          
+        if (updateErr) {
+          console.warn(`FCM Server Cleanup: Failed to update user ${u.id} FCM tokens:`, updateErr);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn("FCM Server Cleanup: Exception in removeInvalidFcmToken:", err.message);
+  }
+}
+
 // Send Notification Proxy using Firebase Cloud Messaging HTTP v1 API
 app.post("/api/send-notification", async (req, res) => {
   try {
@@ -203,6 +245,24 @@ app.post("/api/send-notification", async (req, res) => {
         } catch (err: any) {
           const safeTokenStr = (typeof token === 'string') ? token.substring(0, 10) : String(token);
           console.error(`FCM Server: Failed to send to token: ${safeTokenStr}... Error:`, err.response?.data || err.message);
+          
+          const isInvalidToken = 
+            err.response?.status === 400 || 
+            err.response?.status === 404 ||
+            (err.response?.data?.error?.status === 'INVALID_ARGUMENT') ||
+            (err.response?.data?.error?.status === 'NOT_FOUND') ||
+            (err.response?.data?.error?.status === 'UNREGISTERED') ||
+            (err.response?.data?.error?.message && (
+              err.response.data.error.message.includes('not a valid FCM registration token') ||
+              err.response.data.error.message.includes('Requested entity was not found')
+            ));
+
+          if (isInvalidToken) {
+            removeInvalidFcmToken(token).catch(e => {
+              console.error("FCM Token Cleanup trigger failed:", e);
+            });
+          }
+
           return { token, success: false, error: err.response?.data || err.message };
         }
       })

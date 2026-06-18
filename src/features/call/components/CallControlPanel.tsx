@@ -96,7 +96,12 @@ export const CallControlPanel: React.FC<CallControlPanelProps> = ({
       <div className="max-w-xl mx-auto px-6 flex items-center justify-around">
         {/* 1. SPEAKER toggle (3-state: 0 = voice muted, 1 = earpiece, 2 = loudspeaker) */}
         <button 
-          onClick={onToggleSpeaker}
+          onClick={() => {
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              try { navigator.vibrate(15); } catch (e) {}
+            }
+            onToggleSpeaker();
+          }}
           className={`w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
             speakerState === 0
               ? 'border border-[#ff3b30]/40 bg-[var(--bg-card)] text-[#ff3b30] hover:bg-[#ff3b30]/5'
@@ -121,7 +126,12 @@ export const CallControlPanel: React.FC<CallControlPanelProps> = ({
 
         {/* 2. VIDEO toggle */}
         <button 
-          onClick={onToggleVideo}
+          onClick={() => {
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              try { navigator.vibrate(15); } catch (e) {}
+            }
+            onToggleVideo();
+          }}
           className={`w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
             !isVideoOff 
               ? 'bg-[#0494f4] text-white shadow-lg shadow-[#0494f4]/20 border-none' 
@@ -134,7 +144,12 @@ export const CallControlPanel: React.FC<CallControlPanelProps> = ({
 
         {/* 3. MIC toggle */}
         <button 
-          onClick={onToggleMute}
+          onClick={() => {
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              try { navigator.vibrate(15); } catch (e) {}
+            }
+            onToggleMute();
+          }}
           className={`w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
             !isMuted 
               ? 'bg-[#0494f4] text-white shadow-lg shadow-[#0494f4]/20 border-none' 
@@ -147,7 +162,12 @@ export const CallControlPanel: React.FC<CallControlPanelProps> = ({
 
         {/* 4. RED CUT/END CALL button */}
         <button 
-          onClick={onEndCall}
+          onClick={() => {
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              try { navigator.vibrate([40, 30, 40]); } catch (e) {}
+            }
+            onEndCall();
+          }}
           className="w-[52px] h-[52px] bg-[#ff3b30] hover:bg-[#e03126] text-white rounded-full flex items-center justify-center shadow-lg shadow-[#ff3b30]/20 transition-all active:scale-95 border-none cursor-pointer"
           title="End Call"
         >
@@ -156,7 +176,12 @@ export const CallControlPanel: React.FC<CallControlPanelProps> = ({
 
         {/* 5. ADD USER / OPTIONS toggle */}
         <button 
-          onClick={() => setShowMoreMenu(prev => !prev)}
+          onClick={() => {
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              try { navigator.vibrate(12); } catch (e) {}
+            }
+            setShowMoreMenu(prev => !prev);
+          }}
           className={`w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
             showMoreMenu 
               ? 'bg-[#0494f4] text-white shadow-lg shadow-[#0494f4]/20 border-none' 

@@ -185,6 +185,7 @@ export default function CallScreen() {
           isVideoOff={isVideoOff}
           callStatus={currentStatus}
           timer={timer}
+          receiver={partnerUser}
         />
       )}
 

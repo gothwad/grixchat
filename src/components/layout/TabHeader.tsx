@@ -26,7 +26,8 @@ import {
   Info,
   LogOut,
   X,
-  Trash
+  Trash,
+  Pin
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -113,7 +114,7 @@ export default function TabHeader() {
     ...(userData?.hiddenChatSettings?.showMenuEntry !== false ? [
       { label: 'Hidden chats', icon: EyeOff, path: '/chats/hidden' }
     ] : []),
-    { label: 'Settings', icon: Settings, path: '/settings' },
+    { label: 'Settings', icon: Settings, path: '/profile' },
   ];
 
   const filterOptions = [
@@ -151,6 +152,40 @@ export default function TabHeader() {
         </div>
 
         <div className="flex items-center gap-1">
+          {/* Pin action */}
+          <button 
+            type="button"
+            disabled={selectedChatIds.length === 0}
+            onClick={() => {
+              const pinned = JSON.parse(localStorage.getItem('app-pinned-chats') || '[]');
+              let updated = [...pinned];
+              
+              selectedChatIds.forEach(id => {
+                if (updated.includes(id)) {
+                  updated = updated.filter(x => x !== id);
+                } else if (updated.length < 3) {
+                  updated.push(id);
+                } else {
+                  alert("You can only pin up to 3 chats.");
+                }
+              });
+              
+              localStorage.setItem('app-pinned-chats', JSON.stringify(updated));
+              window.dispatchEvent(new Event('pinned-chats-changed'));
+              
+              setChatSelectMode(false);
+              setSelectedChatIds([]);
+            }}
+            className={`w-12 h-12 flex items-center justify-center rounded-full transition-all cursor-pointer ${
+              selectedChatIds.length > 0 
+                ? 'text-[var(--header-text)] hover:bg-black/5 dark:hover:bg-white/5 active:scale-90' 
+                : 'text-[var(--header-text)]/20 cursor-not-allowed'
+            }`}
+            title="Pin/Unpin Pinned Chats"
+          >
+            <Pin size={22} />
+          </button>
+
           {/* Mute action */}
           <button 
             type="button"

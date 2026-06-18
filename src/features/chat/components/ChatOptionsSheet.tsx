@@ -11,7 +11,8 @@ import {
   Trash, 
   UserX, 
   AlertTriangle,
-  Play
+  Play,
+  Palette
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +30,7 @@ interface ChatOptionsSheetProps {
   hideChat: () => void;
   setIsMuted: (muted: boolean) => void;
   deleteChat: () => void;
+  onCustomizeClick?: () => void;
   children?: React.ReactNode;
 }
 
@@ -44,6 +46,7 @@ export const ChatOptionsSheet: React.FC<ChatOptionsSheetProps> = ({
   hideChat,
   setIsMuted,
   deleteChat,
+  onCustomizeClick,
   children
 }) => {
   const navigate = useNavigate();
@@ -117,6 +120,18 @@ export const ChatOptionsSheet: React.FC<ChatOptionsSheetProps> = ({
                       <User size={20} />
                     </div>
                     <span>View Profile</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      if (onCustomizeClick) onCustomizeClick();
+                    }} 
+                    className="w-full px-5 py-3.5 text-left text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--bg-main)] flex items-center gap-4 transition-colors rounded-2xl"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-[var(--bg-main)] flex items-center justify-center text-[var(--text-secondary)]">
+                      <Palette size={20} className="text-[#0494f4]" />
+                    </div>
+                    <span>Wallpaper & Colors</span>
                   </button>
 
                   <button 
