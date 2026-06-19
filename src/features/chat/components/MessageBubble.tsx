@@ -38,6 +38,7 @@ interface MessageBubbleProps {
   isHighlighted?: boolean;
   isLatestMessage?: boolean;
   isSelected?: boolean;
+  selectedMsgIds?: any[];
   allMessages?: any[];
 }
 
@@ -60,6 +61,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   isHighlighted,
   isLatestMessage,
   isSelected,
+  selectedMsgIds,
   allMessages
 }) => {
   const navigate = useNavigate();
@@ -106,7 +108,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     if (!contactId) return;
     
     const loadCustom = () => {
-      setCustomBubble(localStorage.getItem(`app-chat-bubble-${contactId}`));
+      setCustomBubble(storage.getItem(`app-chat-bubble-${contactId}`));
     };
     loadCustom();
     window.addEventListener(`chat-customization-changed-${contactId}`, loadCustom);
@@ -237,7 +239,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isMessageDelivered = isReceiverOnlineNow || wasReceiverOnlineAfterMessage;
 
   return (
-    <div id={`msg-${msg.id}`} className={`flex flex-col w-full max-w-full ${actualIsMe ? 'items-end' : 'items-start'} ${!isSameSender ? 'mt-3.5' : 'mt-0.5'} ${hasReactions ? 'mb-3.5' : 'mb-0.5'} relative transition-all duration-200`}>
+    <div 
+      id={`msg-${msg.id}`} 
+      onClick={(e) => {
+        if (selectedMsgIds && selectedMsgIds.length > 0) {
+          if (isMsgDeleted) return;
+          handleMessageTap(e as any, msg);
+        }
+      }}
+      className={`flex flex-col w-full max-w-full ${actualIsMe ? 'items-end' : 'items-start'} ${!isSameSender ? 'pt-3' : 'pt-0.5'} ${hasReactions ? 'pb-3.5' : 'pb-0.5'} relative transition-all duration-100 px-2.5 cursor-default ${
+        isSelected 
+          ? 'bg-[var(--primary)]/15 select-none' 
+          : 'hover:bg-black/[0.01] dark:hover:bg-white/[0.003]'
+      } ${selectedMsgIds && selectedMsgIds.length > 0 ? 'cursor-pointer select-none' : ''}`}
+    >
       <AnimatePresence>
         {isHighlighted && (
           <motion.div 
@@ -245,10 +260,38 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             animate={{ opacity: 0.15 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-[var(--primary)] z-0 pointer-events-none"
-            style={{ margin: '-2px -16px' }}
           />
         )}
       </AnimatePresence>
+
+      {selectedMsgIds && selectedMsgIds.length > 0 && (
+        <div 
+          className={`absolute top-1/2 -translate-y-1/2 z-20 flex items-center justify-center pointer-events-none transition-all duration-150 ${
+            actualIsMe ? 'left-6' : 'right-6'
+          }`}
+        >
+          {isSelected ? (
+            <motion.div 
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 500, damping: 20 }}
+              className="w-5.5 h-5.5 rounded-full bg-[var(--primary)] text-white flex items-center justify-center shadow-lg shadow-[var(--primary)]/30 border border-transparent"
+            >
+              <svg 
+                className="w-3.5 h-3.5 text-white" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="4.5" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </motion.div>
+          ) : (
+            <div className="w-5.5 h-5.5 rounded-full border-1.5 border-neutral-500/30 bg-black/5 dark:bg-zinc-850/10" />
+          )}
+        </div>
+      )}
       
       <div className={`relative group max-w-[85%] lg:max-w-[70%] min-w-0 flex items-center gap-2 ${isHighlighted ? 'z-10' : ''}`}>
         {!isSameSender && bubbleStyleSetting === 'whatsapp' && (
@@ -298,11 +341,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           }}
           onClick={(e) => {
             if (isMsgDeleted) return;
+            e.stopPropagation();
             handleMessageTap(e as any, msg);
           }}
           onContextMenu={(e) => {
             e.preventDefault();
             if (isMsgDeleted) return;
+            e.stopPropagation();
             handleMessageTap(e as any, msg);
           }}
           whileTap={{ scale: 0.992 }}
@@ -314,19 +359,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           className={`px-3 pt-2 pb-[19px] ${hasReactions ? 'pb-[27px]' : ''} ${resolvedReplyTo ? 'min-w-[190px]' : 'min-w-[70px]'} shadow-sm border border-neutral-800/10 dark:border-white/5 relative cursor-pointer select-none max-w-full overflow-visible touch-pan-y w-fit transition-colors duration-200 ${bubbleShapeClass} ${
             activeMessageMenu?.id === msg.id ? 'z-50 ring-2.5 ring-[var(--primary)]/45 scale-[1.01] shadow-lg' : 'z-10'
           } ${
-            isSelected 
-              ? 'ring-3 ring-[#0494f4]/80 bg-[#0494f4]/20 scale-[1.02] shadow-cyan-500/10' 
-              : !actualIsMe 
-                ? 'bg-gradient-to-b from-[var(--bubble-other)] to-[var(--bubble-other)]/98 text-[var(--bubble-text-other)] mr-auto border-l-0 font-light' 
-                : customBubble === 'ocean-indigo'
-                  ? 'bg-gradient-to-br from-teal-400 to-indigo-600 text-white ml-auto border-r-0 font-light shadow-md'
-                  : customBubble === 'forest-magic'
-                    ? 'bg-gradient-to-br from-emerald-400 to-teal-600 text-white ml-auto border-r-0 font-light shadow-md'
-                    : customBubble === 'crimson-fire'
-                      ? 'bg-gradient-to-br from-rose-400 to-orange-600 text-white ml-auto border-r-0 font-light shadow-md'
-                      : customBubble === 'sunset-violet'
-                        ? 'bg-gradient-to-br from-violet-600 to-purple-800 text-white ml-auto border-r-0 font-light shadow-md'
-                        : 'bg-gradient-to-b from-[var(--bubble-own)] to-[var(--bubble-own)]/98 text-[var(--bubble-text-own)] ml-auto border-r-0 font-light'
+            !actualIsMe 
+              ? 'bg-gradient-to-b from-[var(--bubble-other)] to-[var(--bubble-other)]/98 text-[var(--bubble-text-other)] mr-auto border-l-0 font-light' 
+              : customBubble === 'ocean-indigo'
+                ? 'bg-gradient-to-br from-teal-400 to-indigo-600 text-white ml-auto border-r-0 font-light shadow-md'
+                : customBubble === 'forest-magic'
+                  ? 'bg-gradient-to-br from-emerald-400 to-teal-600 text-white ml-auto border-r-0 font-light shadow-md'
+                  : customBubble === 'crimson-fire'
+                    ? 'bg-gradient-to-br from-rose-400 to-orange-600 text-white ml-auto border-r-0 font-light shadow-md'
+                    : customBubble === 'sunset-violet'
+                      ? 'bg-gradient-to-br from-violet-600 to-purple-800 text-white ml-auto border-r-0 font-light shadow-md'
+                      : 'bg-gradient-to-b from-[var(--bubble-own)] to-[var(--bubble-own)]/98 text-[var(--bubble-text-own)] ml-auto border-r-0 font-light'
           } hover:brightness-[1.02]`}
         >
           {isForwardedMany ? (

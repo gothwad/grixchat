@@ -27,14 +27,18 @@ import {
   LogOut,
   X,
   Trash,
-  Pin
+  Pin,
+  ArrowLeft
 } from 'lucide-react';
+import { storage } from '../../services/StorageService';
+import { LocalDataCache } from '../../services/LocalDataCache';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useSearch } from '../../contexts/SearchContext.tsx';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { useLayout } from '../../contexts/LayoutContext.tsx';
 import { ChatTabDropdown } from '../chat-ui/ChatTabDropdown';
+import { ChatSelectDropdown } from '../chat-ui/ChatSelectDropdown';
 import { GroupsTabDropdown } from '../chat-ui/GroupsTabDropdown';
 import { ProfileTabDropdown } from '../chat-ui/ProfileTabDropdown';
 import { authService } from '../../features/auth/services/authService.ts';
@@ -49,8 +53,10 @@ export default function TabHeader() {
   const [hasUnreadLikes, setHasUnreadLikes] = useState(false);
   const [hasUnreadNotifs, setHasUnreadNotifs] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showSelectMenu, setShowSelectMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const selectMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -59,6 +65,9 @@ export default function TabHeader() {
       }
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
         setShowProfileMenu(false);
+      }
+      if (selectMenuRef.current && !selectMenuRef.current.contains(event.target as Node)) {
+        setShowSelectMenu(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -133,6 +142,57 @@ export default function TabHeader() {
   const isCallsPage = location.pathname === '/calls';
 
   if (isChatSelectMode && isChatsPage) {
+    const handleSelectAll = () => {
+      const cachedList = authUser ? (LocalDataCache.getConversations(authUser.uid || authUser.id) || []) : [];
+      const activeIds = cachedList.filter((c: any) => {
+        const isHidden = Array.isArray(userData?.hiddenChats) && userData.hiddenChats.includes(c.id);
+        const isArchived = Array.isArray(userData?.archivedChats) && userData.archivedChats.includes(c.id);
+        if (isHidden || isArchived) return false;
+        
+        if (chatListFilter === 'direct' && c.type !== 'direct') return false;
+        if (chatListFilter === 'groups' && c.type !== 'group') return false;
+        if (chatListFilter === 'channels' && c.type !== 'group') return false;
+        
+        return true;
+      }).map((c: any) => c.id);
+      
+      setSelectedChatIds(activeIds);
+      setShowSelectMenu(false);
+    };
+
+    const handleLockChats = async () => {
+      if (userData && authUser) {
+        try {
+          const currentHidden = Array.isArray(userData.hiddenChats) ? userData.hiddenChats : [];
+          const updatedHidden = [...new Set([...currentHidden, ...selectedChatIds])];
+          
+          if (supabase) {
+            const targetId = authUser.id || authUser.uid;
+            await supabase
+              .from('users')
+              .update({ hidden_chats: updatedHidden })
+              .eq('id', targetId);
+            
+            if (refreshUserData) {
+              await refreshUserData();
+            }
+          }
+        } catch (err) {
+          console.error('Failed to lock chats:', err);
+        }
+      }
+      setSelectedChatIds([]);
+      setChatSelectMode(false);
+      setShowSelectMenu(false);
+    };
+
+    const handleActionWithAlert = (message: string) => {
+      alert(message);
+      setSelectedChatIds([]);
+      setChatSelectMode(false);
+      setShowSelectMenu(false);
+    };
+
     return (
       <div className="w-full px-4 min-h-[56px] flex justify-between items-center z-50 shrink-0 relative animate-fade-in select-none">
         <div className="flex items-center gap-3">
@@ -142,12 +202,12 @@ export default function TabHeader() {
               setChatSelectMode(false);
               setSelectedChatIds([]);
             }} 
-            className="w-12 h-12 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer active:scale-95 duration-100"
+            className="w-11 h-11 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer active:scale-95 duration-100"
           >
-            <X size={22} className="text-[#0494f4]" />
+            <ArrowLeft size={22} className="text-[var(--text-primary)]" />
           </button>
-          <span className="font-black text-[18px] text-[#0494f4]">
-            {selectedChatIds.length} Selected
+          <span className="font-bold text-[20px] text-[var(--text-primary)]">
+            {selectedChatIds.length}
           </span>
         </div>
 
@@ -157,7 +217,7 @@ export default function TabHeader() {
             type="button"
             disabled={selectedChatIds.length === 0}
             onClick={() => {
-              const pinned = JSON.parse(localStorage.getItem('app-pinned-chats') || '[]');
+              const pinned = JSON.parse(storage.getItem('app-pinned-chats') || '[]');
               let updated = [...pinned];
               
               selectedChatIds.forEach(id => {
@@ -170,20 +230,58 @@ export default function TabHeader() {
                 }
               });
               
-              localStorage.setItem('app-pinned-chats', JSON.stringify(updated));
+              storage.setItem('app-pinned-chats', JSON.stringify(updated));
               window.dispatchEvent(new Event('pinned-chats-changed'));
               
               setChatSelectMode(false);
               setSelectedChatIds([]);
             }}
-            className={`w-12 h-12 flex items-center justify-center rounded-full transition-all cursor-pointer ${
+            className={`w-11 h-11 flex items-center justify-center rounded-full transition-all cursor-pointer ${
               selectedChatIds.length > 0 
-                ? 'text-[var(--header-text)] hover:bg-black/5 dark:hover:bg-white/5 active:scale-90' 
-                : 'text-[var(--header-text)]/20 cursor-not-allowed'
+                ? 'text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/5 active:scale-90' 
+                : 'text-[var(--text-secondary)]/20 cursor-not-allowed'
             }`}
-            title="Pin/Unpin Pinned Chats"
+            title="Pin/Unpin"
           >
             <Pin size={22} />
+          </button>
+
+          {/* Delete (Hide) action */}
+          <button 
+            type="button"
+            disabled={selectedChatIds.length === 0}
+            onClick={async () => {
+              if (userData && authUser) {
+                try {
+                  const currentHidden = Array.isArray(userData.hiddenChats) ? userData.hiddenChats : [];
+                  const updatedHidden = [...new Set([...currentHidden, ...selectedChatIds])];
+                  
+                  if (supabase) {
+                    const targetId = authUser.id || authUser.uid;
+                    await supabase
+                      .from('users')
+                      .update({ hidden_chats: updatedHidden })
+                      .eq('id', targetId);
+                    
+                    if (refreshUserData) {
+                      await refreshUserData();
+                    }
+                  }
+                } catch (err) {
+                  console.error('Failed to hide selected chats:', err);
+                }
+              }
+              setSelectedChatIds([]);
+              setChatSelectMode(false);
+            }}
+            className={`w-11 h-11 flex items-center justify-center rounded-full transition-all cursor-pointer ${
+              selectedChatIds.length > 0 
+                ? 'text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/5 active:scale-90' 
+                : 'text-[var(--text-secondary)]/20 cursor-not-allowed'
+            }`}
+            title="Delete"
+          >
+            <Trash size={22} />
           </button>
 
           {/* Mute action */}
@@ -195,11 +293,12 @@ export default function TabHeader() {
               setChatSelectMode(false);
               setSelectedChatIds([]);
             }}
-            className={`w-12 h-12 flex items-center justify-center rounded-full transition-all cursor-pointer ${
+            className={`w-11 h-11 flex items-center justify-center rounded-full transition-all cursor-pointer ${
               selectedChatIds.length > 0 
-                ? 'text-[var(--header-text)] hover:bg-black/5 dark:hover:bg-white/5 active:scale-90' 
-                : 'text-[var(--header-text)]/20 cursor-not-allowed'
+                ? 'text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/5 active:scale-90' 
+                : 'text-[var(--text-secondary)]/20 cursor-not-allowed'
             }`}
+            title="Mute"
           >
             <VolumeX size={22} />
           </button>
@@ -232,51 +331,38 @@ export default function TabHeader() {
               setSelectedChatIds([]);
               setChatSelectMode(false);
             }}
-            className={`w-12 h-12 flex items-center justify-center rounded-full transition-all cursor-pointer ${
+            className={`w-11 h-11 flex items-center justify-center rounded-full transition-all cursor-pointer ${
               selectedChatIds.length > 0 
-                ? 'text-[var(--header-text)] hover:bg-black/5 dark:hover:bg-white/5 active:scale-90' 
-                : 'text-[var(--header-text)]/20 cursor-not-allowed'
+                ? 'text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/5 active:scale-90' 
+                : 'text-[var(--text-secondary)]/20 cursor-not-allowed'
             }`}
+            title="Archive"
           >
             <Archive size={22} />
           </button>
 
-          {/* Delete (Hide) action */}
-          <button 
-            type="button"
-            disabled={selectedChatIds.length === 0}
-            onClick={async () => {
-              if (userData && authUser) {
-                try {
-                  const currentHidden = Array.isArray(userData.hiddenChats) ? userData.hiddenChats : [];
-                  const updatedHidden = [...new Set([...currentHidden, ...selectedChatIds])];
-                  
-                  if (supabase) {
-                    const targetId = authUser.id || authUser.uid;
-                    await supabase
-                      .from('users')
-                      .update({ hidden_chats: updatedHidden })
-                      .eq('id', targetId);
-                    
-                    if (refreshUserData) {
-                      await refreshUserData();
-                    }
-                  }
-                } catch (err) {
-                  console.error('Failed to hide selected chats:', err);
-                }
-              }
-              setSelectedChatIds([]);
-              setChatSelectMode(false);
-            }}
-            className={`w-12 h-12 flex items-center justify-center rounded-full transition-all cursor-pointer ${
-              selectedChatIds.length > 0 
-                ? 'text-rose-500 hover:bg-rose-500/10 active:scale-90' 
-                : 'text-[var(--header-text)]/20 cursor-not-allowed'
-            }`}
-          >
-            <Trash size={22} />
-          </button>
+          {/* 3-Dot vertical dropdown Trigger */}
+          <div className="relative" ref={selectMenuRef}>
+            <button 
+              type="button"
+              onClick={() => setShowSelectMenu(prev => !prev)}
+              className="w-11 h-11 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer relative active:scale-95 duration-100"
+              title="More options"
+            >
+              <MoreVertical size={22} className="text-[var(--text-primary)]" />
+            </button>
+            <AnimatePresence>
+              {showSelectMenu && (
+                <ChatSelectDropdown
+                  isOpen={showSelectMenu}
+                  onClose={() => setShowSelectMenu(false)}
+                  onSelectAll={handleSelectAll}
+                  onLockChats={handleLockChats}
+                  onActionWithAlert={handleActionWithAlert}
+                />
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     );

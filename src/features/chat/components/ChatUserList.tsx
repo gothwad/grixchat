@@ -7,6 +7,7 @@ import { supabase } from '../../../lib/supabase';
 import { aiService } from '../../../services/AIService';
 import { useLayout } from '../../../contexts/LayoutContext';
 import Avatar from '../../../components/common/Avatar';
+import { storage } from '../../../services/StorageService';
 
 interface ChatItem {
   id: string;
@@ -142,16 +143,31 @@ const ChatItemRow: React.FC<{
       onMouseUp={cancelPress}
       onMouseLeave={cancelPress}
       onClick={handleClick}
-      className={`relative flex items-center gap-3.5 px-4 py-2.5 transition-all duration-205 cursor-pointer select-none border-b border-[var(--border-color)]/5 last:border-0 border-l-[4px] ${
+      className={`relative flex items-center gap-3 px-3 py-2.5 transition-all duration-205 cursor-pointer select-none border-b border-[var(--border-color)]/5 last:border-b-0 border-l-[4px] border-l-transparent ${
         isSelected 
-          ? 'bg-[var(--primary)]/10 border-l-[var(--primary)]' 
-          : 'bg-[var(--bg-card)] border-l-transparent hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10'
+          ? 'bg-[var(--primary)]/24' 
+          : 'bg-[var(--bg-card)] hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10'
       }`}
     >
-      <Avatar url={chat.avatar} type={chat.type} name={chat.user} isOnline={chat.isOnline} />
+      <div className="relative shrink-0">
+        <Avatar url={chat.avatar} type={chat.type} name={chat.user} isOnline={chat.isOnline} />
+        {isSelected && (
+          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[var(--primary)] border-2 border-[var(--bg-card)] flex items-center justify-center shadow-md z-20 animate-scale-in">
+            <svg 
+              className="w-3 h-3 text-white" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="4" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+        )}
+      </div>
       <div className="flex-1 min-w-0 flex flex-col justify-center">
         <div className="flex justify-between items-baseline mb-0.5">
-          <h3 className={`text-[14.5px] truncate font-semibold text-[var(--text-primary)] transition-colors flex items-center gap-1.5 ${chat.unread ? 'font-bold' : ''}`}>
+          <h3 className={`text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors flex items-center gap-1.5 ${chat.unread ? 'font-bold' : ''}`}>
             {isPinned && <Pin size={13} className="text-[#0494f4] fill-[#0494f4] shrink-0" />}
             <span>{chat.user}</span>
           </h3>
@@ -237,7 +253,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
   useEffect(() => {
     const loadPinned = () => {
       try {
-        const pinned = JSON.parse(localStorage.getItem('app-pinned-chats') || '[]');
+        const pinned = JSON.parse(storage.getItem('app-pinned-chats') || '[]');
         setPinnedChatIds(pinned);
       } catch (_) {}
     };
@@ -339,11 +355,17 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
   }
 
   const handleToggleSelect = (chatId: string) => {
-    setSelectedChatIds(prev => 
-      prev.includes(chatId) 
+    setSelectedChatIds(prev => {
+      const isAlreadySelected = prev.includes(chatId);
+      const nextSelected = isAlreadySelected 
         ? prev.filter(id => id !== chatId) 
-        : [...prev, chatId]
-    );
+        : [...prev, chatId];
+      
+      if (nextSelected.length === 0) {
+        setChatSelectMode(false);
+      }
+      return nextSelected;
+    });
   };
 
   const renderOtherUser = (user: OtherUser) => {
@@ -355,12 +377,12 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       <Link 
         to={`/chat/${user.uid}`} 
         key={user.uid} 
-        className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 last:border-0 group"
+        className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 border-b border-[var(--border-color)]/5 last:border-b-0 group border-l-[4px] border-l-transparent select-none"
       >
         <Avatar url={finalPhoto} type="direct" name={finalName} isOnline={user.isOnline} />
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="flex justify-between items-baseline mb-0.5">
-            <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
+            <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
               {finalName}
             </h3>
             <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] uppercase font-semibold tracking-tight opacity-40">
@@ -383,7 +405,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       {showSecretHeader && (
         <div 
           onClick={onSecretHeaderClick}
-          className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 group cursor-pointer"
+          className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 border-b border-[var(--border-color)]/5 group cursor-pointer border-l-[4px] border-l-transparent select-none"
         >
           <div className="relative shrink-0 z-10">
             <div className="w-12 h-12 rounded-full bg-indigo-500/10 dark:bg-zinc-800 flex items-center justify-center text-indigo-500 group-hover:scale-[1.02] transition-transform border border-[var(--border-color)]/10">
@@ -392,7 +414,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div className="flex justify-between items-baseline mb-0.5">
-              <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
+              <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
                 Hidden Chats
               </h3>
               <span className="text-[9.5px] whitespace-nowrap text-indigo-500 font-semibold tracking-tight bg-indigo-500/10 px-2 py-0.5 rounded-full">
@@ -400,7 +422,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <p className="text-[12px] truncate text-[var(--text-secondary)] font-medium opacity-75">
+              <p className="text-[13px] truncate text-[var(--text-secondary)] font-medium opacity-75">
                 {secretCount > 0 ? `${secretCount} hidden conversations available` : 'Private conversations space'}
               </p>
             </div>
@@ -428,26 +450,20 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
         return (
           <div 
             onClick={() => navigate('/chat/grix-ai')}
-            className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 group cursor-pointer"
+            className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 border-b border-[var(--border-color)]/5 group cursor-pointer border-l-[4px] border-l-transparent select-none"
           >
             <div 
-              className="relative shrink-0 z-10"
+              className="relative shrink-0"
               onClick={(e) => {
                 e.stopPropagation();
                 navigate('/profile/grix-ai');
               }}
             >
-              <img 
-                src="/assets/favicon.png" 
-                className="w-12 h-12 rounded-full object-cover shadow-sm group-hover:scale-[1.02] transition-transform border border-[var(--border-color)]/15"
-                referrerPolicy="no-referrer"
-                alt="Grix AI"
-              />
-              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[var(--bg-card)] rounded-full shadow-sm"></div>
+              <Avatar url="/assets/favicon.png" type="direct" name="Grix AI" isOnline={true} />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center">
               <div className="flex justify-between items-baseline mb-0.5">
-                <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
+                <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
                   Grix AI
                 </h3>
                 <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] opacity-60">
@@ -468,7 +484,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       {showGrixAI && (
         <div 
           onClick={() => navigate('/chats/archived')}
-          className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 group cursor-pointer"
+          className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 border-b border-[var(--border-color)]/5 group cursor-pointer border-l-[4px] border-l-transparent select-none"
         >
           <div className="relative shrink-0 z-10">
             <div className="w-12 h-12 rounded-full bg-[#0494f4]/10 dark:bg-zinc-800 flex items-center justify-center text-[var(--primary)] group-hover:scale-[1.02] transition-transform border border-[var(--border-color)]/15">
@@ -477,7 +493,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div className="flex justify-between items-baseline mb-0.5">
-              <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
+              <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
                 Archived Chats
               </h3>
               <span className="text-[10px] whitespace-nowrap text-[#0494f4] font-semibold tracking-tight bg-[#0494f4]/10 px-2 py-0.5 rounded-full">
@@ -485,7 +501,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <p className="text-[12px] truncate text-[var(--text-secondary)] font-medium opacity-75">
+              <p className="text-[13px] truncate text-[var(--text-secondary)] font-medium opacity-75">
                 Saved and hidden from main mailbox
               </p>
             </div>
@@ -497,7 +513,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       {showGrixAI && showHiddenChatsEntry && !showSecretHeader && (
         <div 
           onClick={() => navigate('/chats/hidden')}
-          className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 group cursor-pointer"
+          className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 border-b border-[var(--border-color)]/5 group cursor-pointer border-l-[4px] border-l-transparent select-none"
         >
           <div className="relative shrink-0 z-10">
             <div className="w-12 h-12 rounded-full bg-indigo-500/10 dark:bg-zinc-800 flex items-center justify-center text-indigo-500 group-hover:scale-[1.02] transition-transform border border-[var(--border-color)]/15">
@@ -506,7 +522,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div className="flex justify-between items-baseline mb-0.5">
-              <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)]">
+              <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
                 Hidden Chats
               </h3>
               <span className="text-[10px] whitespace-nowrap text-indigo-500 font-semibold tracking-tight bg-indigo-500/10 px-2 py-0.5 rounded-full">
@@ -514,7 +530,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <p className="text-[12px] truncate text-[var(--text-secondary)] font-medium opacity-75">
+              <p className="text-[13px] truncate text-[var(--text-secondary)] font-medium opacity-75">
                 Private conversations protected with secret code
               </p>
             </div>

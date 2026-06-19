@@ -30,7 +30,6 @@ export default function SearchTab() {
   const { user: authUser, userData } = useAuth();
   const { initiateCall } = useCall();
   
-  const [activeFilter, setActiveFilter] = useState<'all' | 'contacts' | 'ai'>('all');
   // Tab-specific search state
   const [discoverSearchTerm, setDiscoverSearchTerm] = useState('');
   const [discoverLoading, setDiscoverLoading] = useState(false);
@@ -225,25 +224,26 @@ export default function SearchTab() {
       <div 
         key={profile.uid}
         onClick={() => navigate(`/user/${profile.uid}`)}
-        className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group cursor-pointer select-none"
+        className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 group cursor-pointer select-none border-b border-[var(--border-color)]/5 last:border-b-0 border-l-[4px] border-l-transparent"
       >
         <Avatar 
           url={profile.photoURL} 
           type="direct" 
           name={profile.fullName || profile.username || 'GrixUser'} 
+          isOnline={profile.isOnline}
         />
         
-        <div className="flex-1 min-w-0 flex items-center justify-between">
-          <div className="min-w-0 pr-2">
-            <h4 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[#0494f4] transition-colors leading-tight">
-              {profile.fullName || profile.username || 'GrixChat User'}
-            </h4>
-            <p className="text-[12.5px] text-[var(--text-secondary)] opacity-75 font-medium mt-0.5 leading-tight">@{profile.username || 'username'}</p>
-          </div>
-          
-          <div className="flex items-center gap-2 mr-1 shrink-0">
-            <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200 shrink-0" />
-          </div>
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
+            {profile.fullName || profile.username || 'GrixChat User'}
+          </h3>
+          <p className="text-[13px] text-[var(--text-secondary)] opacity-75 mt-0.5 font-medium">
+            @{profile.username || 'username'}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200" />
         </div>
       </div>
     );
@@ -277,130 +277,57 @@ export default function SearchTab() {
           onClear={() => setDiscoverSearchTerm('')}
         />
 
-        {/* Dynamic Category Filter Pill Bar */}
-        <div className="flex gap-2 px-4 py-2 bg-[var(--bg-card)] overflow-x-auto no-scrollbar shrink-0 select-none border-b border-[var(--border-color)]/10">
-          {[
-            { id: 'all', label: 'All Results' },
-            { id: 'contacts', label: 'Contacts Only' },
-            { id: 'ai', label: 'AI Buddies' }
-          ].map((pill) => {
-            const isPillActive = activeFilter === pill.id;
-            return (
-              <button
-                key={pill.id}
-                onClick={() => {
-                  setActiveFilter(pill.id as any);
-                  if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                    navigator.vibrate(10);
-                  }
-                }}
-                className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-200 border-none cursor-pointer whitespace-nowrap ${
-                  isPillActive 
-                    ? 'bg-[#0494f4] text-white shadow-sm' 
-                    : 'bg-[var(--bg-main)] text-[var(--text-secondary)] opacity-85 hover:bg-[var(--border-color)]/10'
-                }`}
-              >
-                {pill.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex flex-col mt-1">
-          {activeFilter === 'ai' ? (
-            /* AI Filter View */
-            <div className="flex flex-col bg-[var(--bg-card)] divide-y divide-[var(--border-color)]/5 border-b border-[var(--border-color)]/5">
-              {renderInlineHeader('AI Companions', 1)}
-              {renderUserProfileRow({
-                uid: 'grix-ai',
-                username: 'grix_ai',
-                fullName: 'Grix AI Butler',
-                photoURL: 'https://cdn-icons-png.flaticon.com/512/4712/4712139.png',
-                isOnline: true
-              }, false)}
-            </div>
-          ) : discoverSearchTerm ? (
+        <div className="flex flex-col mt-1 bg-[var(--bg-card)]">
+          {discoverSearchTerm ? (
             /* Search results view and header */
-            <div className="flex flex-col bg-[var(--bg-card)] divide-y divide-[var(--border-color)]/5 border-b border-[var(--border-color)]/5">
-              {activeFilter === 'contacts' ? (
-                /* Searching but filtered to Contacts Only */
-                (() => {
-                  const filteredContacts = contacts.filter(
-                    c => c.fullName.toLowerCase().includes(discoverSearchTerm.toLowerCase()) || 
-                         c.username.toLowerCase().includes(discoverSearchTerm.toLowerCase())
-                  );
-                  return (
-                    <>
-                      {renderInlineHeader('Matched Contacts', filteredContacts.length)}
-                      {filteredContacts.length === 0 ? (
-                        <div className="px-5 py-12 text-center text-xs text-[var(--text-secondary)]">No matching contacts found in list</div>
-                      ) : (
-                        filteredContacts.map(profile => renderUserProfileRow(profile, true))
-                      )}
-                    </>
-                  );
-                })()
+            <div className="flex flex-col bg-[var(--bg-card)]">
+              {renderInlineHeader('Global Network Discovery', userResults.filter(p => !hiddenUserIds.includes(p.uid)).length)}
+              {discoverLoading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-2 bg-[var(--bg-card)]">
+                  <Loader2 className="animate-spin text-[#0494f4]" size={22} />
+                  <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider">Searching direct entries...</p>
+                </div>
+              ) : userResults.filter(p => !hiddenUserIds.includes(p.uid)).length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center px-4 gap-2 bg-[var(--bg-card)]">
+                  <Users size={22} className="text-[var(--text-secondary)] opacity-50 shrink-0" />
+                  <div>
+                    <h4 className="text-[13px] font-bold text-[var(--text-primary)]">No profiles matched</h4>
+                    <p className="text-[11px] text-[var(--text-secondary)] px-4 leading-tight mt-0.5">Please check spelling or type correct username references.</p>
+                  </div>
+                </div>
               ) : (
-                /* All results searching */
-                <>
-                  {renderInlineHeader('Global Network Discovery', userResults.filter(p => !hiddenUserIds.includes(p.uid)).length)}
-                  {discoverLoading ? (
-                    <div className="flex flex-col items-center justify-center py-20 gap-2 bg-[var(--bg-card)]">
-                      <Loader2 className="animate-spin text-[#0494f4]" size={22} />
-                      <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider">Searching direct entries...</p>
-                    </div>
-                  ) : userResults.filter(p => !hiddenUserIds.includes(p.uid)).length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-center px-4 gap-2 bg-[var(--bg-card)]">
-                      <Users size={22} className="text-[var(--text-secondary)] opacity-50 shrink-0" />
-                      <div>
-                        <h4 className="text-[13px] font-bold text-[var(--text-primary)]">No profiles matched</h4>
-                        <p className="text-[11px] text-[var(--text-secondary)] px-4 leading-tight mt-0.5">Please check spelling or type correct username references.</p>
-                      </div>
-                    </div>
-                  ) : (
-                    userResults.filter(p => !hiddenUserIds.includes(p.uid)).map(profile => {
-                      const isMutual = contacts.some(c => c.uid === profile.uid);
-                      return renderUserProfileRow(profile, isMutual);
-                    })
-                  )}
-                </>
+                userResults.filter(p => !hiddenUserIds.includes(p.uid)).map(profile => {
+                  const isMutual = contacts.some(c => c.uid === profile.uid);
+                  return renderUserProfileRow(profile, isMutual);
+                })
               )}
             </div>
           ) : (
             /* Default Contacts List View */
-            <div className="flex flex-col bg-[var(--bg-card)] divide-y divide-[var(--border-color)]/5 border-b border-[var(--border-color)]/5">
+            <div className="flex flex-col bg-[var(--bg-card)]">
               
-              {/* Only show requests folder if not exclusively browsing contacts tab list */}
-              {activeFilter === 'all' && (
-                <div 
-                  onClick={() => navigate('/chats/requests')}
-                  className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all border-b border-[var(--border-color)]/5 group cursor-pointer"
-                >
-                  <div className="relative shrink-0 z-10">
-                    <div className="w-12 h-12 rounded-full bg-[#0494f4]/10 dark:bg-zinc-800/60 flex items-center justify-center text-[var(--primary)] group-hover:scale-[1.02] transition-transform border border-[var(--border-color)]/15">
-                      <Users size={19} className="text-[#0494f4]" />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0 flex flex-col justify-center select-none">
-                    <div className="flex justify-between items-baseline mb-0.5">
-                      <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] leading-tight">
-                        Pending Requests
-                      </h3>
-                    </div>
-                    <div>
-                      <p className="text-[11px] truncate text-[var(--text-secondary)] font-normal opacity-70 leading-normal">
-                        Mutual requests and incoming profiles waiting
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[10px] text-[#0494f4] font-black tracking-wider bg-[#0494f4]/10 px-2 py-0.5 rounded-full mr-1">
-                      {pendingRequestsCount > 0 ? `${pendingRequestsCount}` : '0'}
-                    </span>
-                    <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200" />
+              {/* Only show requests folder if not browsing search keyword results */}
+              <div 
+                onClick={() => navigate('/chats/requests')}
+                className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 border-b border-[var(--border-color)]/5 group cursor-pointer select-none border-l-[4px] border-l-transparent"
+              >
+                <div className="relative shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-[#0494f4]/10 dark:bg-zinc-800/60 flex items-center justify-center text-[#0494f4] group-hover:scale-[1.02] transition-transform border border-[var(--border-color)]/15">
+                    <Users size={19} className="text-[#0494f4]" />
                   </div>
                 </div>
-              )}
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
+                    Pending Requests
+                  </h3>
+                  <p className="text-[13px] truncate text-[var(--text-secondary)] mt-0.5 font-medium opacity-75">
+                    Incoming friend requests
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200" />
+                </div>
+              </div>
 
               {contactsLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-2">

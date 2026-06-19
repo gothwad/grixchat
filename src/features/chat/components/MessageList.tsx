@@ -92,12 +92,12 @@ export const MessageList: React.FC<MessageListProps> = ({
     <div 
       ref={scrollContainerRef}
       onScroll={handleScroll}
-      className={`flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-2 relative no-scrollbar touch-pan-y w-full max-w-full ${chatBackground || 'bg-[var(--bg-main)]'}`} 
+      className={`flex-1 overflow-y-auto overflow-x-hidden px-0 py-4 relative no-scrollbar touch-pan-y w-full max-w-full ${chatBackground || 'bg-[var(--bg-main)]'}`} 
       onClick={() => { setActiveMessageMenu(null); }}
     >
       <div className="absolute inset-0 opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")', backgroundSize: '400px' }}></div>
       
-      <div className="relative z-10 flex flex-col gap-1 w-full max-w-full overflow-hidden">
+      <div className="relative z-10 flex flex-col w-full max-w-full overflow-hidden">
         {loadingMore && (
           <div className="flex flex-col items-center justify-center py-4 gap-2">
             <Loader2 size={20} className="text-[var(--primary)] animate-spin" />
@@ -187,6 +187,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                 isHighlighted={highlightedMessageId === msg.id}
                 isLatestMessage={index === currentMessages.length - 1}
                 isSelected={selectedMsgIds.includes(msg.id)}
+                selectedMsgIds={selectedMsgIds}
                 allMessages={uniqueMessages}
               />
             );

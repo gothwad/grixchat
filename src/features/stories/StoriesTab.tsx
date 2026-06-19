@@ -146,7 +146,7 @@ export default function StoriesTab() {
         />
 
         {/* Unified Top-to-Bottom List */}
-        <div className="flex flex-col bg-[var(--bg-card)] divide-y divide-[var(--border-color)]/5 border-b border-[var(--border-color)]/5">
+        <div className="flex flex-col mt-1 bg-[var(--bg-card)]">
           
           {/* MY STATUS TILE */}
           <div 
@@ -157,18 +157,16 @@ export default function StoriesTab() {
                 navigate('/stories/create');
               }
             }}
-            className="flex items-center gap-3.5 px-4 py-3 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group cursor-pointer select-none"
+            className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 group cursor-pointer select-none border-b border-[var(--border-color)]/5 last:border-b-0 border-l-[4px] border-l-transparent"
           >
             {/* Left: Avatar with dynamic Ring or Plus Overlay */}
             <div className="relative shrink-0">
               {myStoriesGroup ? (
-                <div className="relative p-[2px] rounded-full ring-2 ring-[var(--primary)]">
-                  <Avatar 
-                    url={userData?.photoURL} 
-                    type="direct" 
-                    name={myStoryName} 
-                  />
-                </div>
+                <Avatar 
+                  url={userData?.photoURL} 
+                  type="direct" 
+                  name={myStoryName} 
+                />
               ) : (
                 <div className="relative">
                   <Avatar 
@@ -184,11 +182,11 @@ export default function StoriesTab() {
             </div>
 
             {/* Middle: Details */}
-            <div className="flex-1 min-w-0">
-              <h4 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[#0494f4] transition-colors leading-tight">
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
+              <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
                 {myStoryName}
-              </h4>
-              <p className="text-[12.5px] text-[var(--text-secondary)] opacity-75 mt-0.5 font-medium leading-tight">
+              </h3>
+              <p className="text-[13px] text-[var(--text-secondary)] opacity-75 mt-0.5 font-medium">
                 {myStoriesGroup 
                   ? `Last update: ${formatStoryTime(myStoriesGroup.stories[0].created_at)}` 
                   : 'Tap to publish a status update'
@@ -207,7 +205,7 @@ export default function StoriesTab() {
               <span className="text-[10px] uppercase font-black tracking-wider text-[var(--text-secondary)]">Loading stories...</span>
             </div>
           ) : otherStoriesGroups.length === 0 ? (
-            <div className="px-5 py-8 text-center bg-[var(--bg-card)]">
+            <div className="px-5 py-8 text-center bg-[var(--bg-card)] border-b border-[var(--border-color)]/5 last:border-b-0">
               <p className="text-xs text-[var(--text-secondary)] opacity-75 italic">No shared status updates from other friends yet.</p>
             </div>
           ) : (
@@ -215,10 +213,10 @@ export default function StoriesTab() {
               <div 
                 key={group.userId}
                 onClick={() => navigate(`/stories/view/${group.userId}`)}
-                className="flex items-center gap-3.5 px-4 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-colors group cursor-pointer select-none"
+                className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 group cursor-pointer select-none border-b border-[var(--border-color)]/5 last:border-b-0 border-l-[4px] border-l-transparent"
               >
                 {/* Left: Avatar with brand themed ring */}
-                <div className="relative shrink-0 p-[2px] rounded-full ring-2 ring-[var(--primary)]">
+                <div className="relative shrink-0">
                   <Avatar 
                     url={group.photoURL} 
                     type="direct" 
@@ -227,11 +225,11 @@ export default function StoriesTab() {
                 </div>
 
                 {/* Middle: Details */}
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[#0494f4] transition-colors leading-tight">
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
                     {group.fullName || group.username}
-                  </h4>
-                  <p className="text-[12.5px] text-[var(--text-secondary)] opacity-75 mt-0.5 font-medium leading-tight">
+                  </h3>
+                  <p className="text-[13px] text-[var(--text-secondary)] opacity-75 mt-0.5 font-medium">
                     {formatStoryTime(group.stories[0].created_at)}
                   </p>
                 </div>

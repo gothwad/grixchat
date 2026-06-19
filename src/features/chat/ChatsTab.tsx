@@ -8,6 +8,7 @@ import { useConversations } from './hooks/useConversations.ts';
 import { useCalls } from './hooks/useCalls.ts';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { ChatUserList } from './components/ChatUserList.tsx';
+import { CallsHistoryList } from '../call/components/CallsHistoryList.tsx';
 import { supabase } from '../../lib/supabase';
 import { getAcceptedChats, initializeAcceptedConversations } from '../../utils/acceptedChats';
 import { storage } from '../../services/StorageService';
@@ -168,57 +169,22 @@ export default function ChatsTab() {
                 );
               }
               return (
-                <div className="divide-y divide-[var(--border-color)]">
-                  {filteredCalls.map((call) => (
-
-                  <motion.div 
-                    key={call.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex items-center gap-[15px] px-4 py-3 hover:bg-[var(--bg-main)] transition-all active:scale-[0.98] group"
-                  >
-                    <Avatar url={call.avatar} type="direct" size="custom" customSizeClass="w-[52px] h-[52px]" name={call.user} />
-                    
-                    <div className="flex-1 min-w-0 border-b border-[var(--border-color)]/50 pb-3 group-last:border-0">
-                      <div className="flex justify-between items-baseline mb-0.5">
-                        <h3 className={`text-[15px] truncate font-bold ${call.isMissed ? 'text-rose-500' : 'text-[var(--text-primary)]'}`}>
-                          {call.user}
-                        </h3>
-                        <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)]">
-                          {call.time}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-[var(--text-secondary)] text-[11px]">
-                        {call.isMissed ? (
-                          <PhoneMissed size={12} className="text-rose-500" />
-                        ) : call.isIncoming ? (
-                          <ArrowDownLeft size={12} className="text-emerald-500" />
-                        ) : (
-                          <ArrowUpRight size={12} className="text-[var(--primary)]" />
-                        )}
-                        <span>{call.isMissed ? 'Missed' : call.isIncoming ? 'Incoming' : 'Outgoing'}</span>
-                      </div>
+                <div className="flex flex-col">
+                  <CallsHistoryList 
+                    calls={filteredCalls} 
+                    loading={callsLoading} 
+                    onCall={(userId, type) => navigate(`/call/${userId}?type=${type}`)}
+                    onReset={() => {}}
+                  />
+                  {callsLoadingMore && (
+                    <div className="flex items-center justify-center py-4 gap-2 bg-[var(--bg-card)]">
+                      <Loader2 size={16} className="text-[#0494f4] animate-spin" />
+                      <span className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">Loading more calls...</span>
                     </div>
-
-                    <div className="flex items-center gap-4 text-[var(--primary)]">
-                      <Link to={`/call/${call.otherUserId}?type=${call.type}`}>
-                        {call.type === 'video' ? <Video size={20} /> : <Phone size={20} />}
-                      </Link>
-                      <button className="text-[var(--text-secondary)]">
-                        <Info size={20} />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-                {callsLoadingMore && (
-                  <div className="flex items-center justify-center py-4 gap-2 bg-[var(--bg-card)]">
-                    <Loader2 size={16} className="text-[#0494f4] animate-spin" />
-                    <span className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">Loading more calls...</span>
-                  </div>
-                )}
-              </div>
-            );
-          })()
+                  )}
+                </div>
+              );
+            })()
           ) : (
             <>
               <ChatUserList 

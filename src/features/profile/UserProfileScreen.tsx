@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   Bell,
   Settings,
-  QrCode,
   ChevronRight,
   Edit3,
   UserPlus,

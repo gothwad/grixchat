@@ -17,6 +17,7 @@ import { useChatFormHandler } from './hooks/useChatFormHandler';
 import { useChatScroll } from './hooks/useChatScroll';
 import { formatLastSeen, toDate } from '../../utils/dateUtils.ts';
 import { useTheme } from '../../contexts/ThemeContext';
+import { storage } from '../../services/StorageService';
 
 import ChatHeader from '../../components/layout/ChatHeader.tsx';
 import ChatBottom from '../../components/layout/ChatBottom.tsx';
@@ -342,7 +343,7 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!receiverId) return;
     const loadCustomBg = () => {
-      setCustomBg(localStorage.getItem(`app-chat-background-${receiverId}`));
+      setCustomBg(storage.getItem(`app-chat-background-${receiverId}`));
     };
     loadCustomBg();
     
@@ -601,9 +602,9 @@ export default function ChatScreen() {
                         type="button"
                         onClick={() => {
                           if (bgItem.id === '') {
-                            localStorage.removeItem(`app-chat-background-${receiverId}`);
+                            storage.removeItem(`app-chat-background-${receiverId}`);
                           } else {
-                            localStorage.setItem(`app-chat-background-${receiverId}`, bgItem.id);
+                            storage.setItem(`app-chat-background-${receiverId}`, bgItem.id);
                           }
                           setCustomBg(bgItem.id || null);
                           window.dispatchEvent(new Event(`chat-customization-changed-${receiverId}`));
@@ -633,7 +634,7 @@ export default function ChatScreen() {
                     { id: 'crimson-fire', label: 'Crimson Fire', preview: 'bg-gradient-to-br from-rose-400 to-orange-600' },
                     { id: 'sunset-violet', label: 'Sunset Violet', preview: 'bg-gradient-to-br from-violet-600 to-purple-800' },
                   ].map((bubItem) => {
-                    const localBub = localStorage.getItem(`app-chat-bubble-${receiverId}`) || '';
+                    const localBub = storage.getItem(`app-chat-bubble-${receiverId}`) || '';
                     const isSelected = localBub === bubItem.id;
                     return (
                       <button
@@ -641,9 +642,9 @@ export default function ChatScreen() {
                         type="button"
                         onClick={() => {
                           if (bubItem.id === '') {
-                            localStorage.removeItem(`app-chat-bubble-${receiverId}`);
+                            storage.removeItem(`app-chat-bubble-${receiverId}`);
                           } else {
-                            localStorage.setItem(`app-chat-bubble-${receiverId}`, bubItem.id);
+                            storage.setItem(`app-chat-bubble-${receiverId}`, bubItem.id);
                           }
                           window.dispatchEvent(new Event(`chat-customization-changed-${receiverId}`));
                         }}
