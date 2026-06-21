@@ -98,7 +98,7 @@ export default function ProfileSettingsContent() {
                   onClick={() => navigate('/edit-profile')}
                   className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 group cursor-pointer select-none border-b border-[var(--border-color)]/5 border-l-[4px] border-l-transparent"
                 >
-                  <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center bg-[#0494f4]/10 text-[#0494f4] border border-[#0494f4]/15 shadow-sm shrink-0 group-hover:scale-[1.02] transition-transform">
+                  <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center bg-[var(--primary)] text-[var(--primary-foreground)] border border-[var(--primary)]/10 shadow-sm shrink-0 group-hover:scale-[1.02] transition-transform">
                     <InfoIcon size={20} className="stroke-[2.2]" />
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-center select-none">
@@ -155,7 +155,7 @@ export default function ProfileSettingsContent() {
                 onClick={item.onClick}
                 className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 group text-left cursor-pointer select-none border-none outline-none bg-transparent border-b border-[var(--border-color)]/5 last:border-b-0 border-l-[4px] border-l-transparent"
               >
-                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#0494f4]/10 text-[#0494f4] border border-[#0494f4]/15 shadow-sm group-hover:scale-[1.02] transition-transform shrink-0">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--primary)] text-[var(--primary-foreground)] border border-[var(--primary)]/10 shadow-sm group-hover:scale-[1.02] transition-transform shrink-0">
                   <item.icon size={20} className="stroke-[2.2]" />
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-center">

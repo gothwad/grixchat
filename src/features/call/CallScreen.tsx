@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Lock } from 'lucide-react';
+import { LiveKitRoom } from '@livekit/components-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { useCall } from '../../providers/CallProvider';
@@ -32,7 +33,9 @@ export default function CallScreen() {
     toggleSpeaker,
     toggleScreenShare,
     flipCamera,
-    stopSounds
+    stopSounds,
+    room,
+    isSandboxSimulated
   } = useCall();
   
   const queryParams = new URLSearchParams(location.search);
@@ -175,7 +178,7 @@ export default function CallScreen() {
 
   // Volume controls are now consolidated under the remote stream handler above
 
-  return (
+  const innerUI = (
     <div className="absolute inset-0 z-[100] bg-[var(--bg-main)] flex flex-col items-center justify-between text-[var(--text-primary)] font-sans overflow-hidden select-none animate-fade-in">
       {/* Video Streams */}
       {type === 'video' && (
@@ -224,4 +227,14 @@ export default function CallScreen() {
       />
     </div>
   );
+
+  if (room && !isSandboxSimulated) {
+    return (
+      <LiveKitRoom room={room} token="" serverUrl="">
+        {innerUI}
+      </LiveKitRoom>
+    );
+  }
+
+  return innerUI;
 }

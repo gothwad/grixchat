@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, SendHorizontal, CheckCircle2, User, Loader2 } from 'lucide-react';
+import { X, Search, SendHorizontal, User, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../../lib/supabase';
 import { LocalDataCache } from '../../services/LocalDataCache';
 import { useTheme } from '../../contexts/ThemeContext';
+import Avatar from '../common/Avatar';
 
 interface ChatForwardOverlayProps {
   isOpen: boolean;
@@ -37,9 +38,11 @@ export const ChatForwardOverlay: React.FC<ChatForwardOverlayProps> = ({
       const convoItems = cachedConvs.map((c: any) => ({
         id: c.id,
         isConversation: true,
+        isGroup: c.type === 'group' || c.isGroup,
         name: c.user || c.name || 'Grix Chat',
         username: c.username || '',
-        photoURL: c.photoURL || '',
+        photoURL: c.avatar || c.photoURL || '',
+        isOnline: c.isOnline === true,
       }));
 
       // 2. Fetch alternative users from Supabase to allow initiating DMs
@@ -47,7 +50,7 @@ export const ChatForwardOverlay: React.FC<ChatForwardOverlayProps> = ({
         if (supabase) {
           const { data: usersData } = await supabase
             .from('users')
-            .select('id, username, full_name, photo_url')
+            .select('id, username, full_name, photo_url, is_online')
             .neq('id', currentUserId)
             .limit(30);
 
@@ -57,9 +60,11 @@ export const ChatForwardOverlay: React.FC<ChatForwardOverlayProps> = ({
               .map(u => ({
                 id: u.id,
                 isConversation: false,
+                isGroup: false,
                 name: u.full_name || u.username || 'Grix User',
                 username: u.username || '',
                 photoURL: u.photo_url || '',
+                isOnline: u.is_online === true,
               }));
 
             setItems([...convoItems, ...userItems]);
@@ -112,20 +117,20 @@ export const ChatForwardOverlay: React.FC<ChatForwardOverlayProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[10000] flex flex-col bg-[var(--bg-card)] text-[var(--text-primary)]">
-        {/* Modern Synced App-Style Header Overlay */}
-        <div className="h-16 flex items-center px-4 bg-[var(--bg-card)] border-b border-[var(--border-color)]/20 shadow-sm gap-3 shrink-0">
+      <div className="fixed inset-0 z-[10000] flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)]">
+        {/* Modern Synced App-Style Header Overlay matching TabHeader */}
+        <div className="min-h-[56px] py-1.5 flex items-center px-4 bg-[var(--header-bg)] border-b border-[var(--border-color)]/35 shadow-sm gap-3 shrink-0 rounded-b-2xl">
           <button 
             type="button"
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-[var(--bg-main)] text-[var(--text-primary)] transition-colors cursor-pointer border-none bg-transparent"
+            className="w-11 h-11 flex items-center justify-center hover:bg-white/10 rounded-full text-[var(--header-text)] transition-all cursor-pointer border-none bg-transparent active:scale-95 duration-100 shrink-0"
           >
             <X size={22} className="stroke-[2.5]" />
           </button>
           
-          <div className="flex-1">
-            <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Forward message</h2>
-            <p className="text-[11px] font-semibold text-[var(--text-secondary)] tracking-wide">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[17px] font-black text-[var(--header-text)] leading-tight">Forward</h2>
+            <p className="text-[10px] font-black uppercase tracking-wider text-[var(--header-text)] opacity-75 mt-0.5 leading-none">
               {selectedIds.length === 0 ? 'Select contacts' : `${selectedIds.length} contact${selectedIds.length > 1 ? 's' : ''} selected`}
             </p>
           </div>
@@ -140,7 +145,7 @@ export const ChatForwardOverlay: React.FC<ChatForwardOverlayProps> = ({
               placeholder="Search chats or users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)]/50 outline-none w-full border-none"
+              className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)]/50 outline-none w-full border-none font-medium"
             />
             {searchTerm && (
               <button 
@@ -155,7 +160,7 @@ export const ChatForwardOverlay: React.FC<ChatForwardOverlayProps> = ({
         </div>
 
         {/* Contacts scrolling lists */}
-        <div className="flex-1 overflow-y-auto p-2.5 space-y-1 bg-[var(--bg-card)]">
+        <div className="flex-1 overflow-y-auto bg-[var(--bg-card)]">
           {loading && items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <Loader2 className="w-7 h-7 animate-spin text-[#0494f4]" />
@@ -173,43 +178,44 @@ export const ChatForwardOverlay: React.FC<ChatForwardOverlayProps> = ({
                   type="button"
                   key={item.id}
                   onClick={() => toggleSelect(item.id)}
-                  className={`w-full flex items-center px-3.5 py-3 rounded-2xl transition-all duration-150 gap-3 text-left border-none cursor-pointer bg-transparent ${
+                  className={`w-full flex items-center px-3 py-2.5 transition-all duration-205 gap-3 text-left border-none cursor-pointer border-b border-[var(--border-color)]/5 last:border-b-0 border-l-[4px] select-none ${
                     isSelected 
-                      ? 'bg-[var(--bg-main)]/80 shadow-sm border border-[#0494f4]/20' 
-                      : 'hover:bg-[var(--bg-main)]/40 active:bg-[var(--bg-main)] border border-transparent'
+                      ? 'bg-[var(--primary)]/24 border-l-[var(--primary)]' 
+                      : 'bg-transparent hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 border-l-transparent'
                   }`}
                 >
-                  {/* Rounded avatar element */}
-                  <div className="relative w-11 h-11 rounded-2xl overflow-hidden bg-[var(--bg-main)] flex items-center justify-center border border-[var(--border-color)]/25 shadow-sm shrink-0">
-                    {item.photoURL ? (
-                      <img 
-                        src={item.photoURL} 
-                        alt={item.name} 
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover" 
-                      />
-                    ) : (
-                      <User className="text-[var(--text-secondary)]/80" size={20} />
+                  {/* Rounded avatar element with check overlay */}
+                  <div className="relative shrink-0">
+                    <Avatar 
+                      url={item.photoURL} 
+                      type={item.isGroup ? 'group' : 'direct'} 
+                      name={item.name} 
+                      isOnline={item.isOnline}
+                    />
+                    {isSelected && (
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[var(--primary)] border-2 border-[var(--bg-card)] flex items-center justify-center shadow-md z-20 animate-scale-in">
+                        <svg 
+                          className="w-3 h-3 text-white" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          strokeWidth="4" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
                     )}
                   </div>
-
+ 
                   {/* Profile Metadata */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-[var(--text-primary)] truncate">{item.name}</p>
-                    <p className="text-xs font-medium text-[var(--text-secondary)]/80 truncate mt-0.5">
-                      {item.isConversation ? 'Active chat session' : `@${item.username || 'user'}`}
+                    <p className="text-[14.5px] font-semibold text-[var(--text-primary)] truncate">{item.name}</p>
+                    <p className="text-[11.5px] font-medium text-[var(--text-secondary)]/70 truncate mt-0.5">
+                      {item.isGroup 
+                        ? 'Group Chat' 
+                        : (item.username && item.username !== 'group' ? `@${item.username}` : 'Active Chat Session')
+                      }
                     </p>
-                  </div>
-
-                  {/* Synchronized Select Indicator with Theme Accent Blue `#0494f4` */}
-                  <div className="shrink-0 ml-1">
-                    {isSelected ? (
-                      <div className="w-5 h-5 rounded-full bg-[#0494f4] flex items-center justify-center text-white shadow-[0_0_6px_rgba(4,148,244,0.3)] animate-scaleIn">
-                        <CheckCircle2 size={13} className="stroke-[3]" />
-                      </div>
-                    ) : (
-                      <div className="w-5 h-5 rounded-full border-2 border-[var(--border-color)]/50 transition-colors" />
-                    )}
                   </div>
                 </button>
               );

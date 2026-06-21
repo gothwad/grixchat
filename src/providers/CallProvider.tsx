@@ -152,6 +152,8 @@ interface CallContextType {
   flipCamera: () => Promise<void>;
   playOutgoingBeep: () => void;
   stopSounds: () => void;
+  room: Room | null;
+  isSandboxSimulated: boolean;
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined);
@@ -174,6 +176,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [speakerState, setSpeakerState] = useState(2); // 0=muted, 1=earpiece, 2=loudspeaker
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [room, setRoom] = useState<Room | null>(null);
+  const [isSandboxSimulated, setIsSandboxSimulated] = useState<boolean>(true);
 
   // LiveKit internal refs
   const roomRef = useRef<Room | null>(null);
@@ -285,6 +289,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       roomRef.current = null;
     }
+    setRoom(null);
+    setIsSandboxSimulated(true);
 
     // 2. Tear down streams
     if (localStreamRef.current) {
@@ -448,13 +454,28 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log(`[Calling] Fetching secure token from backend for room_id: ${roomName}...`);
       
-      const res = await fetch("/api/livekit-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roomName, participantIdentity })
-      });
+      let payload = { success: false, token: "mock-livekit-token-sandbox", error: "" };
       
-      const payload = await res.json();
+      try {
+        const res = await fetch("/api/livekit-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ roomName, participantIdentity })
+        });
+        
+        if (res.ok) {
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            payload = await res.json();
+          } else {
+            console.warn("[Calling] Received non-JSON response from backend. Defaulting to sandbox mode.");
+          }
+        } else {
+          console.warn(`[Calling] Backend token generation returned status ${res.status}. Defaulting to sandbox mode.`);
+        }
+      } catch (fetchErr) {
+        console.warn("[Calling] Failed to communicate with livekit-token API or parse JSON. Defaulting to sandbox mode:", fetchErr);
+      }
       
       // Fallback or explicit cloud address
       const livekitUrl = import.meta.env.VITE_LIVEKIT_URL;
@@ -462,9 +483,10 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let token = payload.token;
       
       // Check if we are running in simulator/sandbox without active LiveKit credentials.
-      const isSandboxSimulated = !payload.success || !livekitUrl || token === "mock-livekit-token-sandbox";
+      const isSandboxSimulatedVal = !payload.success || !livekitUrl || token === "mock-livekit-token-sandbox";
+      setIsSandboxSimulated(isSandboxSimulatedVal);
 
-      if (isSandboxSimulated) {
+      if (isSandboxSimulatedVal) {
         console.warn(`[Grix Peer Simulator] Running high-fidelity local peer calling simulator for sandboxed/demo preview.`);
         
         // Try to capture user's real camera & microphone so they see themselves live
@@ -500,17 +522,20 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error(payload.error || "Failed to generate LiveKit endpoint credentials.");
       }
 
+      setIsSandboxSimulated(false);
+
       // Establish Room Client
-      const room = new Room({
+      const roomInstance = new Room({
         adaptiveStream: true,
         dynacast: true,
       });
 
-      roomRef.current = room;
+      roomRef.current = roomInstance;
+      setRoom(roomInstance);
 
-      room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      roomInstance.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
         console.log(`[LiveKit] Remote track subscribed: ${track.kind}`);
-        updateRemoteStreamFromRoom(room);
+        updateRemoteStreamFromRoom(roomInstance);
         setActiveCall(prev => {
           if (prev && prev.status !== 'connected') {
             return { ...prev, status: 'connected' };
@@ -519,22 +544,22 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       });
 
-      room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+      roomInstance.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
         console.log(`[LiveKit] Remote track unsubscribed: ${track.kind}`);
-        updateRemoteStreamFromRoom(room);
+        updateRemoteStreamFromRoom(roomInstance);
       });
 
-      room.on(RoomEvent.LocalTrackPublished, (publication, participant) => {
+      roomInstance.on(RoomEvent.LocalTrackPublished, (publication, participant) => {
         console.log(`[LiveKit] Local track published: ${publication.track?.kind}`);
-        updateLocalStreamFromRoom(room);
+        updateLocalStreamFromRoom(roomInstance);
       });
 
-      room.on(RoomEvent.LocalTrackUnpublished, (publication, participant) => {
+      roomInstance.on(RoomEvent.LocalTrackUnpublished, (publication, participant) => {
         console.log(`[LiveKit] Local track unpublished: ${publication.track?.kind}`);
-        updateLocalStreamFromRoom(room);
+        updateLocalStreamFromRoom(roomInstance);
       });
 
-      room.on(RoomEvent.ParticipantConnected, (p) => {
+      roomInstance.on(RoomEvent.ParticipantConnected, (p) => {
         console.log(`[LiveKit] Peer Participant online:`, p.identity);
         setActiveCall(prev => {
           if (prev && prev.status !== 'connected') {
@@ -544,29 +569,29 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       });
 
-      room.on(RoomEvent.ParticipantDisconnected, (p) => {
+      roomInstance.on(RoomEvent.ParticipantDisconnected, (p) => {
         console.log(`[LiveKit] Peer Participant offline:`, p.identity);
         endCall();
       });
 
-      room.on(RoomEvent.Disconnected, () => {
+      roomInstance.on(RoomEvent.Disconnected, () => {
         console.log(`[LiveKit] Room disconnected`);
         handleEndCallLocally();
       });
 
       // Joint connection Handshake
-      await room.connect(livekitUrl, token);
+      await roomInstance.connect(livekitUrl, token);
       console.log(`[LiveKit] Connected to SFU gateway seamlessly.`);
 
       // Enable devices dynamically
       if (callType === 'video') {
-        await room.localParticipant.setCameraEnabled(true);
-        await room.localParticipant.setMicrophoneEnabled(true);
+        await roomInstance.localParticipant.setCameraEnabled(true);
+        await roomInstance.localParticipant.setMicrophoneEnabled(true);
       } else {
-        await room.localParticipant.setMicrophoneEnabled(true);
+        await roomInstance.localParticipant.setMicrophoneEnabled(true);
       }
 
-      updateLocalStreamFromRoom(room);
+      updateLocalStreamFromRoom(roomInstance);
 
     } catch (error: any) {
       console.error("[LiveKit Initialization Error]", error);
@@ -879,7 +904,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toggleScreenShare, 
       flipCamera, 
       playOutgoingBeep, 
-      stopSounds 
+      stopSounds,
+      room,
+      isSandboxSimulated
     }}>
       {children}
       

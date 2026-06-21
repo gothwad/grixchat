@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, SendHorizontal, Loader2, Mic, MicOff, StopCircle, Trash2, Camera as CameraIcon, Paperclip, Image as ImageIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import ChatAttachmentMenu from '../chat-ui/ChatAttachmentMenu';
+import PollBuilderModal from '../chat-ui/PollBuilderModal';
+import LocationSelectModal from '../chat-ui/LocationSelectModal';
 import { 
   ChatMessageMenu, 
   ChatEditPreview, 
@@ -50,6 +53,8 @@ interface ChatBottomProps {
   onForwardClick?: (msg: any) => void;
   onSelectClick?: (msg: any) => void;
   onPinClick?: (msg: any) => void;
+  onSendLocation?: (location: { latitude: number; longitude: number; name: string }) => void;
+  onSendPoll?: (poll: { question: string; options: string[]; multiple: boolean }) => void;
 }
 
 export default function ChatBottom({
@@ -90,13 +95,20 @@ export default function ChatBottom({
   placeholder = "Message",
   onForwardClick,
   onSelectClick,
-  onPinClick
+  onPinClick,
+  onSendLocation,
+  onSendPoll
 }: ChatBottomProps) {
   const navigate = useNavigate();
   const { resolvedTheme } = useTheme();
   const [showCameraModal, setShowCameraModal] = useState(false);
   const fallbackImageInputRef = useRef<HTMLInputElement>(null);
   const actualImageInputRef = imageInputRef || fallbackImageInputRef;
+
+  const [showAttachmentDropdown, setShowAttachmentDropdown] = useState(false);
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const attachmentButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const handleCameraCapture = (file: File, captionText: string) => {
     setSelectedFiles([...selectedFiles, file]);
@@ -395,12 +407,13 @@ export default function ChatBottom({
                     multiple
                   />
                   <button 
-                    onClick={() => fileInputRef.current?.click()}
+                    ref={attachmentButtonRef}
+                    onClick={() => setShowAttachmentDropdown(!showAttachmentDropdown)}
                     className={`p-2 transition-colors flex items-center justify-center rounded-full ${
                       isDark 
                         ? 'text-[#a0aab8] hover:text-white hover:bg-white/5' 
                         : 'text-[#64748b] hover:text-black hover:bg-black/5'
-                    }`}
+                    } ${showAttachmentDropdown ? 'bg-[var(--primary)]/15 text-[var(--primary)]' : ''}`}
                     title="Attach"
                   >
                     <Paperclip size={22} className="-rotate-45" />
@@ -440,6 +453,32 @@ export default function ChatBottom({
           )}
         </button>
       </div>
+
+      <ChatAttachmentMenu
+        isOpen={showAttachmentDropdown}
+        onClose={() => setShowAttachmentDropdown(false)}
+        onSelectPhotoVideo={() => actualImageInputRef.current?.click()}
+        onSelectFile={() => fileInputRef.current?.click()}
+        onSelectLocation={() => setShowLocationModal(true)}
+        onSelectPoll={() => setShowPollModal(true)}
+        buttonRef={attachmentButtonRef}
+      />
+
+      {onSendPoll && (
+        <PollBuilderModal
+          isOpen={showPollModal}
+          onClose={() => setShowPollModal(false)}
+          onCreate={onSendPoll}
+        />
+      )}
+
+      {onSendLocation && (
+        <LocationSelectModal
+          isOpen={showLocationModal}
+          onClose={() => setShowLocationModal(false)}
+          onSend={onSendLocation}
+        />
+      )}
     </div>
   );
 }

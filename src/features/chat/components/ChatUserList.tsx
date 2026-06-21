@@ -8,6 +8,7 @@ import { aiService } from '../../../services/AIService';
 import { useLayout } from '../../../contexts/LayoutContext';
 import Avatar from '../../../components/common/Avatar';
 import { storage } from '../../../services/StorageService';
+import { LocalDataCache } from '../../../services/LocalDataCache';
 
 interface ChatItem {
   id: string;
@@ -56,6 +57,36 @@ const ChatItemRow: React.FC<{
   const startYRef = React.useRef<number>(0);
   const isLongPressActiveRef = React.useRef<boolean>(false);
   const [isTyping, setIsTyping] = React.useState(false);
+  const [draft, setDraft] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    if (!chat.otherUserId) return;
+    setDraft(LocalDataCache.get<any>(`draft_${chat.otherUserId}`));
+    
+    return LocalDataCache.subscribe(`draft_status_${chat.otherUserId}`, (payload) => {
+      setDraft(payload);
+    });
+  }, [chat.otherUserId]);
+
+  const { isDraft, displayLastMsg } = React.useMemo(() => {
+    if (draft && (draft.text?.trim() || (draft.files && draft.files.length > 0))) {
+      let msg = '';
+      if (draft.text?.trim()) {
+        msg = draft.text;
+      } else if (draft.files && draft.files.length > 0) {
+        const firstFile = draft.files[0];
+        if (firstFile.type?.startsWith('image/')) {
+          msg = '🖼️ Photo';
+        } else if (firstFile.type?.startsWith('video/')) {
+          msg = '🎥 Video';
+        } else {
+          msg = '📁 Attachment';
+        }
+      }
+      return { isDraft: true, displayLastMsg: msg };
+    }
+    return { isDraft: false, displayLastMsg: chat.lastMsg };
+  }, [draft, chat.lastMsg]);
 
   React.useEffect(() => {
     if (!supabase || !chat.id || !chat.otherUserId) return;
@@ -188,7 +219,14 @@ const ChatItemRow: React.FC<{
               </span>
             ) : (
               <p className={`text-[13px] truncate flex-1 leading-snug p-0 m-0 ${chat.unread ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-secondary)] opacity-75'}`}>
-                {chat.lastMsg}
+                {isDraft ? (
+                  <>
+                    <span className="text-rose-500 dark:text-rose-400 font-bold mr-1">Draft:</span>
+                    <span className="text-[var(--text-primary)] dark:text-zinc-200">{displayLastMsg}</span>
+                  </>
+                ) : (
+                  chat.lastMsg
+                )}
               </p>
             )}
           </div>
@@ -432,9 +470,36 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
 
       {/* Grix AI */}
       {showGrixAI && (() => {
+        const [aiDraft, setAiDraft] = useState<any>(null);
+
+        useEffect(() => {
+          setAiDraft(LocalDataCache.get<any>('draft_grix-ai'));
+          return LocalDataCache.subscribe('draft_status_grix-ai', (payload) => {
+            setAiDraft(payload);
+          });
+        }, []);
+
         const aiMessages = aiService.getMessages();
         const lastAiMsg = aiMessages[aiMessages.length - 1];
-        const lastAiText = lastAiMsg ? lastAiMsg.text : "Ask me anything! I'm here to help.";
+        
+        let lastAiText = lastAiMsg ? lastAiMsg.text : "Ask me anything! I'm here to help.";
+        let isAiDraft = false;
+
+        if (aiDraft && (aiDraft.text?.trim() || (aiDraft.files && aiDraft.files.length > 0))) {
+          isAiDraft = true;
+          if (aiDraft.text?.trim()) {
+            lastAiText = aiDraft.text;
+          } else if (aiDraft.files && aiDraft.files.length > 0) {
+            const firstFile = aiDraft.files[0];
+            if (firstFile.type?.startsWith('image/')) {
+              lastAiText = '🖼️ Photo';
+            } else if (firstFile.type?.startsWith('video/')) {
+              lastAiText = '🎥 Video';
+            } else {
+              lastAiText = '📁 Attachment';
+            }
+          }
+        }
         
         let lastAiTime = "Online";
         if (lastAiMsg) {
@@ -472,7 +537,14 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
               </div>
               <div className="flex justify-between items-center">
                 <p className="text-[13px] truncate text-[var(--text-secondary)] font-medium opacity-75">
-                  {lastAiText}
+                  {isAiDraft ? (
+                    <>
+                      <span className="text-rose-500 dark:text-rose-400 font-bold mr-1">Draft:</span>
+                      <span className="text-[var(--text-primary)] dark:text-zinc-200">{lastAiText}</span>
+                    </>
+                  ) : (
+                    lastAiText
+                  )}
                 </p>
               </div>
             </div>

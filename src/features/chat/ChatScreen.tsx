@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
-import { X, Forward, Trash, Palette } from 'lucide-react';
+import { X, Forward, Trash, Palette, Check } from 'lucide-react';
 import { ChatForwardOverlay } from '../../components/chat-ui/ChatForwardOverlay';
 import { chatService } from './services/chatService';
 import { LocalDataCache } from '../../services/LocalDataCache';
@@ -125,6 +125,14 @@ export default function ChatScreen() {
   const [pinnedMsg, setPinnedMsg] = useState<any>(null);
   const [forwardTargetMsg, setForwardTargetMsg] = useState<any>(null);
   const [selectedMsgIds, setSelectedMsgIds] = useState<string[]>([]);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(prev => prev === msg ? null : prev);
+    }, 2200);
+  };
 
   // Search and date selection filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -275,6 +283,35 @@ export default function ChatScreen() {
     setForwardTargetMsg(null);
   };
 
+  const handleSendLocation = async (loc: { latitude: number; longitude: number; name: string }) => {
+    if (!user || !chatId) return;
+    try {
+      await performSendMessage({
+        text: JSON.stringify(loc),
+        customMediaType: 'location'
+      });
+    } catch (err) {
+      console.error('Error sending location:', err);
+    }
+  };
+
+  const handleSendPoll = async (poll: { question: string; options: string[]; multiple: boolean }) => {
+    if (!user || !chatId) return;
+    try {
+      const pollText = JSON.stringify({
+        question: poll.question,
+        options: poll.options.map((opt, i) => ({ id: String(i), text: opt, voters: [] })),
+        multiple: poll.multiple
+      });
+      await performSendMessage({
+        text: pollText,
+        customMediaType: 'poll'
+      });
+    } catch (err) {
+      console.error('Error sending poll:', err);
+    }
+  };
+
   useEffect(() => {
     if (location.state?.capturedImage) {
       const dataUrl = location.state.capturedImage;
@@ -360,57 +397,6 @@ export default function ChatScreen() {
 
   return (
     <div className="flex flex-col h-full w-full max-w-full bg-[var(--bg-main)] overflow-hidden relative">
-      {/* WhatsApp style selection bar overlay */}
-      {selectedMsgIds.length > 0 && (
-        <div className="absolute top-0 left-0 right-0 h-16 bg-[#1f2c34] flex items-center justify-between px-4 z-[95] shadow-md border-b border-zinc-800 animate-fade-in">
-          <div className="flex items-center gap-4">
-            <button 
-              type="button"
-              onClick={() => setSelectedMsgIds([])}
-              className="p-1 rounded-full text-zinc-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer border-none bg-transparent"
-            >
-              <X size={22} />
-            </button>
-            <span className="text-base font-bold text-white">{selectedMsgIds.length} Selected</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button 
-              type="button"
-              onClick={() => {
-                const combinedText = messages
-                  .filter(m => selectedMsgIds.includes(m.id))
-                  .map(m => m.content || m.text || '')
-                  .join('\n\n');
-                
-                setForwardTargetMsg({ id: 'bulk', content: combinedText });
-                setSelectedMsgIds([]);
-              }}
-              className="p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold border-none bg-transparent"
-            >
-              <Forward size={18} />
-              <span className="hidden sm:inline">Forward</span>
-            </button>
-
-            <button 
-              type="button"
-              onClick={async () => {
-                if (window.confirm(`Delete ${selectedMsgIds.length} selected messages for me?`)) {
-                  for (const id of selectedMsgIds) {
-                    await performDeleteMessage(id);
-                  }
-                  setSelectedMsgIds([]);
-                }
-              }}
-              className="p-2 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold border-none bg-transparent"
-            >
-              <Trash size={18} />
-              <span className="hidden sm:inline">Delete</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       <ChatHeader 
         receiver={{
           ...receiver,
@@ -441,6 +427,41 @@ export default function ChatScreen() {
         setSelectedDate={setSelectedDate}
         showSearch={showSearch}
         setShowSearch={setShowSearch}
+        selectedMsgCount={selectedMsgIds.length}
+        onClearMsgSelection={() => setSelectedMsgIds([])}
+        onForwardMsgSelection={() => {
+          const combinedText = messages
+            .filter(m => selectedMsgIds.includes(m.id))
+            .map(m => m.content || m.text || '')
+            .join('\n\n');
+          
+          setForwardTargetMsg({ id: 'bulk', content: combinedText });
+          setSelectedMsgIds([]);
+        }}
+        onDeleteMsgSelection={async () => {
+          if (window.confirm(`Delete ${selectedMsgIds.length} selected messages for me?`)) {
+            for (const id of selectedMsgIds) {
+              await performDeleteMessage(id);
+            }
+            setSelectedMsgIds([]);
+            showToast('Messages deleted successfully');
+          }
+        }}
+        onCopyMsgSelection={() => {
+          const combinedText = messages
+            .filter(m => selectedMsgIds.includes(m.id))
+            .map(m => m.content || m.text || '')
+            .filter(Boolean)
+            .join('\n\n');
+          
+          if (combinedText) {
+            navigator.clipboard.writeText(combinedText);
+            showToast(`${selectedMsgIds.length} message${selectedMsgIds.length > 1 ? 's' : ''} copied`);
+          } else {
+            showToast('No copyable text content in selected messages');
+          }
+          setSelectedMsgIds([]);
+        }}
       />
 
       {/* Telegram native Android Style Pinned Message Banner */}
@@ -540,6 +561,8 @@ export default function ChatScreen() {
         onForwardClick={(msg) => { setForwardTargetMsg(msg); setActiveMessageMenu(null); }}
         onSelectClick={(msg) => { setSelectedMsgIds([msg.id]); setActiveMessageMenu(null); }}
         onPinClick={handlePinClick}
+        onSendLocation={handleSendLocation}
+        onSendPoll={handleSendPoll}
       />
 
       <ChatOptionsSheet 
@@ -682,6 +705,21 @@ export default function ChatScreen() {
         currentUserId={user?.id || ''}
         onForwardComplete={handleForwardComplete}
       />
+
+      {/* Toast Alert Indicator */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div 
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] bg-zinc-900/95 dark:bg-zinc-800/95 text-white text-xs font-semibold px-4.5 py-2.5 rounded-full shadow-lg flex items-center gap-2 border border-white/5 backdrop-blur-md"
+          >
+            <Check size={14} className="text-[var(--primary)]" />
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

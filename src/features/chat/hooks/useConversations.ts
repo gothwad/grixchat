@@ -230,7 +230,8 @@ export const useConversations = (activeFilter: string) => {
           .from('messages')
           .select('conversation_id, text, media_type, created_at, sender_id, deleted_by')
           .in('conversation_id', conversationIds)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(Math.max(50, conversationIds.length * 5));
 
         latestMsgs?.forEach((m: any) => {
           hasMessagesInDb.add(m.conversation_id);

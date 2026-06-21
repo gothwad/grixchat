@@ -14,19 +14,23 @@ export const useChatActions = (conversationId: string, receiverId: string) => {
     file,
     localPreviewUrl,
     replyTo,
-    onProgress
+    onProgress,
+    customMediaType
   }: {
     text: string;
     file?: File | Blob | null;
     localPreviewUrl?: string;
     replyTo?: any;
     onProgress?: (progress: number) => void;
+    customMediaType?: string;
   }) => {
     if (!user || !conversationId || !supabase) return;
 
     let mediaData: { url: string; type: string } | undefined;
 
-    if (file) {
+    if (customMediaType) {
+      mediaData = { url: '', type: customMediaType };
+    } else if (file) {
       const fileName = (file as File).name || (file.type.startsWith('audio/') ? 'voice_message.webm' : 'file');
       const fileType = file.type.startsWith('image/') ? 'image' : 
                        file.type.startsWith('video/') ? 'video' : 
