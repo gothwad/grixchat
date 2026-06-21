@@ -122,48 +122,60 @@ export function useChatFormHandler({
       return;
     }
 
+    // Save text portion synchronously RIGHT AWAY to guarantee no text loss ever!
+    const trimmedText = newMessage.trim();
+    const existing = LocalDataCache.get<any>(`draft_${receiverId}`);
+    
+    // Save immediate text state first (merging with existing files if they exist)
+    if (!trimmedText && selectedFiles.length === 0) {
+      if (existing) {
+        LocalDataCache.remove(`draft_${receiverId}`);
+        LocalDataCache.notify(`draft_status_${receiverId}`, null);
+      }
+    } else {
+      const tempDraft = {
+        text: newMessage,
+        files: existing?.files || [] // retain previously saved serialized files
+      };
+      LocalDataCache.set(`draft_${receiverId}`, tempDraft);
+      LocalDataCache.notify(`draft_status_${receiverId}`, tempDraft);
+    }
+
     let active = true;
 
-    const performSave = async () => {
-      // Convert current Files to serializable base64 strings
-      const filePromises = selectedFiles.map(async (file) => {
-        try {
-          const b64 = await fileToBase64(file);
-          return {
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            base64: b64,
-          };
-        } catch (err) {
-          console.error("Error converting file to base64 for draft:", err);
-          return null;
-        }
-      });
+    // File base64 serialization handles asynchronously
+    if (selectedFiles.length > 0) {
+      const performSaveFiles = async () => {
+        const filePromises = selectedFiles.map(async (file) => {
+          try {
+            const b64 = await fileToBase64(file);
+            return {
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              base64: b64,
+            };
+          } catch (err) {
+            console.error("Error converting file to base64 for draft:", err);
+            return null;
+          }
+        });
 
-      const resolvedFiles = (await Promise.all(filePromises)).filter(Boolean);
+        const resolvedFiles = (await Promise.all(filePromises)).filter(Boolean);
 
-      if (!active) return;
+        if (!active) return;
 
-      const trimmedText = newMessage.trim();
-      if (!trimmedText && resolvedFiles.length === 0) {
-        // Clear draft from storage if empty
-        const existing = LocalDataCache.get<any>(`draft_${receiverId}`);
-        if (existing) {
-          LocalDataCache.remove(`draft_${receiverId}`);
-          LocalDataCache.notify(`draft_status_${receiverId}`, null);
-        }
-      } else {
+        const currentDraft = LocalDataCache.get<any>(`draft_${receiverId}`) || { text: newMessage };
         const nextDraft = {
-          text: newMessage,
-          files: resolvedFiles,
+          ...currentDraft,
+          files: resolvedFiles
         };
         LocalDataCache.set(`draft_${receiverId}`, nextDraft);
         LocalDataCache.notify(`draft_status_${receiverId}`, nextDraft);
-      }
-    };
+      };
 
-    performSave();
+      performSaveFiles();
+    }
 
     return () => {
       active = false;

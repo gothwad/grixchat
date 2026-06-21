@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, Lock, Archive, Check, ArrowDownLeft, ArrowUpRight, Trash, VolumeX, Pin } from 'lucide-react';
+import { MessageCircle, Lock, Archive, Check, Trash, VolumeX, Pin } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../../../providers/AuthProvider.tsx';
 import { supabase } from '../../../lib/supabase';
@@ -231,22 +231,98 @@ const ChatItemRow: React.FC<{
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {chat.unread ? (
+            {chat.unread && (
               <div className="min-w-[18px] h-[18px] px-1.5 bg-[var(--primary)] rounded-full flex items-center justify-center shadow-sm">
                 <span className="text-[9.5px] text-white font-extrabold leading-none">
                   {chat.unreadCount && chat.unreadCount > 4 ? '4+' : chat.unreadCount}
                 </span>
               </div>
-            ) : (
-              chat.lastMsgStatus && (
-                chat.lastMsgStatus === 'Sent' ? (
-                  <ArrowUpRight size={15} strokeWidth={2.8} className="text-[#0494f4] shrink-0 opacity-70" />
-                ) : (
-                  <ArrowDownLeft size={15} strokeWidth={2.8} className="text-emerald-500 shrink-0 opacity-70" />
-                )
-              )
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const GrixAIRow: React.FC = () => {
+  const navigate = useNavigate();
+  const [aiDraft, setAiDraft] = useState<any>(null);
+
+  useEffect(() => {
+    setAiDraft(LocalDataCache.get<any>('draft_grix-ai'));
+    return LocalDataCache.subscribe('draft_status_grix-ai', (payload) => {
+      setAiDraft(payload);
+    });
+  }, []);
+
+  const aiMessages = aiService.getMessages();
+  const lastAiMsg = aiMessages[aiMessages.length - 1];
+  
+  let lastAiText = lastAiMsg ? lastAiMsg.text : "Ask me anything! I'm here to help.";
+  let isAiDraft = false;
+
+  if (aiDraft && (aiDraft.text?.trim() || (aiDraft.files && aiDraft.files.length > 0))) {
+    isAiDraft = true;
+    if (aiDraft.text?.trim()) {
+      lastAiText = aiDraft.text;
+    } else if (aiDraft.files && aiDraft.files.length > 0) {
+      const firstFile = aiDraft.files[0];
+      if (firstFile.type?.startsWith('image/')) {
+        lastAiText = '🖼️ Photo';
+      } else if (firstFile.type?.startsWith('video/')) {
+        lastAiText = '🎥 Video';
+      } else {
+        lastAiText = '📁 Attachment';
+      }
+    }
+  }
+  
+  let lastAiTime = "Online";
+  if (lastAiMsg) {
+    const msgDate = new Date(lastAiMsg.timestamp);
+    const now = new Date();
+    if (msgDate.toDateString() === now.toDateString()) {
+      lastAiTime = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else {
+      lastAiTime = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+  }
+
+  return (
+    <div 
+      onClick={() => navigate('/chat/grix-ai')}
+      className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 border-b border-[var(--border-color)]/5 group cursor-pointer border-l-[4px] border-l-transparent select-none"
+    >
+      <div 
+        className="relative shrink-0"
+        onClick={(e) => {
+          e.stopPropagation();
+          navigate('/profile/grix-ai');
+        }}
+      >
+        <Avatar url="/assets/favicon.png" type="direct" name="Grix AI" isOnline={true} />
+      </div>
+      <div className="flex-1 min-w-0 flex flex-col justify-center">
+        <div className="flex justify-between items-baseline mb-0.5">
+          <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
+            Grix AI
+          </h3>
+          <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] opacity-60">
+            {lastAiTime}
+          </span>
+        </div>
+        <div className="flex justify-between items-center">
+          <p className="text-[13px] truncate text-[var(--text-secondary)] font-medium opacity-75">
+            {isAiDraft ? (
+              <>
+                <span className="text-rose-500 dark:text-rose-400 font-bold mr-1">Draft:</span>
+                <span className="text-[var(--text-primary)] dark:text-zinc-200">{lastAiText}</span>
+              </>
+            ) : (
+              lastAiText
+            )}
+          </p>
         </div>
       </div>
     </div>
@@ -469,88 +545,7 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({
       )}
 
       {/* Grix AI */}
-      {showGrixAI && (() => {
-        const [aiDraft, setAiDraft] = useState<any>(null);
-
-        useEffect(() => {
-          setAiDraft(LocalDataCache.get<any>('draft_grix-ai'));
-          return LocalDataCache.subscribe('draft_status_grix-ai', (payload) => {
-            setAiDraft(payload);
-          });
-        }, []);
-
-        const aiMessages = aiService.getMessages();
-        const lastAiMsg = aiMessages[aiMessages.length - 1];
-        
-        let lastAiText = lastAiMsg ? lastAiMsg.text : "Ask me anything! I'm here to help.";
-        let isAiDraft = false;
-
-        if (aiDraft && (aiDraft.text?.trim() || (aiDraft.files && aiDraft.files.length > 0))) {
-          isAiDraft = true;
-          if (aiDraft.text?.trim()) {
-            lastAiText = aiDraft.text;
-          } else if (aiDraft.files && aiDraft.files.length > 0) {
-            const firstFile = aiDraft.files[0];
-            if (firstFile.type?.startsWith('image/')) {
-              lastAiText = '🖼️ Photo';
-            } else if (firstFile.type?.startsWith('video/')) {
-              lastAiText = '🎥 Video';
-            } else {
-              lastAiText = '📁 Attachment';
-            }
-          }
-        }
-        
-        let lastAiTime = "Online";
-        if (lastAiMsg) {
-          const msgDate = new Date(lastAiMsg.timestamp);
-          const now = new Date();
-          if (msgDate.toDateString() === now.toDateString()) {
-            lastAiTime = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          } else {
-            lastAiTime = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
-          }
-        }
-
-        return (
-          <div 
-            onClick={() => navigate('/chat/grix-ai')}
-            className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 border-b border-[var(--border-color)]/5 group cursor-pointer border-l-[4px] border-l-transparent select-none"
-          >
-            <div 
-              className="relative shrink-0"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate('/profile/grix-ai');
-              }}
-            >
-              <Avatar url="/assets/favicon.png" type="direct" name="Grix AI" isOnline={true} />
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center">
-              <div className="flex justify-between items-baseline mb-0.5">
-                <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
-                  Grix AI
-                </h3>
-                <span className="text-[10px] whitespace-nowrap text-[var(--text-secondary)] opacity-60">
-                  {lastAiTime}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <p className="text-[13px] truncate text-[var(--text-secondary)] font-medium opacity-75">
-                  {isAiDraft ? (
-                    <>
-                      <span className="text-rose-500 dark:text-rose-400 font-bold mr-1">Draft:</span>
-                      <span className="text-[var(--text-primary)] dark:text-zinc-200">{lastAiText}</span>
-                    </>
-                  ) : (
-                    lastAiText
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {showGrixAI && <GrixAIRow />}
 
       {/* Archived Chats Pinned Shortcut */}
       {showGrixAI && (

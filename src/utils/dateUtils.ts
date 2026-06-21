@@ -1,4 +1,6 @@
 
+import { formatDetailedLastSeen } from './lastSeenFormatter';
+
 /**
  * Safely converts a potential Firestore timestamp (or other date formats) to a JavaScript Date object.
  * Handles Firestore Timestamp objects, plain objects with seconds/nanoseconds, 
@@ -56,22 +58,12 @@ export function formatTime(timestamp: any): string {
  * Formats a timestamp into a human-readable last seen string.
  */
 export function formatLastSeen(timestamp: any): string {
-  const date = toDate(timestamp);
-  if (!date) return '';
+  const formatted = formatDetailedLastSeen(timestamp);
+  if (formatted === 'OnlineNow') return 'Online';
   
-  const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday = date.toDateString() === yesterday.toDateString();
-
-  if (isToday) {
-    return `last seen at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}`;
-  } else if (isYesterday) {
-    return 'last seen at Yesterday';
-  } else {
-    const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
-    const formattedDate = date.toLocaleDateString('en-GB', options); // e.g., "1 Oct 2024"
-    return `last seen at ${formattedDate}`;
+  // Clean up prefix format for consistency with ChatHeader expects style
+  if (formatted.toLowerCase().startsWith('active')) {
+    return formatted.replace(/^active\s+/i, 'last seen ');
   }
+  return formatted;
 }

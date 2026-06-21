@@ -10,7 +10,9 @@ import {
   Compass,
   HelpCircle,
   CheckCircle2,
-  Circle
+  Circle,
+  ClipboardList,
+  Calendar
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../providers/AuthProvider.tsx';
@@ -262,6 +264,39 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
   };
 
+  const handleToggleTask = async () => {
+    if (!user || isMsgDeleted || !supabase) return;
+    try {
+      const task = JSON.parse(cleanRawText);
+      const updatedStatus = task.status === 'completed' ? 'pending' : 'completed';
+      const updatedTask = { ...task, status: updatedStatus };
+      const updatedText = JSON.stringify(updatedTask);
+
+      // 1. Optimistic Cache Update
+      const conversationId = msg.conversation_id;
+      if (conversationId) {
+        const cached = LocalDataCache.getMessages(conversationId) || [];
+        const nextMsgs = cached.map((m: any) => {
+          if (m.id === msg.id) {
+            return { ...m, text: updatedText, content: updatedText };
+          }
+          return m;
+        });
+        LocalDataCache.saveMessages(conversationId, nextMsgs);
+        LocalDataCache.notify(`messages:${conversationId}`, nextMsgs);
+      }
+
+      // 2. Database persistent write
+      await supabase
+        .from('messages')
+        .update({ text: updatedText })
+        .eq('id', msg.id);
+
+    } catch (err) {
+      console.error("Failed to toggle task:", err);
+    }
+  };
+
   let renderedContent: any = cleanRawText;
   if (isGrixAiMessage) {
     renderedContent = cleanRawText.replace(/^🤖 Grix AI:\s*/i, '');
@@ -392,6 +427,74 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       );
     } catch (err) {
       console.warn("Could not parse poll JSON:", err);
+    }
+  }
+
+  // Render interactive task widget beautifully
+  if (mediaType === 'task' && !isMsgDeleted) {
+    try {
+      const task = JSON.parse(cleanRawText);
+      const isCompleted = task.status === 'completed';
+
+      renderedContent = (
+        <div 
+          className="flex flex-col gap-2 min-w-[230px] max-w-[280px] p-3 bg-black/15 dark:bg-black/25 rounded-2xl border border-white/5 text-zinc-200 select-none cursor-default"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleToggleTask();
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-start gap-2">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 border ${
+              isCompleted 
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15' 
+                : 'bg-pink-500/10 text-pink-400 border-pink-500/15'
+            }`}>
+              <ClipboardList size={15} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className={`text-[13px] font-black leading-snug transition-all ${
+                isCompleted ? 'line-through text-zinc-500' : 'text-zinc-100'
+              }`}>
+                {task.title}
+              </p>
+              {task.description && (
+                <p className="text-[11px] font-medium text-zinc-400 mt-1 line-clamp-2">
+                  {task.description}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Details Row */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-1 pt-2 border-t border-white/5">
+            {task.assignee && (
+              <div className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg text-[10px] font-bold text-zinc-300">
+                <span className="text-zinc-500 font-medium">For:</span>
+                <span className="text-zinc-100 truncate max-w-[80px]">{task.assignee}</span>
+              </div>
+            )}
+            
+            {task.dueDate && (
+              <div className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg text-[10px] font-bold text-zinc-300">
+                <Calendar size={10} className="text-zinc-500" />
+                <span className="text-zinc-100">{task.dueDate}</span>
+              </div>
+            )}
+
+            <div className={`ml-auto flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-wider ${
+              isCompleted 
+                ? 'bg-emerald-500/15 text-emerald-400' 
+                : 'bg-pink-500/15 text-pink-400'
+            }`}>
+              {isCompleted ? 'Completed' : 'Pending'}
+            </div>
+          </div>
+        </div>
+      );
+    } catch (err) {
+      console.warn("Could not parse task JSON:", err);
     }
   }
 

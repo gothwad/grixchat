@@ -52,6 +52,7 @@ interface ChatHeaderProps {
   onForwardMsgSelection?: () => void;
   onDeleteMsgSelection?: () => void;
   onCopyMsgSelection?: () => void;
+  onSelectChatTime?: () => void;
 }
 
 export default function ChatHeader({
@@ -86,7 +87,8 @@ export default function ChatHeader({
   onClearMsgSelection,
   onForwardMsgSelection,
   onDeleteMsgSelection,
-  onCopyMsgSelection
+  onCopyMsgSelection,
+  onSelectChatTime
 }: ChatHeaderProps) {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -371,6 +373,7 @@ export default function ChatHeader({
                     triggerSearch={() => {
                       if (setShowSearch) setShowSearch(true);
                     }}
+                    onSelectChatTime={onSelectChatTime}
                   />
                 )}
               </AnimatePresence>

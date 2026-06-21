@@ -13,7 +13,8 @@ import {
   Eraser, 
   Search,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -34,6 +35,7 @@ interface ChatHeaderDropdownProps {
   clearChat?: () => Promise<void>;
   startCall: (callType: 'voice' | 'video') => void;
   triggerSearch: () => void;
+  onSelectChatTime?: () => void;
 }
 
 export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
@@ -51,7 +53,8 @@ export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
   deleteChat,
   clearChat,
   startCall,
-  triggerSearch
+  triggerSearch,
+  onSelectChatTime
 }) => {
   const navigate = useNavigate();
   const [page, setPage] = useState<1 | 2>(1);
@@ -162,6 +165,21 @@ export const ChatHeaderDropdown: React.FC<ChatHeaderDropdownProps> = ({
                     <span>Video Call</span>
                   </button>
                 </>
+              )}
+
+              {/* Chat Time */}
+              {receiverId !== 'gx-ai' && receiverId !== 'grix-ai' && !isGroup && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    if (onSelectChatTime) onSelectChatTime();
+                  }}
+                  className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[#0494f4] hover:bg-[#0494f4]/10 active:bg-[#0494f4]/25 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent animate-fade-in"
+                >
+                  <Clock size={16} className="text-[#0494f4]" />
+                  <span>Chat Time</span>
+                </button>
               )}
 
               {/* Delete Chat */}

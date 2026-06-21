@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, HelpCircle } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface PollBuilderModalProps {
@@ -50,98 +50,106 @@ export default function PollBuilderModal({ isOpen, onClose, onCreate }: PollBuil
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
-        {/* Backdrop */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 bg-black/60 backdrop-blur-md"
-        />
-
-        {/* Modal body */}
-        <motion.div
-          initial={{ scale: 0.95, opacity: 0, y: 15 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.95, opacity: 0, y: 15 }}
-          className="relative bg-[#1e2022] dark:bg-[#1a1b1d] border border-white/10 rounded-3xl shadow-2xl p-6 w-full max-w-md text-white overflow-hidden z-10"
-        >
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                <HelpCircle size={18} />
-              </div>
-              <h3 className="text-lg font-black tracking-wide text-zinc-100">Create Poll</h3>
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 30 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 280 }}
+        className="fixed inset-0 z-[500] bg-[#1a1b1d] dark:bg-[#121314] flex flex-col w-full h-[100dvh] text-white overflow-hidden pb-[safe]"
+      >
+        {/* Fullscreen Header */}
+        <div className="h-14 shrink-0 flex items-center justify-between px-4 border-b border-white/5 bg-[#202225] dark:bg-[#17181a]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 hover:bg-white/5 rounded-full text-zinc-300 active:scale-95 transition-all border-none bg-transparent cursor-pointer flex items-center gap-1.5"
+          >
+            <ChevronLeft size={22} />
+            <span className="text-sm font-semibold">Back</span>
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center">
+              <HelpCircle size={14} />
             </div>
-            <button 
-              onClick={onClose}
-              className="p-1.5 hover:bg-white/10 rounded-full text-zinc-400 transition-colors border-none bg-transparent cursor-pointer"
-            >
-              <X size={20} />
-            </button>
+            <span className="text-[14px] font-black tracking-wider uppercase text-zinc-200">New Poll Workspace</span>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-black text-zinc-400 uppercase tracking-widest mb-1.5 pl-1">
-                Question
+          {/* Dummy element for symmetry */}
+          <div className="w-16" />
+        </div>
+
+        {/* Scrollable Workspace Container */}
+        <div className="flex-1 overflow-y-auto px-6 py-8">
+          <form onSubmit={handleSubmit} className="max-w-md mx-auto w-full space-y-6">
+            
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest pl-1">
+                Poll Question
               </label>
               <input
                 type="text"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Ask a question..."
+                placeholder="What would you like to ask?"
                 required
                 maxLength={100}
-                className="w-full px-4 py-3 bg-zinc-900/60 border border-white/5 focus:border-[var(--primary)] text-[15px] font-bold rounded-2xl focus:outline-none transition-colors placeholder:text-zinc-500 text-white"
+                className="w-full px-4 py-3.5 bg-zinc-900/60 border border-white/10 focus:border-[#0494f4] focus:ring-1 focus:ring-[#0494f4] text-[15px] font-black rounded-2xl focus:outline-none transition-colors placeholder:text-zinc-650 text-white"
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-xs font-black text-zinc-400 uppercase tracking-widest pl-1">
-                Options ({options.length}/5)
-              </label>
-              {options.map((option, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={option}
-                    onChange={(e) => handleOptionChange(index, e.target.value)}
-                    placeholder={`Option ${index + 1}`}
-                    required
-                    maxLength={50}
-                    className="flex-1 px-4 py-2.5 bg-zinc-900/40 border border-white/5 focus:border-[var(--primary)] text-sm rounded-xl focus:outline-none transition-colors placeholder:text-zinc-600 text-white"
-                  />
-                  {options.length > 2 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveOption(index)}
-                      className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors border-none bg-transparent cursor-pointer shrink-0"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </div>
-              ))}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pl-1">
+                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                  Choices ({options.length} / 5 max)
+                </label>
+              </div>
+              
+              <div className="space-y-2.5">
+                {options.map((option, index) => (
+                  <div key={index} className="flex items-center gap-2.5">
+                    <div className="text-xs font-black text-zinc-500 w-5 text-center">
+                      {index + 1}
+                    </div>
+                    <input
+                      type="text"
+                      value={option}
+                      onChange={(e) => handleOptionChange(index, e.target.value)}
+                      placeholder={`Enter choice ${index + 1}`}
+                      required
+                      maxLength={50}
+                      className="flex-1 px-4 py-3 bg-zinc-900/40 border border-white/5 focus:border-[#0494f4] text-sm font-bold rounded-xl focus:outline-none transition-colors placeholder:text-zinc-600 text-white"
+                    />
+                    {options.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveOption(index)}
+                        className="p-2.5 text-zinc-400 hover:text-rose-450 hover:bg-rose-500/10 rounded-xl transition-all border-none bg-transparent cursor-pointer shrink-0 active:scale-90"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
 
               {options.length < 5 && (
                 <button
                   type="button"
                   onClick={handleAddOption}
-                  className="w-full py-2.5 bg-zinc-805/30 hover:bg-white/5 border border-dashed border-white/10 text-xs font-bold text-zinc-300 rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  className="w-full py-3 bg-zinc-900/20 hover:bg-zinc-900/40 border border-dashed border-white/10 text-xs font-bold text-zinc-300 rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer mt-2"
                 >
-                  <Plus size={14} />
-                  <span>Add Option</span>
+                  <Plus size={15} />
+                  <span>Add another poll choice</span>
                 </button>
               )}
             </div>
 
             {/* Checkbox settings */}
-            <div className="pt-2 flex items-center justify-between bg-zinc-900/20 p-3 rounded-2xl border border-white/5">
+            <div className="flex items-center justify-between bg-zinc-900/30 p-4 rounded-2xl border border-white/5">
               <div className="flex flex-col">
-                <span className="text-xs font-black text-zinc-300 tracking-wide">Multiple Choice</span>
-                <span className="text-[10px] text-zinc-500">Allow users to select multiple options</span>
+                <span className="text-xs font-black text-zinc-200 tracking-wide">Multiple Choice</span>
+                <span className="text-[10px] text-zinc-500 font-medium">Allows voters to choose multiple options</span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer select-none">
                 <input 
@@ -150,22 +158,22 @@ export default function PollBuilderModal({ isOpen, onClose, onCreate }: PollBuil
                   onChange={(e) => setMultiple(e.target.checked)} 
                   className="sr-only peer"
                 />
-                <div className="w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-200 after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--primary)]"></div>
+                <div className="w-10 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0494f4]"></div>
               </label>
             </div>
 
-            <div className="pt-3">
+            <div className="pt-4">
               <button
                 type="submit"
                 disabled={!question.trim() || options.filter(o => o.trim()).length < 2}
-                className="w-full py-3 bg-[#0494f4] hover:bg-[#0382d6] disabled:opacity-40 text-black font-black text-sm uppercase tracking-widest rounded-2xl transition-all shadow-md active:scale-98"
+                className="w-full py-4 bg-[#0494f4] hover:bg-[#0382d6] disabled:opacity-30 disabled:cursor-not-allowed text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg active:scale-98 flex items-center justify-center cursor-pointer"
               >
-                Post Poll
+                Launch Poll onto Chat
               </button>
             </div>
           </form>
-        </motion.div>
-      </div>
+        </div>
+      </motion.div>
     </AnimatePresence>
   );
 }

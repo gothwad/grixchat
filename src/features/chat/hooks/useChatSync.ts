@@ -2,23 +2,117 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../providers/AuthProvider.tsx';
 import { isUserOnline } from '../../../utils/presence';
+import { LocalDataCache } from '../../../services/LocalDataCache';
+
+function getInitialReceiverCached(receiverId: string | undefined, convType: 'direct' | 'group') {
+  if (!receiverId) return null;
+
+  const currentUserId = LocalDataCache.getCurrentUserId();
+
+  if (convType === 'direct') {
+    // 1. Try directly from universal profile cache
+    const userCached = LocalDataCache.get<any>(`user_prof_${receiverId}`);
+    if (userCached) {
+      return {
+        uid: userCached.id,
+        fullName: userCached.full_name,
+        username: userCached.username,
+        photoURL: userCached.photo_url,
+        isOnline: isUserOnline(userCached.is_online, userCached.last_seen),
+        lastSeen: userCached.last_seen
+      };
+    }
+
+    // 2. Try conversations cache
+    if (currentUserId) {
+      const cachedList = LocalDataCache.getConversations(currentUserId) || [];
+      const match = cachedList.find((c: any) => c.otherUserId === receiverId);
+      if (match) {
+        return {
+          uid: match.otherUserId,
+          fullName: match.fullName || match.user,
+          username: match.username || '',
+          photoURL: match.avatar,
+          isOnline: match.isOnline,
+          lastSeen: match.lastSeen || match.lastMsgAt
+        };
+      }
+    }
+  } else {
+    // Group conversation
+    if (currentUserId) {
+      const cachedList = LocalDataCache.getConversations(currentUserId) || [];
+      const match = cachedList.find((c: any) => c.id === receiverId);
+      if (match) {
+        return {
+          id: match.id,
+          name: match.fullName || match.user,
+          photo_url: match.avatar,
+          type: 'group'
+        };
+      }
+    }
+  }
+
+  // Fallback for special Grix AI bot immediately
+  if (receiverId === 'grix-ai' || receiverId === 'gx-ai') {
+    return {
+      uid: receiverId,
+      fullName: 'Grix AI',
+      username: 'grix_ai_bot',
+      photoURL: '/assets/favicon.png',
+      isOnline: true,
+      lastSeen: new Date().toISOString()
+    };
+  }
+
+  return null;
+}
 
 export function useChatSync(receiverId: string | undefined, chatId: string, convType: 'direct' | 'group') {
-  const [receiver, setReceiver] = useState<any>(null);
-  const [receiverStatus, setReceiverStatus] = useState<'online' | 'offline'>('offline');
+  const [receiver, setReceiver] = useState<any>(() => getInitialReceiverCached(receiverId, convType));
+  const [receiverStatus, setReceiverStatus] = useState<'online' | 'offline'>(() => {
+    const cached = getInitialReceiverCached(receiverId, convType);
+    return cached && cached.isOnline ? 'online' : 'offline';
+  });
   const [receiverActiveChatId, setReceiverActiveChatId] = useState<string | null>(null);
-  const [receiverLastSeen, setReceiverLastSeen] = useState<any>(null);
+  const [receiverLastSeen, setReceiverLastSeen] = useState<any>(() => {
+    const cached = getInitialReceiverCached(receiverId, convType);
+    return cached ? cached.lastSeen : null;
+  });
   const [chatSettings, setChatSettings] = useState<any>(null);
   const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [watchData, setWatchData] = useState<any>(null);
   const [isWatchMode, setIsWatchMode] = useState(false);
   const { user, userData: authUser } = useAuth();
 
+  const [prevReceiverId, setPrevReceiverId] = useState<string | undefined>(receiverId);
+
+  // Synchronously update state on receiverId / convType change to prevent ANY GrixChat User / offline flicker
+  if (receiverId !== prevReceiverId) {
+    setPrevReceiverId(receiverId);
+    const cached = getInitialReceiverCached(receiverId, convType);
+    setReceiver(cached);
+    setReceiverStatus(cached && cached.isOnline ? 'online' : 'offline');
+    setReceiverLastSeen(cached ? cached.lastSeen : null);
+  }
+
   useEffect(() => {
-    // Clear old states immediately on receiverId change to prevent visual bleed from the previous conversation
-    setReceiver(null);
-    setReceiverStatus('offline');
-    setReceiverLastSeen(null);
+    // Check if we can instantly find details from cache to prevent the "GrixChat User / Offline" flicker
+    let cachedInfo = getInitialReceiverCached(receiverId, convType);
+
+    if (cachedInfo) {
+      setReceiver(cachedInfo);
+      setReceiverStatus(cachedInfo.isOnline ? 'online' : 'offline');
+      if (cachedInfo.lastSeen) {
+        setReceiverLastSeen(cachedInfo.lastSeen);
+      }
+    } else {
+      // Clear old states immediately if no cache is found on receiverId change to prevent visual bleed from the previous conversation
+      setReceiver(null);
+      setReceiverStatus('offline');
+      setReceiverLastSeen(null);
+    }
 
     if (!receiverId || !supabase) return;
 
@@ -31,6 +125,16 @@ export function useChatSync(receiverId: string | undefined, chatId: string, conv
           .single();
         
         if (data) {
+          // Save or update user profile cache to keep it fast for subsequent loads
+          LocalDataCache.set(`user_prof_${receiverId}`, {
+            id: data.id,
+            username: data.username,
+            full_name: data.full_name,
+            photo_url: data.photo_url,
+            is_online: data.is_online,
+            last_seen: data.last_seen
+          });
+
           setReceiver({
             uid: data.id,
             fullName: data.full_name,
@@ -64,6 +168,16 @@ export function useChatSync(receiverId: string | undefined, chatId: string, conv
       }, (payload) => {
         const data = payload.new as any;
         if (convType === 'direct') {
+          // Keep local cache synced
+          LocalDataCache.set(`user_prof_${receiverId}`, {
+            id: data.id,
+            username: data.username,
+            full_name: data.full_name,
+            photo_url: data.photo_url,
+            is_online: data.is_online,
+            last_seen: data.last_seen
+          });
+
           setReceiverStatus(isUserOnline(data.is_online, data.last_seen) ? 'online' : 'offline');
           setReceiverLastSeen(data.last_seen);
           setReceiver(prev => ({ 
@@ -83,7 +197,7 @@ export function useChatSync(receiverId: string | undefined, chatId: string, conv
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [receiverId, convType]);
+  }, [receiverId, convType, user?.id]);
 
   // Periodically refresh the online status locally as time passes (heartbeat window check)
   useEffect(() => {

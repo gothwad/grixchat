@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import ChatAttachmentMenu from '../chat-ui/ChatAttachmentMenu';
 import PollBuilderModal from '../chat-ui/PollBuilderModal';
 import LocationSelectModal from '../chat-ui/LocationSelectModal';
+import TaskBuilderModal from '../chat-ui/TaskBuilderModal';
 import { 
   ChatMessageMenu, 
   ChatEditPreview, 
@@ -55,6 +56,9 @@ interface ChatBottomProps {
   onPinClick?: (msg: any) => void;
   onSendLocation?: (location: { latitude: number; longitude: number; name: string }) => void;
   onSendPoll?: (poll: { question: string; options: string[]; multiple: boolean }) => void;
+  onSendTask?: (task: { title: string; description: string; assignee: string; dueDate: string; status: 'pending' }) => void;
+  isLocked?: boolean;
+  lockMessage?: string;
 }
 
 export default function ChatBottom({
@@ -97,7 +101,10 @@ export default function ChatBottom({
   onSelectClick,
   onPinClick,
   onSendLocation,
-  onSendPoll
+  onSendPoll,
+  onSendTask,
+  isLocked = false,
+  lockMessage = ""
 }: ChatBottomProps) {
   const navigate = useNavigate();
   const { resolvedTheme } = useTheme();
@@ -108,6 +115,7 @@ export default function ChatBottom({
   const [showAttachmentDropdown, setShowAttachmentDropdown] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
   const attachmentButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const handleCameraCapture = (file: File, captionText: string) => {
@@ -336,89 +344,98 @@ export default function ChatBottom({
               </div>
             ) : (
               <>
-                <div className="flex items-center shrink-0 mb-1">
-                  <EmojiPickerMenu 
-                    showEmojiPicker={showEmojiPicker}
-                    setShowEmojiPicker={setShowEmojiPicker}
-                    emojiPickerRef={emojiPickerRef}
-                    onEmojiSelect={(emoji) => {
-                      setNewMessage(prev => prev + emoji);
-                      setShowEmojiPicker(false);
-                      textareaRef.current?.focus();
-                    }}
-                  />
-                </div>
+                {isLocked ? (
+                  <div className="flex-1 flex items-center justify-center py-2.5 px-4 font-bold text-xs sm:text-sm tracking-wide text-zinc-500 bg-black/10 dark:bg-black/35 rounded-2xl select-none text-center">
+                    <span className="mr-2">🔒</span>
+                    <span>{lockMessage || 'Locked till allowed chat time'}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center shrink-0 mb-1">
+                      <EmojiPickerMenu 
+                        showEmojiPicker={showEmojiPicker}
+                        setShowEmojiPicker={setShowEmojiPicker}
+                        emojiPickerRef={emojiPickerRef}
+                        onEmojiSelect={(emoji) => {
+                          setNewMessage(prev => prev + emoji);
+                          setShowEmojiPicker(false);
+                          textareaRef.current?.focus();
+                        }}
+                      />
+                    </div>
 
-                <textarea 
-                  ref={textareaRef}
-                  placeholder={placeholder}
-                  value={newMessage}
-                  onChange={(e) => {
-                    setNewMessage(e.target.value);
-                    handleTyping();
-                    e.target.style.height = 'auto';
-                    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-                  }}
-                  rows={1}
-                  className={`flex-1 bg-transparent text-[17px] focus:outline-none py-2.5 px-2 resize-none max-h-[120px] leading-tight ${
-                    isDark 
-                      ? 'text-zinc-100 placeholder:text-zinc-500' 
-                      : 'text-zinc-800 placeholder:text-zinc-400'
-                  }`}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && !isMicMode) {
-                      e.preventDefault();
-                      handleSendMessage(e as any);
-                    }
-                  }}
-                />
-
-                <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 pr-1 mb-1 self-end">
-                  {!newMessage.trim() && selectedFiles.length === 0 && (
-                    <button 
-                      type="button"
-                      onClick={() => setShowCameraModal(true)}
-                      className={`p-2 transition-colors flex items-center justify-center rounded-full ${
+                    <textarea 
+                      ref={textareaRef}
+                      placeholder={placeholder}
+                      value={newMessage}
+                      onChange={(e) => {
+                        setNewMessage(e.target.value);
+                        handleTyping();
+                        e.target.style.height = 'auto';
+                        e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                      }}
+                      rows={1}
+                      className={`flex-1 bg-transparent text-[17px] focus:outline-none py-2.5 px-2 resize-none max-h-[120px] leading-tight ${
                         isDark 
-                          ? 'text-[#a0aab8] hover:text-white hover:bg-white/5' 
-                          : 'text-[#64748b] hover:text-black hover:bg-black/5'
+                          ? 'text-zinc-100 placeholder:text-zinc-500' 
+                          : 'text-zinc-800 placeholder:text-zinc-400'
                       }`}
-                      title="Camera"
-                    >
-                      <CameraIcon size={22} />
-                    </button>
-                  )}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && !isMicMode) {
+                          e.preventDefault();
+                          handleSendMessage(e as any);
+                        }
+                      }}
+                    />
 
-                  <input 
-                    type="file" 
-                    ref={actualImageInputRef} 
-                    className="hidden" 
-                    onChange={handleFileChange}
-                    accept="image/*,video/*"
-                    multiple
-                  />
+                    <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 pr-1 mb-1 self-end">
+                      {!newMessage.trim() && selectedFiles.length === 0 && (
+                        <button 
+                          type="button"
+                          onClick={() => setShowCameraModal(true)}
+                          className={`p-2 transition-colors flex items-center justify-center rounded-full ${
+                            isDark 
+                              ? 'text-[#a0aab8] hover:text-white hover:bg-white/5' 
+                              : 'text-[#64748b] hover:text-black hover:bg-black/5'
+                          }`}
+                          title="Camera"
+                        >
+                          <CameraIcon size={22} />
+                        </button>
+                      )}
 
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    onChange={handleFileChange}
-                    accept="*/*"
-                    multiple
-                  />
-                  <button 
-                    ref={attachmentButtonRef}
-                    onClick={() => setShowAttachmentDropdown(!showAttachmentDropdown)}
-                    className={`p-2 transition-colors flex items-center justify-center rounded-full ${
-                      isDark 
-                        ? 'text-[#a0aab8] hover:text-white hover:bg-white/5' 
-                        : 'text-[#64748b] hover:text-black hover:bg-black/5'
-                    } ${showAttachmentDropdown ? 'bg-[var(--primary)]/15 text-[var(--primary)]' : ''}`}
-                    title="Attach"
-                  >
-                    <Paperclip size={22} className="-rotate-45" />
-                  </button>
-                </div>
+                      <input 
+                        type="file" 
+                        ref={actualImageInputRef} 
+                        className="hidden" 
+                        onChange={handleFileChange}
+                        accept="image/*,video/*"
+                        multiple
+                      />
+
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        onChange={handleFileChange}
+                        accept="*/*"
+                        multiple
+                      />
+                      <button 
+                        ref={attachmentButtonRef}
+                        onClick={() => setShowAttachmentDropdown(!showAttachmentDropdown)}
+                        className={`p-2 transition-colors flex items-center justify-center rounded-full ${
+                          isDark 
+                            ? 'text-[#a0aab8] hover:text-white hover:bg-white/5' 
+                            : 'text-[#64748b] hover:text-black hover:bg-black/5'
+                        } ${showAttachmentDropdown ? 'bg-[var(--primary)]/15 text-[var(--primary)]' : ''}`}
+                        title="Attach"
+                      >
+                        <Paperclip size={22} className="-rotate-45" />
+                      </button>
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -435,7 +452,7 @@ export default function ChatBottom({
               handleSendMessage(e as any);
             }
           }}
-          disabled={((!newMessage.trim() && selectedFiles.length === 0) && !isMicMode && !isRecording) || isSending}
+          disabled={isLocked || ((!newMessage.trim() && selectedFiles.length === 0) && !isMicMode && !isRecording) || isSending}
           className={`shrink-0 w-[48px] h-[48px] flex items-center justify-center rounded-full transition-all active:scale-95 text-white shadow-md ${
             isRecording 
               ? 'bg-red-500 hover:bg-red-600' 
@@ -459,8 +476,10 @@ export default function ChatBottom({
         onClose={() => setShowAttachmentDropdown(false)}
         onSelectPhotoVideo={() => actualImageInputRef.current?.click()}
         onSelectFile={() => fileInputRef.current?.click()}
+        onSelectFiles={() => fileInputRef.current?.click()}
         onSelectLocation={() => setShowLocationModal(true)}
         onSelectPoll={() => setShowPollModal(true)}
+        onSelectTask={() => setShowTaskModal(true)}
         buttonRef={attachmentButtonRef}
       />
 
@@ -477,6 +496,14 @@ export default function ChatBottom({
           isOpen={showLocationModal}
           onClose={() => setShowLocationModal(false)}
           onSend={onSendLocation}
+        />
+      )}
+
+      {onSendTask && (
+        <TaskBuilderModal
+          isOpen={showTaskModal}
+          onClose={() => setShowTaskModal(false)}
+          onCreate={onSendTask}
         />
       )}
     </div>

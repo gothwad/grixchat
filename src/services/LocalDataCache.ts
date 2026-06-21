@@ -26,6 +26,10 @@ class LocalDataCacheService {
     console.log(`[Cache Control] Switched active cache partition to: ${userId || 'guest'}`);
   }
 
+  public getCurrentUserId(): string | null {
+    return this.currentUserId;
+  }
+
   public getPartitionedKey(key: string): string {
     if (!this.currentUserId) return key;
     const lowerKey = key.toLowerCase();

@@ -1,3 +1,5 @@
+import { formatDetailedLastSeen } from './lastSeenFormatter';
+
 /**
  * Utility to determine if a user is truly online based on both is_online value
  * and the last_seen heartbeat timestamp.
@@ -29,24 +31,7 @@ export function formatLastSeen(isOnline: boolean | undefined | null, lastSeenStr
   if (online) return 'Online';
   if (!lastSeenStr) return 'Offline';
   
-  try {
-    const lastSeenDate = new Date(lastSeenStr);
-    const now = new Date();
-    const diffMs = now.getTime() - lastSeenDate.getTime();
-    
-    if (diffMs < 0) return 'Online'; // Catch potential timezone offsets
-    
-    const minutes = Math.floor(diffMs / 60000);
-    if (minutes < 1) return 'Active just now';
-    if (minutes < 60) return `Active ${minutes}m ago`;
-    
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `Active ${hours}h ago`;
-    
-    const days = Math.floor(hours / 24);
-    if (days === 1) return 'Active yesterday';
-    return `Active ${days}d ago`;
-  } catch (_) {
-    return 'Offline';
-  }
+  const formatted = formatDetailedLastSeen(lastSeenStr);
+  if (formatted === 'OnlineNow') return 'Online';
+  return formatted;
 }

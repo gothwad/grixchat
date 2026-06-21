@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Image, FileText, MapPin, BarChart3 } from 'lucide-react';
+import { Image, FileText, MapPin, BarChart3, Folder, ClipboardList } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface ChatAttachmentMenuProps {
@@ -7,8 +7,10 @@ interface ChatAttachmentMenuProps {
   onClose: () => void;
   onSelectPhotoVideo: () => void;
   onSelectFile: () => void;
+  onSelectFiles: () => void;
   onSelectLocation: () => void;
   onSelectPoll: () => void;
+  onSelectTask: () => void;
   buttonRef: React.RefObject<HTMLButtonElement | null>;
 }
 
@@ -17,8 +19,10 @@ export default function ChatAttachmentMenu({
   onClose,
   onSelectPhotoVideo,
   onSelectFile,
+  onSelectFiles,
   onSelectLocation,
   onSelectPoll,
+  onSelectTask,
   buttonRef
 }: ChatAttachmentMenuProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -51,7 +55,7 @@ export default function ChatAttachmentMenu({
       />
 
       {/* 100% Symmetrical elegant menu matching the Chat Header Dropdown style precisely */}
-      <div className="absolute bottom-16 right-14 z-[101]">
+      <div className="absolute bottom-16 right-4 sm:right-14 z-[101]">
         <motion.div
           ref={containerRef}
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -86,6 +90,19 @@ export default function ChatAttachmentMenu({
             <span>Document</span>
           </button>
 
+          {/* Files Item (for pdf, folder etc.) */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectFiles();
+              onClose();
+            }}
+            className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+          >
+            <Folder size={16} className="text-[#3b82f6]" />
+            <span>Files</span>
+          </button>
+
           {/* Shared Location Item */}
           <button
             type="button"
@@ -110,6 +127,19 @@ export default function ChatAttachmentMenu({
           >
             <BarChart3 size={16} className="text-amber-500" />
             <span>Poll</span>
+          </button>
+
+          {/* Task Item */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTask();
+              onClose();
+            }}
+            className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--bg-main)]/80 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"
+          >
+            <ClipboardList size={16} className="text-pink-400" />
+            <span>Task</span>
           </button>
         </motion.div>
       </div>

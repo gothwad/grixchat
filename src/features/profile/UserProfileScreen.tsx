@@ -28,7 +28,7 @@ import { profileService } from './services/profileService';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { truncateToChars } from '../../utils/bioHelper';
-import { chatService } from '../chat/services/chatService';
+import { chatService } from '../../services/ChatService';
 import { acceptChat } from '../../utils/acceptedChats';
 import { isUserOnline, formatLastSeen } from '../../utils/presence';
 import { LocalDataCache } from '../../services/LocalDataCache';

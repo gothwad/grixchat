@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, Trash2, Loader2 } from 'lucide-react';
+import { Check, Trash2, Loader2, Clock, CalendarDays, Ban } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 
@@ -9,6 +9,16 @@ import { useAuth } from '../../providers/AuthProvider.tsx';
 import ChatSettingsHeader from './components/ChatSettingsHeader';
 import ChatSettingsDetails from './components/ChatSettingsDetails';
 import ChatSettingsSharedAssets from './components/ChatSettingsSharedAssets';
+
+const DAYS_OF_WEEK = [
+  { value: 0, label: 'Sun' },
+  { value: 1, label: 'Mon' },
+  { value: 2, label: 'Tue' },
+  { value: 3, label: 'Wed' },
+  { value: 4, label: 'Thu' },
+  { value: 5, label: 'Fri' },
+  { value: 6, label: 'Sat' }
+];
 
 export default function ChatSettingsScreen() {
   const { id: receiverId } = useParams();
@@ -24,6 +34,15 @@ export default function ChatSettingsScreen() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Chat Time Scheduler state
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [chatTimeEnabled, setChatTimeEnabled] = useState(false);
+  const [chatTimeNeverAllowed, setChatTimeNeverAllowed] = useState(false);
+  const [chatTimeAllowedDays, setChatTimeAllowedDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [chatTimeStart, setChatTimeStart] = useState('09:00');
+  const [chatTimeEnd, setChatTimeEnd] = useState('17:00');
+  const [savingSchedule, setSavingSchedule] = useState(false);
 
   // Shared assets state
   const [sharedMedia, setSharedMedia] = useState<string[]>([]);
@@ -126,6 +145,27 @@ export default function ChatSettingsScreen() {
         }
         
         if (convId) {
+          setChatId(convId);
+          try {
+            const { data: convData } = await supabase
+              .from('conversations')
+              .select('watch_state')
+              .eq('id', convId)
+              .single();
+            if (convData && convData.watch_state) {
+              const tr = (convData.watch_state as any).chat_times;
+              if (tr) {
+                setChatTimeEnabled(tr.enabled ?? false);
+                setChatTimeNeverAllowed(tr.neverAllowed ?? false);
+                setChatTimeAllowedDays(tr.allowedDays ?? [1, 2, 3, 4, 5]);
+                setChatTimeStart(tr.startTime || '09:00');
+                setChatTimeEnd(tr.endTime || '17:00');
+              }
+            }
+          } catch (trErr) {
+            console.error("Error loading chat times in settings:", trErr);
+          }
+
           const { data: messagesData } = await supabase
             .from('messages')
             .select('text, media_url, media_type, file_url, type, created_at')
@@ -302,6 +342,51 @@ export default function ChatSettingsScreen() {
     showToast(`${label} copied to clipboard`);
   };
 
+  const handleSaveChatTimeSchedule = async () => {
+    if (!chatId || !supabase) return;
+    setSavingSchedule(true);
+    try {
+      const { data: convData } = await supabase
+        .from('conversations')
+        .select('watch_state')
+        .eq('id', chatId)
+        .single();
+      
+      const currentWatchState = convData?.watch_state || {};
+      const nextWatchState = {
+        ...currentWatchState,
+        chat_times: {
+          enabled: chatTimeEnabled,
+          neverAllowed: chatTimeNeverAllowed,
+          allowedDays: chatTimeAllowedDays.length > 0 ? chatTimeAllowedDays : [0, 1, 2, 3, 4, 5, 6],
+          startTime: chatTimeStart,
+          endTime: chatTimeEnd
+        }
+      };
+
+      const { error } = await supabase
+        .from('conversations')
+        .update({ watch_state: nextWatchState })
+        .eq('id', chatId);
+
+      if (error) throw error;
+      showToast("Chat schedule updated successfully!");
+    } catch (err) {
+      console.error("Error saving schedule details:", err);
+      showToast("Failed to save schedule settings");
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
+  const toggleScheduleDay = (dayValue: number) => {
+    if (chatTimeAllowedDays.includes(dayValue)) {
+      setChatTimeAllowedDays(chatTimeAllowedDays.filter(d => d !== dayValue));
+    } else {
+      setChatTimeAllowedDays([...chatTimeAllowedDays, dayValue].sort());
+    }
+  };
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-[var(--bg-main)]">
@@ -363,6 +448,134 @@ export default function ChatSettingsScreen() {
           onMuteToggle={handleMuteToggle}
           onCopyToClipboard={handleCopyToClipboard}
         />
+
+        {/* Inline Embedded Chat Time Scheduler */}
+        <div className="w-full bg-[#1e2022] dark:bg-[#17181a] border border-white/5 rounded-3xl p-5 text-left text-white shadow-md flex flex-col gap-4">
+          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-[#0494f4]/15 text-[#0494f4] flex items-center justify-center">
+                <Clock size={16} />
+              </div>
+              <div className="flex flex-col">
+                <h4 className="text-xs font-black tracking-wider uppercase text-zinc-205">Chat Time Scheduler</h4>
+                <p className="text-[10px] text-zinc-500 font-hindi">चैट समय सारणी अनुकूलन</p>
+              </div>
+            </div>
+
+            <label className="relative inline-flex items-center cursor-pointer select-none">
+              <input 
+                type="checkbox" 
+                checked={chatTimeEnabled} 
+                onChange={(e) => setChatTimeEnabled(e.target.checked)} 
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-400 after:border-zinc-500 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#0494f4]"></div>
+            </label>
+          </div>
+
+          <AnimatePresence initial={false}>
+            {chatTimeEnabled && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4 overflow-hidden"
+              >
+                {/* Block Entirely (Kabhi Nahi) Toggle */}
+                <div className="flex items-center justify-between bg-zinc-900/40 p-3 rounded-2xl border border-white/5 transition-colors">
+                  <div className="flex items-center gap-2.5">
+                    <Ban size={14} className="text-pink-400" />
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-black text-zinc-300">Never Allowed (Kabhi Nahi)</span>
+                      <span className="text-[9px] text-zinc-555 font-hindi font-semibold text-rose-350">चैट पूर्णतः प्रतिबंधित करें</span>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      checked={chatTimeNeverAllowed} 
+                      onChange={(e) => setChatTimeNeverAllowed(e.target.checked)} 
+                      className="sr-only peer"
+                    />
+                    <div className="w-8 h-4 bg-zinc-805 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-zinc-400 after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-pink-500"></div>
+                  </label>
+                </div>
+
+                {!chatTimeNeverAllowed && (
+                  <div className="space-y-3.5 pt-0.5">
+                    {/* Days Picker Row */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5 pl-1">
+                        <CalendarDays size={12} className="text-[#0494f4]" />
+                        <span className="text-[9px] font-black text-zinc-450 uppercase tracking-widest">Allowed Week Days</span>
+                      </div>
+                      
+                      <div className="flex justify-between gap-1">
+                        {DAYS_OF_WEEK.map((day) => {
+                          const isSelected = chatTimeAllowedDays.includes(day.value);
+                          return (
+                            <button
+                              key={day.value}
+                              type="button"
+                              onClick={() => toggleScheduleDay(day.value)}
+                              className={`flex-1 py-1.5 text-center text-[10px] font-black rounded-xl transition-all cursor-pointer border-none select-none relative active:scale-95 ${
+                                isSelected 
+                                  ? 'bg-[#0494f4] text-white shadow-sm' 
+                                  : 'bg-zinc-900 text-zinc-500 hover:bg-zinc-800'
+                              }`}
+                            >
+                              {day.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Start & End Times Inputs */}
+                    <div className="grid grid-cols-2 gap-3.5 pt-1.5">
+                      <div className="space-y-1.5">
+                        <span className="block text-[9px] font-black text-zinc-450 uppercase tracking-widest pl-1">Start Hour</span>
+                        <input
+                          type="time"
+                          value={chatTimeStart}
+                          onChange={(e) => setChatTimeStart(e.target.value)}
+                          className="w-full px-3 py-3 bg-zinc-900 border border-white/5 focus:border-[#0494f4] text-xs font-bold text-center rounded-2xl text-white cursor-pointer select-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <span className="block text-[9px] font-black text-zinc-450 uppercase tracking-widest pl-1">End Hour</span>
+                        <input
+                          type="time"
+                          value={chatTimeEnd}
+                          onChange={(e) => setChatTimeEnd(e.target.value)}
+                          className="w-full px-3 py-3 bg-zinc-900 border border-white/5 focus:border-[#0494f4] text-xs font-bold text-center rounded-2xl text-white cursor-pointer select-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <button
+            type="button"
+            onClick={handleSaveChatTimeSchedule}
+            disabled={savingSchedule}
+            className="w-full py-3.5 bg-[#0494f4] hover:bg-[#0382d6] active:scale-[0.98] disabled:opacity-40 rounded-2xl text-[11px] font-black uppercase tracking-wider text-white transition-all shadow-md cursor-pointer border-none flex items-center justify-center gap-2 mt-1"
+          >
+            {savingSchedule ? (
+              <>
+                <Loader2 size={13} className="animate-spin" />
+                <span>Applying constraints...</span>
+              </>
+            ) : (
+              <span>Apply Schedule Settings</span>
+            )}
+          </button>
+        </div>
 
         {/* Shared Media, Links & Files Assets filters */}
         <ChatSettingsSharedAssets

@@ -50,3 +50,70 @@ GrixChat has a highly polished, aesthetic modern visual blend:
 * Keep code modular. Do not bloat files like `App.tsx` or `ChatScreen.tsx`. Extract helpers, individual sheets, and custom tabs to independent folders.
 * Always execute `/src` actions with high type-safety using standard standard TypeScript types and strictly avoid compiling failures.
 * **SQL Registry Structure:** All database schemas, incremental migration updates, row-level security (RLS) definitions, triggers, and indices must be kept updated and strictly stored inside the `/sql` folder at the root level. Running developers/AI agents must keep the `/sql` directory perfectly updated at all times.
+
+---
+
+## 5. Enterprise-Scale Folder Structure & Architecture (100-Score Blueprint)
+To scale seamlessly from a prototype to a massive enterprise application managing thousands of files without cognitive overload or structural visual bleed, GrixChat implements a **Feature-Driven Domain Architecture** with strict layer boundaries.
+
+### A. Architectural Evaluation Matrix
+Our standard rating scale assesses structural health across five key dimensions:
+1. **Modularity & Isolation (Feature-Slicing):** Feature modules (`src/features/*`) must be fully self-contained. Any cross-feature interaction must happen via shared interfaces or explicit public APIs.
+2. **Layer Separation (Presentation vs. Business Logic):** Views and JSX layers should be purely declarative. Async side effects, data caching, database hydration, and sync streams must reside strictly inside custom custom hooks (`hooks/`) or dedicated services (`services/`).
+3. **Circular Dependency Safeguards:** Direct relative imports between different sibling feature modules (e.g., `features/chat/` directly importing from `features/call/`) are major anti-patterns. They must import from shared abstractions (`src/components/`, `src/services/`, or `src/types/`).
+4. **Cache & Persistence Integrity:** Local offline caching engines (IndexedDB/State controllers) must reside wholly separated from presentation components to allow clean data layers.
+5. **Type Preservation:** Explicit shared global interfaces (`src/types/`) and domain-level contract shapes must govern compiled flows (No loose `any` declarations or ad-hoc casting).
+
+### B. Standardized Directory Layout (Enterprise Scale)
+This structured layout groups concerns clearly and defines strict nesting limits:
+
+```text
+/src
+├── App.tsx                    # Main App entry with global router configs
+├── main.tsx                   # Client-side bootstrap
+├── index.css                  # Tailwinds design parameters & custom theme configurations
+├── types/                     # Global data models, database structures, and platform declarations
+│   ├── index.ts               # Bundled type exports
+│   └── database.types.ts      # Strictly typed schema definitions matching Supabase Postgres
+├── config/                    # Global configuration setups
+│   └── supabase.ts            # Client client authorizations
+├── lib/                       # Third-party SDK client setups (Supabase, WebRTC adapters)
+│   └── supabase.ts
+├── providers/                 # Global React Context providers (Auth, Calls, Theme, Realtime Indicators)
+│   ├── AuthProvider.tsx
+│   └── CallProvider.tsx
+├── services/                  # Global enterprise service layer (Singletons handling state & cross-feature actions)
+│   ├── LocalDataCache.ts      # Active fast memory cache mapping IndexedDB transactions
+│   ├── IndexedDBService.ts    # Durable persistent Web SQL / IndexedDB client backplane
+│   ├── AIService.ts           # Offline/Online AI interface syncing with Grix AI bot
+│   └── StorageService.ts      # Standardized secure local client disk storage interface
+├── utils/                     # Pure, stateless utility functions (date parsers, token validators)
+│   └── scheduleUtils.ts       # Time math calculations
+├── components/                # Global UI components shared across multiple feature modules
+│   ├── common/                # Universal visual atoms (Buttons, Spinners, InputFields)
+│   ├── layout/                # Global Shell Frames (Desktop Welcomes, Sidebars, Bottom Nav Bars)
+│   └── chat-ui/               # Reusable chat layout wrappers and shared modals
+└── features/                  # Domain-driven feature domains (100% Isolated Modular Core Slices)
+    ├── auth/                  # User lifecycle authentication, profiles signup, setup screens
+    │   ├── components/        # Isolated Signup / Login sub-components
+    │   ├── hooks/             # Custom authentication state controllers
+    │   └── services/          # Pure Auth API helpers
+    ├── chat/                  # Messaging flows, list directories, drafts, chat logs, groups, settings
+    │   ├── components/        # ChatUserList, ChatMessageRow, MessagesList
+    │   ├── hooks/             # useChatSync, useConversations, useChatId
+    │   └── services/          # pushNotificationService, messageRequestService
+    ├── call/                  # Call Screen, signaling states, active active ringings, call history logs
+    │   ├── components/        # CallsHistoryList, CallRingUI, CallFloatingHeader
+    │   ├── hooks/             # useCalls, useActiveCallTimer
+    │   └── services/          # CallSyncService
+    ├── profile/               # User bio editors, blocked accounts, custom user profile sheets
+    │   ├── components/
+    │   └── services/
+    ├── search/                # Universal dynamic search indices (finding contacts, messages, calls)
+    └── settings/              # App configuration, security presets, active device controllers, deletes
+```
+
+### C. Import Restrictions & Integrity Policies
+1. **The Sandbox Rule:** Every subfolder inside `features/` should be designed as a miniature self-contained package.
+2. **Relative Sibling Imports are Strictly Forbidden:** Sibling features cannot import from each other via relative paths like `../../call/hooks/useCalls`. Instead, if data is needed, compile it via global service layers or providers.
+3. **No Unstructured Base Bloats:** Avoid creating files with multiple different classes and hook controllers. Always split complex views into logical sub-components (e.g. `ChatUserList.tsx` rendering isolated components like `GrixAIRow`).

@@ -1,28 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import { CallsHistoryList } from './components/CallsHistoryList';
-import { LocalDataCache } from '../../services/LocalDataCache';
 import { CommonSearchBar } from '../../components/common/CommonSearchBar';
+import { CallSyncService, CallRecord } from './services/CallSyncService';
 
 export default function CallsTab() {
   const { user: authUser } = useAuth();
   const navigate = useNavigate();
   
   // Instant load calls history from Cache
-  const [calls, setCalls] = useState<any[]>(() => {
+  const [calls, setCalls] = useState<CallRecord[]>(() => {
     if (authUser?.id) {
-      const cached = LocalDataCache.get<any[]>(`gx_calls_history_${authUser.id}`);
-      if (cached && Array.isArray(cached)) return cached;
+      return CallSyncService.getCachedCalls(authUser.id);
     }
     return [];
   });
   
   const [callsLoading, setCallsLoading] = useState(() => {
     if (authUser?.id) {
-      const cached = LocalDataCache.get<any[]>(`gx_calls_history_${authUser.id}`);
-      if (cached && Array.isArray(cached) && cached.length > 0) return false;
+      const cached = CallSyncService.getCachedCalls(authUser.id);
+      if (cached && cached.length > 0) return false;
     }
     return true;
   });
@@ -43,22 +41,18 @@ export default function CallsTab() {
   // Sync state with Cache when authUser becomes resolved
   useEffect(() => {
     if (authUser?.id) {
-      const cachedCalls = LocalDataCache.get<any[]>(`gx_calls_history_${authUser.id}`);
-      if (cachedCalls && Array.isArray(cachedCalls) && cachedCalls.length > 0) {
+      const cachedCalls = CallSyncService.getCachedCalls(authUser.id);
+      if (cachedCalls && cachedCalls.length > 0) {
         setCalls(cachedCalls);
         setCallsLoading(false);
       }
     }
   }, [authUser?.id]);
 
-  const authUserZone = () => {
-    return authUser && authUser.id;
-  };
-
   const fetchCalls = React.useCallback(async () => {
-    if (!authUser?.id || !supabase) return;
+    if (!authUser?.id) return;
     try {
-      const cached = LocalDataCache.get<any[]>(`gx_calls_history_${authUser.id}`);
+      const cached = CallSyncService.getCachedCalls(authUser.id);
       const currentCalls = callsRef.current;
       const hasData = (currentCalls && currentCalls.length > 0) || (cached && cached.length > 0);
       
@@ -70,44 +64,10 @@ export default function CallsTab() {
         }
       }
 
-      const { data, error } = await supabase
-        .from('calls')
-        .select(`
-          *,
-          caller:users!calls_caller_id_fkey (id, username, photo_url, full_name),
-          receiver:users!calls_receiver_id_fkey (id, username, photo_url, full_name)
-        `)
-        .or(`caller_id.eq.${authUser.id},receiver_id.eq.${authUser.id}`)
-        .order('created_at', { ascending: false })
-        .limit(limit + 1);
-
-      if (!error && data) {
-        let hasMoreData = false;
-        let queryData = data || [];
-        if (queryData.length > limit) {
-          hasMoreData = true;
-          queryData = queryData.slice(0, limit);
-        }
-        setHasMore(hasMoreData);
-
-        const callList = queryData.map((c: any) => {
-          const isCaller = c.caller_id === authUser.id;
-          const otherUser = isCaller ? c.receiver : c.caller;
-          
-          return {
-            id: c.id,
-            otherUserId: isCaller ? c.receiver_id : c.caller_id,
-            user: otherUser?.full_name || otherUser?.username || 'GrixChat User',
-            avatar: otherUser?.photo_url || `https://cdn-icons-png.flaticon.com/512/149/149071.png`,
-            type: c.type === 'audio' ? 'voice' : c.type,
-            isIncoming: !isCaller,
-            isMissed: c.is_missed || false,
-            time: c.created_at ? new Date(c.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently'
-          };
-        });
-        setCalls(callList);
-        LocalDataCache.set(`gx_calls_history_${authUser.id}`, callList);
-      }
+      const result = await CallSyncService.fetchCallsHistory(authUser.id, limit);
+      
+      setCalls(result.callList);
+      setHasMore(result.hasMore);
     } catch (e) {
       console.error("Error fetching calls:", e);
     } finally {
@@ -132,26 +92,15 @@ export default function CallsTab() {
   useEffect(() => {
     fetchCalls();
 
-    if (!supabase || !authUserZone()) return;
+    if (!authUser?.id) return;
 
-    const channel = supabase
-      .channel('calls-updates-realtime')
-      .on('postgres_changes', { 
-         event: '*', 
-         schema: 'public', 
-         table: 'calls',
-         filter: `caller_id=eq.${authUser?.id}`
-       }, () => fetchCalls())
-      .on('postgres_changes', { 
-         event: '*', 
-         schema: 'public', 
-         table: 'calls',
-         filter: `receiver_id=eq.${authUser?.id}`
-       }, () => fetchCalls())
-      .subscribe();
+    // Realtime update hook via CallSyncService subscription helper
+    const unsubscribe = CallSyncService.subscribeToCalls(authUser.id, () => {
+      fetchCalls();
+    });
 
     return () => {
-      channel.unsubscribe();
+      unsubscribe();
     };
   }, [authUser?.id, fetchCalls]);
 
