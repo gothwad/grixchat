@@ -47,6 +47,13 @@ export default function StoriesTab() {
     if (!supabase || !authUser?.id) return;
     setStoriesLoading(true);
     try {
+      // Clean up expired stories (> 24 hours) defensively at database level before fetching
+      try {
+        await supabase.rpc('cleanup_expired_stories');
+      } catch (rpcErr) {
+        console.warn('Defensive cleanup_expired_stories call failed (migration might not be run yet):', rpcErr);
+      }
+
       const { data, error } = await supabase
         .from('stories')
         .select('*, users:user_id(username, full_name, photo_url)')
@@ -188,7 +195,7 @@ export default function StoriesTab() {
               </h3>
               <p className="text-[13px] text-[var(--text-secondary)] opacity-75 mt-0.5 font-medium">
                 {myStoriesGroup 
-                  ? `Last update: ${formatStoryTime(myStoriesGroup.stories[0].created_at)}` 
+                  ? formatStoryTime(myStoriesGroup.stories[0].created_at)
                   : 'Tap to publish a status update'
                 }
               </p>

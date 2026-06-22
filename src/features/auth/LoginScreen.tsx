@@ -33,7 +33,7 @@ export default function LoginScreen() {
     let loginEmail = identifier;
 
     try {
-      // Check if identifier is email or username
+      // Check if identifier is email or username/phone
       if (identifier.includes('@')) {
         loginEmail = identifier;
       } else {
@@ -54,9 +54,26 @@ export default function LoginScreen() {
         } catch (uErr) {
           console.error("Username query fallback error", uErr);
         }
+
+        // If not matched by username, try matching by phone number
+        if (!matchedUser) {
+          try {
+            const { data, error: pError } = await supabase
+              .from('users')
+              .select('email')
+              .eq('phone', cleanId)
+              .maybeSingle();
+
+            if (!pError && data) {
+              matchedUser = data;
+            }
+          } catch (pErr) {
+            console.error("Phone query fallback error", pErr);
+          }
+        }
         
         if (!matchedUser) {
-          throw new Error("Username not found");
+          throw new Error("No account found with this Phone, Email or Username");
         }
         
         loginEmail = matchedUser.email;
@@ -189,7 +206,7 @@ export default function LoginScreen() {
           Cancel
         </button>
       )}
-      <div className="w-full px-8 pt-8 pb-12 z-10 flex flex-col items-center min-h-full relative max-w-md mx-auto">
+      <div className="w-full px-8 pt-8 pb-32 pb-safe z-10 flex flex-col items-center min-h-full relative max-w-md mx-auto">
         {/* Header Card */}
         <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 text-center flex flex-col items-center justify-center mb-5 shadow-sm">
           <div className="w-16 h-16 bg-[var(--bg-main)] rounded-2xl shadow-inner flex items-center justify-center border border-[var(--border-color)] p-0 overflow-hidden mb-3">
@@ -232,7 +249,7 @@ export default function LoginScreen() {
                 <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
                 <input 
                   type="text" 
-                  placeholder="Enter email or username"
+                  placeholder="Email, Phone or Username"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full pl-12 pr-5 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
@@ -262,22 +279,22 @@ export default function LoginScreen() {
               <div className="flex justify-between items-center px-1">
                 <div 
                   onClick={() => setRememberMe(!rememberMe)}
-                  className="flex items-center gap-2 cursor-pointer group select-none"
+                  className="flex items-center gap-2.5 cursor-pointer group select-none py-1"
                 >
                   <div 
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+                    className={`w-[18px] h-[18px] rounded-[5px] border flex items-center justify-center transition-all duration-200 ${
                       rememberMe 
-                        ? 'bg-[var(--primary)] border-[var(--primary)]' 
-                        : 'bg-[var(--bg-card)] border-[var(--border-color)] group-hover:border-[var(--text-secondary)]/50'
+                        ? 'bg-[#0494f4] border-[#0494f4] shadow-sm shadow-[#0494f4]/20' 
+                        : 'bg-[var(--bg-card)] border-[var(--border-color)] group-hover:border-[var(--primary)]'
                     }`}
                   >
                     {rememberMe && (
-                      <svg className="w-2.5 h-2.5 text-white stroke-[3.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-3 h-3 text-white stroke-[3.5] animate-[fade-in_0.15s_ease-out]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                       </svg>
                     )}
                   </div>
-                  <span className="text-[11px] font-medium text-[var(--text-secondary)] cursor-pointer group-hover:text-[var(--text-primary)] transition-colors">
+                  <span className="text-xs font-semibold text-[var(--text-secondary)]/90 group-hover:text-[var(--text-primary)] transition-colors select-none">
                     Remember me
                   </span>
                 </div>
@@ -296,37 +313,12 @@ export default function LoginScreen() {
             </>
           ) : (
             <>
-              {/* Remember me (Left Aligned for consistent aesthetics) */}
-              <div className="flex justify-between items-center px-1">
-                <div 
-                  onClick={() => setRememberMe(!rememberMe)}
-                  className="flex items-center gap-2 cursor-pointer group select-none"
-                >
-                  <div 
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
-                      rememberMe 
-                        ? 'bg-[var(--primary)] border-[var(--primary)]' 
-                        : 'bg-[var(--bg-card)] border-[var(--border-color)] group-hover:border-[var(--text-secondary)]/50'
-                    }`}
-                  >
-                    {rememberMe && (
-                      <svg className="w-2.5 h-2.5 text-white stroke-[3.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                      </svg>
-                    )}
-                  </div>
-                  <span className="text-[11px] font-medium text-[var(--text-secondary)] cursor-pointer group-hover:text-[var(--text-primary)] transition-colors">
-                    Remember me
-                  </span>
-                </div>
-              </div>
-
-              {/* Email / Username field immediately underneath remember me */}
+              {/* Email / Username field in forgot password mode */}
               <div className="relative group">
                 <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--primary)] transition-colors" />
                 <input 
                   type="text" 
-                  placeholder="Enter email or username"
+                  placeholder="Email, Phone or Username"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full pl-12 pr-5 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/10 focus:border-[var(--primary)]/40 transition-all placeholder:text-[var(--text-secondary)]/50 text-[var(--text-primary)]"
@@ -433,10 +425,21 @@ export default function LoginScreen() {
             </>
           )}
 
-          <p className="text-[10px] text-center text-[var(--text-secondary)]/65 pt-6 leading-normal max-w-[280px] mx-auto select-none">
-            By using GrixChat, you agree to our <span className="font-bold text-[var(--primary)] hover:underline cursor-pointer">Terms of Service</span> & <span className="font-bold text-[var(--primary)] hover:underline cursor-pointer">Privacy Policy</span>.
-          </p>
+          <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 text-center flex flex-col items-center justify-center mt-6 shadow-sm select-none gap-3.5">
+            <p className="text-[10px] text-[var(--text-secondary)]/65 leading-relaxed max-w-[280px] mx-auto">
+              By using <a href="https://grixchat.gothwad.workers.dev" target="_blank" rel="noopener noreferrer" className="font-bold text-[#0494f4] hover:underline cursor-pointer">GrixChat</a>, you agree to our <span onClick={() => navigate('/terms')} className="font-bold text-[var(--primary)] hover:underline cursor-pointer">Terms of Service</span> & <span onClick={() => navigate('/terms')} className="font-bold text-[var(--primary)] hover:underline cursor-pointer">Privacy Policy</span>.
+            </p>
+            <div className="w-full h-[1px] bg-[var(--border-color)]/50"></div>
+            <div className="text-center max-w-[280px] mx-auto">
+              <span className="text-[10px] font-semibold text-[var(--text-secondary)]/55 block leading-relaxed">
+                <a href="https://grixchat.gothwad.workers.dev" target="_blank" rel="noopener noreferrer" className="font-bold text-[#0494f4] hover:underline cursor-pointer decoration-[#0494f4] decoration-2">GrixChat</a> is proudly developed and managed by <a href="https://gothwadtechnologies.com" target="_blank" rel="noopener noreferrer" className="font-bold text-[#0494f4] hover:underline cursor-pointer decoration-[#0494f4] decoration-2">Gothwad</a> in support of India's Atmanirbhar Bharat initiative. If you have any concerns, please <a href="mailto:support@gothwadtechnologies.com" className="font-bold text-[#0494f4] hover:underline cursor-pointer decoration-[#0494f4] decoration-2">contact us</a>.
+              </span>
+            </div>
+          </div>
         </form>
+        
+        {/* Extra bottom spacer to ensure the branding card is well-spaced from the screen edge */}
+        <div className="h-14 w-full shrink-0" />
       </div>
     </div>
   );

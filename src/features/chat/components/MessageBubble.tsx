@@ -196,26 +196,91 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // Modern, ios, retro, or classic-style shapes
   let bubbleShapeClass = 'rounded-2xl';
   if (bubbleStyleSetting === 'modern') {
-    if (isSameSender) {
-      bubbleShapeClass = 'rounded-[18px]';
-    } else {
-      bubbleShapeClass = actualIsMe ? 'rounded-[18px] rounded-tr-[4px]' : 'rounded-[18px] rounded-tl-[4px]';
-    }
+    bubbleShapeClass = 'rounded-[20px]';
   } else if (bubbleStyleSetting === 'ios') {
-    if (isSameSender) {
-      bubbleShapeClass = 'rounded-[20px]';
-    } else {
-      bubbleShapeClass = actualIsMe ? 'rounded-[20px] rounded-tr-[5px]' : 'rounded-[20px] rounded-tl-[5px]';
-    }
+    bubbleShapeClass = 'rounded-[22px]';
   } else if (bubbleStyleSetting === 'retro') {
     bubbleShapeClass = 'rounded-none border-2 border-[var(--border-color)]';
   } else { 
-    if (isSameSender) {
-      bubbleShapeClass = 'rounded-xl';
-    } else {
-      bubbleShapeClass = actualIsMe ? 'rounded-xl rounded-tr-none' : 'rounded-xl rounded-tl-none';
-    }
+    bubbleShapeClass = 'rounded-2xl';
   }
+
+  // Press-and-hold (long-press) logic for instant message selection
+  const holdTimeoutRef = React.useRef<any>(null);
+  const touchStartPosRef = React.useRef<{ x: number; y: number } | null>(null);
+  const wasLongPressedRef = React.useRef<boolean>(false);
+
+  const startPressTimer = (clientX: number, clientY: number) => {
+    if (isMsgDeleted) return;
+    
+    if (holdTimeoutRef.current) {
+      clearTimeout(holdTimeoutRef.current);
+    }
+    
+    wasLongPressedRef.current = false;
+    touchStartPosRef.current = { x: clientX, y: clientY };
+
+    // Ultra-fast responsive threshold of 260ms
+    holdTimeoutRef.current = setTimeout(() => {
+      wasLongPressedRef.current = true;
+      if (window.navigator?.vibrate) {
+        try { window.navigator.vibrate(35); } catch (err) {}
+      }
+      handleMessageTap({ isLongPress: true, stopPropagation: () => {} }, msg);
+    }, 260);
+  };
+
+  const cancelPressTimer = () => {
+    if (holdTimeoutRef.current) {
+      clearTimeout(holdTimeoutRef.current);
+      holdTimeoutRef.current = null;
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (touch) {
+      startPressTimer(touch.clientX, touch.clientY);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (touch && touchStartPosRef.current) {
+      const dx = touch.clientX - touchStartPosRef.current.x;
+      const dy = touch.clientY - touchStartPosRef.current.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance > 8) {
+        cancelPressTimer();
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (wasLongPressedRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    cancelPressTimer();
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 0) {
+      startPressTimer(e.clientX, e.clientY);
+    }
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (wasLongPressedRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    cancelPressTimer();
+  };
+
+  const handleMouseLeave = () => {
+    cancelPressTimer();
+  };
 
   const handleVote = async (optionId: string) => {
     if (!user || isMsgDeleted || !supabase) return;
@@ -579,11 +644,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       )}
       
       <div className={`relative group max-w-[85%] lg:max-w-[70%] min-w-0 flex items-center gap-2 ${isHighlighted ? 'z-10' : ''}`}>
-        {!isSameSender && bubbleStyleSetting === 'whatsapp' && (
-          <div className={`absolute top-0 w-2 h-2 ${actualIsMe ? '-right-1.5 bg-[var(--bubble-own)]' : '-left-1.5 bg-[var(--bubble-other)]'}`} 
-               style={{ clipPath: actualIsMe ? 'polygon(0 0, 0 100%, 100% 0)' : 'polygon(100% 0, 100% 100%, 0 0)' }}>
-          </div>
-        )}
 
         {/* Smooth WhatsApp/Telegram sliding background reply indicator */}
         <motion.div 
@@ -624,18 +684,31 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             setSwipeActive(false);
             hasVibratedRef.current = false;
           }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
           onClick={(e) => {
             if (isMsgDeleted) return;
             e.stopPropagation();
+            if (wasLongPressedRef.current) {
+              wasLongPressedRef.current = false;
+              return;
+            }
             handleMessageTap(e as any, msg);
           }}
           onContextMenu={(e) => {
             e.preventDefault();
             if (isMsgDeleted) return;
             e.stopPropagation();
+            if (wasLongPressedRef.current) {
+              wasLongPressedRef.current = false;
+              return;
+            }
             handleMessageTap(e as any, msg);
           }}
-          whileTap={{ scale: 0.992 }}
           animate={isHighlighted ? { 
             backgroundColor: actualIsMe ? 'var(--bubble-own)' : 'var(--bubble-other)',
             scale: [1, 1.02, 1],

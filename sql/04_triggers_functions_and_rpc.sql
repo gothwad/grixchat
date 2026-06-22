@@ -61,6 +61,7 @@ BEGIN
     INSERT INTO public.users (
         id, 
         email, 
+        phone, 
         full_name, 
         username, 
         photo_url, 
@@ -69,6 +70,7 @@ BEGIN
     VALUES (
         new.id,
         new.email,
+        COALESCE(new.raw_user_meta_data->>'phone', ''),
         full_name_val,
         LOWER(username_val),
         COALESCE(new.raw_user_meta_data->>'avatar_url', 'https://cdn-icons-png.flaticon.com/512/149/149071.png'),
@@ -76,6 +78,7 @@ BEGIN
     )
     ON CONFLICT (id) DO UPDATE SET
         email = EXCLUDED.email,
+        phone = COALESCE(public.users.phone, EXCLUDED.phone),
         full_name = COALESCE(public.users.full_name, EXCLUDED.full_name),
         username = COALESCE(public.users.username, EXCLUDED.username);
 

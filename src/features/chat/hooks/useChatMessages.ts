@@ -28,6 +28,16 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
   const [messageLimit, setMessageLimit] = useState(initialLimit);
   const lastMessageCount = useRef(0);
   const { user, userData, isAuthReady } = useAuth();
+  const markAsReadTimeoutRef = useRef<any>(null);
+
+  // Cleanup markAsRead debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (markAsReadTimeoutRef.current) {
+        clearTimeout(markAsReadTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const messagesRef = useRef<any[]>([]);
   useEffect(() => {
@@ -221,21 +231,41 @@ export const useChatMessages = (conversationId: string, initialLimit: number = 2
       }
     }
 
-    try {
-      const { error } = await supabase
-        .from('messages')
-        .update({ is_read: true } as any)
-        .eq('conversation_id', conversationId)
-        .neq('sender_id', user.id)
-        .eq('is_read', false);
-      
-      if (error) {
-        console.error('Error marking messages as read:', error);
-      } else {
-        console.log('Successfully marked messages as read for conv:', conversationId);
+    const executeUpdate = async () => {
+      try {
+        const { error } = await supabase
+          .from('messages')
+          .update({ is_read: true } as any)
+          .eq('conversation_id', conversationId)
+          .neq('sender_id', user.id)
+          .eq('is_read', false);
+        
+        if (error) {
+          console.error('Error marking messages as read:', error);
+        } else {
+          console.log('Successfully marked messages as read for conv (debounced):', conversationId);
+        }
+      } catch (err) {
+        console.error('Failed to mark messages as read:', err);
       }
-    } catch (err) {
-      console.error('Failed to mark messages as read:', err);
+    };
+
+    if (force) {
+      // Immediate update for critical focus triggers/transitions
+      if (markAsReadTimeoutRef.current) {
+        clearTimeout(markAsReadTimeoutRef.current);
+        markAsReadTimeoutRef.current = null;
+      }
+      await executeUpdate();
+    } else {
+      // Debounce non-force read confirmations by 1200ms
+      // This collapses multiple updates into 1 singular database write request!
+      if (markAsReadTimeoutRef.current) {
+        clearTimeout(markAsReadTimeoutRef.current);
+      }
+      markAsReadTimeoutRef.current = setTimeout(() => {
+        executeUpdate();
+      }, 1200);
     }
   }, [conversationId, user?.id]);
 

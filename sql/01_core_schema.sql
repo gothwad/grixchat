@@ -30,6 +30,7 @@ DROP TABLE IF EXISTS public.users CASCADE;
 CREATE TABLE public.users (
     id UUID PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
     email TEXT,
+    phone TEXT,
     full_name TEXT,
     username TEXT UNIQUE NOT NULL,
     photo_url TEXT DEFAULT 'https://cdn-icons-png.flaticon.com/512/149/149071.png',

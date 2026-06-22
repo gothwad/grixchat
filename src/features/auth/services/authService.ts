@@ -11,7 +11,7 @@ export const authService = {
     return data.user;
   },
 
-  async signup(email: string, pass: string, fullName: string, username: string) {
+  async signup(email: string, pass: string, fullName: string, username: string, phone?: string) {
     if (!supabase) throw new Error("Supabase is not initialized");
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -20,6 +20,7 @@ export const authService = {
         data: {
           full_name: fullName,
           username: username,
+          phone: phone || '',
           avatar_url: `https://cdn-icons-png.flaticon.com/512/149/149071.png`
         }
       }

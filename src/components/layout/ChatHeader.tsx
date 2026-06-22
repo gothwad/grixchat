@@ -53,6 +53,7 @@ interface ChatHeaderProps {
   onDeleteMsgSelection?: () => void;
   onCopyMsgSelection?: () => void;
   onSelectChatTime?: () => void;
+  onInfoMsgSelection?: () => void;
 }
 
 export default function ChatHeader({
@@ -88,7 +89,8 @@ export default function ChatHeader({
   onForwardMsgSelection,
   onDeleteMsgSelection,
   onCopyMsgSelection,
-  onSelectChatTime
+  onSelectChatTime,
+  onInfoMsgSelection
 }: ChatHeaderProps) {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -259,7 +261,11 @@ export default function ChatHeader({
                       <button
                         type="button"
                         onClick={() => {
-                          showLocalToast(`Message Info details are private.`);
+                          if (onInfoMsgSelection) {
+                            onInfoMsgSelection();
+                          } else {
+                            showLocalToast(`Message Info details are private.`);
+                          }
                           setSelectDropdownOpen(false);
                         }}
                         className="w-full px-4 py-2.5 text-left text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-main)] active:bg-[var(--text-primary)]/10 transition-colors flex items-center gap-3 rounded-xl cursor-pointer border-none bg-transparent"

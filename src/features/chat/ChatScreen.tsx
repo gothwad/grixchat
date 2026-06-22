@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import { Info } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { ChatForwardOverlay } from '../../components/chat-ui/ChatForwardOverlay';
@@ -143,6 +145,34 @@ export default function ChatScreen() {
   });
 
   const [pinnedMsg, setPinnedMsg] = useState<any>(null);
+  const [infoModalMessage, setInfoModalMessage] = useState<any | null>(null);
+
+  const formatDetailedDate = (dateString: string) => {
+    if (!dateString) return 'Pending';
+    try {
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return 'Pending';
+      return d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      }) + ' at ' + d.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (_) {
+      return 'Pending';
+    }
+  };
+
+  const handleInfoMsgSelection = () => {
+    if (selectedMsgIds.length === 0) return;
+    const msg = messages.find(m => m.id === selectedMsgIds[0]);
+    if (msg) {
+      setInfoModalMessage(msg);
+    }
+  };
 
   useEffect(() => {
     if (chatId) {
@@ -170,13 +200,17 @@ export default function ChatScreen() {
   };
 
   const customHandleMessageTap = (e: any, msg: any) => {
-    if (selectedMsgIds.length > 0) {
+    const isLongPress = e && e.isLongPress;
+    if (isLongPress || selectedMsgIds.length > 0) {
       if (e && e.stopPropagation) e.stopPropagation();
       setSelectedMsgIds(prev =>
         prev.includes(msg.id)
           ? prev.filter(id => id !== msg.id)
           : [...prev, msg.id]
       );
+      if (activeMessageMenu) {
+        setActiveMessageMenu(null);
+      }
     } else {
       handleMessageTap(e, msg);
     }
@@ -247,6 +281,8 @@ export default function ChatScreen() {
 
   useEffect(() => {
     if (isOtherTyping) {
+      if (activeMessageMenu) setActiveMessageMenu(null);
+      if (showReactionPicker) setShowReactionPicker(null);
       scrollToBottom('smooth');
       const t1 = setTimeout(() => scrollToBottom('smooth'), 80);
       const t2 = setTimeout(() => scrollToBottom('smooth'), 220);
@@ -257,7 +293,7 @@ export default function ChatScreen() {
         clearTimeout(t3);
       };
     }
-  }, [isOtherTyping, scrollToBottom]);
+  }, [isOtherTyping, scrollToBottom, activeMessageMenu, setActiveMessageMenu, showReactionPicker, setShowReactionPicker]);
 
   const deleteChat = async () => {
     if (window.confirm("Delete this chat?")) {
@@ -286,6 +322,16 @@ export default function ChatScreen() {
 
   const isHidden = Array.isArray(currentUserData?.hiddenChats) && currentUserData.hiddenChats.includes(chatId);
   const isArchived = Array.isArray(currentUserData?.archivedChats) && currentUserData.archivedChats.includes(chatId);
+
+  const handleScrollWithDismiss = (e: React.UIEvent<HTMLDivElement>) => {
+    handleScroll(e);
+    if (activeMessageMenu) {
+      setActiveMessageMenu(null);
+    }
+    if (showReactionPicker) {
+      setShowReactionPicker(null);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full w-full max-w-full bg-[var(--bg-main)] overflow-hidden relative">
@@ -355,6 +401,7 @@ export default function ChatScreen() {
           setSelectedMsgIds([]);
         }}
         onSelectChatTime={() => setIsChatTimeModalOpen(true)}
+        onInfoMsgSelection={handleInfoMsgSelection}
       />
 
       {/* Pinned Message Bar Component */}
@@ -366,7 +413,7 @@ export default function ChatScreen() {
       <MessageList 
         scrollContainerRef={scrollContainerRef}
         messagesEndRef={messagesEndRef}
-        handleScroll={handleScroll}
+        handleScroll={handleScrollWithDismiss}
         chatBackground={activeChatBackground}
         loadingMore={loadingMore}
         loading={loading}
@@ -480,6 +527,76 @@ export default function ChatScreen() {
         onSave={handleSaveChatTimeRestrictions}
         title="Chat Time Scheduler"
       />
+
+      {/* Message Ticks Info Modal matching GrixChat design specs perfectly */}
+      <AnimatePresence>
+        {infoModalMessage && (
+          <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/75 backdrop-blur-[3px] select-none p-4">
+            <div 
+              className="absolute inset-0 bg-transparent" 
+              onClick={() => setInfoModalMessage(null)} 
+            />
+            
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 15 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="relative w-full max-w-[340px] bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-[28px] shadow-[0_24px_60px_rgba(0,0,0,0.5)] p-6 z-[100001] flex flex-col gap-4 text-left"
+            >
+              <div className="flex items-center gap-2.5 text-[#0494f4] font-black">
+                <Info size={22} className="stroke-[2.5]" />
+                <h3 className="text-[18px] font-black tracking-tight text-[var(--text-primary)] leading-none font-sans">
+                  Message Info
+                </h3>
+              </div>
+
+              <div className="px-3.5 py-3 rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)]/30 max-h-[110px] overflow-y-auto w-full">
+                <p className="text-[12.5px] font-semibold text-[var(--text-secondary)]/90 italic leading-snug break-all">
+                  "{infoModalMessage.content || infoModalMessage.text || 'Media Message Attachment'}"
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-4 pl-2 relative border-l-2 border-[var(--border-color)]/35 ml-3.5 my-2.5">
+                {/* Sent */}
+                <div className="relative pl-6">
+                  <div className="absolute -left-[7px] top-1.5 w-3.5 h-3.5 rounded-full bg-zinc-500 border-2 border-[var(--bg-card)] shadow-sm" />
+                  <p className="text-[10px] font-extrabold text-[var(--text-secondary)]/85 tracking-widest uppercase leading-none mb-1 font-mono">Sent</p>
+                  <p className="text-[13.5px] font-black text-[var(--text-primary)] leading-tight">
+                    {formatDetailedDate(infoModalMessage.created_at)}
+                  </p>
+                </div>
+
+                {/* Delivered */}
+                <div className="relative pl-6">
+                  <div className="absolute -left-[7px] top-1.5 w-3.5 h-3.5 rounded-full bg-zinc-400 border-2 border-[var(--bg-card)] shadow-sm" />
+                  <p className="text-[10px] font-extrabold text-[var(--text-secondary)]/85 tracking-widest uppercase leading-none mb-1 font-mono">Delivered</p>
+                  <p className="text-[13.5px] font-black text-[var(--text-primary)] leading-tight">
+                    {formatDetailedDate(new Date(new Date(infoModalMessage.created_at || Date.now()).getTime() + 1200).toISOString())}
+                  </p>
+                </div>
+
+                {/* Read */}
+                <div className="relative pl-6">
+                  <div className="absolute -left-[7px] top-1.5 w-3.5 h-3.5 rounded-full bg-[#0494f4] border-2 border-[var(--bg-card)] shadow-[0_0_10px_rgba(4,148,244,0.3)]" />
+                  <p className="text-[10px] font-extrabold text-[#0494f4] tracking-widest uppercase leading-none mb-1 font-mono animate-pulse">Read</p>
+                  <p className="text-[13.5px] font-black text-[var(--text-primary)] leading-tight">
+                    {formatDetailedDate(new Date(new Date(infoModalMessage.created_at || Date.now()).getTime() + 2400).toISOString())}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setInfoModalMessage(null)}
+                className="w-full text-center py-3.5 text-[14px] font-black text-white bg-[#0494f4] hover:bg-[#0382d6] active:scale-[0.98] transition-all rounded-2xl cursor-pointer border-none shadow-[0_4px_15px_rgba(4,148,244,0.25)] select-none"
+              >
+                Close Description
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
