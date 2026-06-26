@@ -1,10 +1,10 @@
-# 🌌 GrixChat — Secure Social & Real-Time Messaging Platform
+# ð GrixChat â Secure Social & Real-Time Messaging Platform  hihihi
 
-GrixChat is a ultra-modern, high-performance messaging, private calling, and short-form video application designed for lightning-fast speeds and low-cost scalability. Delivering a hybrid visual experience—blending **60% unique Dark Cosmic identity**, **20% Telegram performance micro-animations**, and **20% WhatsApp communication mechanics**—it runs perfectly as a PWA and Google Play TWA.
+GrixChat is a ultra-modern, high-performance messaging, private calling, and short-form video application designed for lightning-fast speeds and low-cost scalability. Delivering a hybrid visual experienceâblending **60% unique Dark Cosmic identity**, **20% Telegram performance micro-animations**, and **20% WhatsApp communication mechanics**âit runs perfectly as a PWA and Google Play TWA.
 
 ---
 
-## 🏗 Core Architecture Blueprint
+## ð Core Architecture Blueprint
 
 * **Backend, Storage & Real-Time Sync**: Driven **100% by Supabase**. Includes custom PostgreSQL procedures, storage buckets, and filtered `postgres_changes` listeners.
 * **Push Notifications**: **Firebase Cloud Messaging (FCM)** is strictly restricted to background mobile notifications so database egress loads remain at exactly zero.
@@ -13,17 +13,17 @@ GrixChat is a ultra-modern, high-performance messaging, private calling, and sho
 
 ---
 
-## 💸 Cost-Optimization & 50K Free User Scalability
+## ð¸ Cost-Optimization & 50K Free User Scalability
 
 To support more than 50,000 active users comfortably on Supabase's free tier, database operations obey strict efficiency guidelines:
 1. **Unfiltered Listeners Banned**: All real-time channel listeners are strictly targeted and filtered based on keys (e.g. `receiver_id=eq.${userId}`). We never listen to entire tables globally to protect egress.
-2. **Lightweight WebSocket Broadcasts**: High-frequency, fleeting events—such as typing feedback, read ticks, or calling connection states—are routed via Supabase Broadcast and Presence channels, avoiding heavy relational database queries.
+2. **Lightweight WebSocket Broadcasts**: High-frequency, fleeting eventsâsuch as typing feedback, read ticks, or calling connection statesâare routed via Supabase Broadcast and Presence channels, avoiding heavy relational database queries.
 3. **Optimized Local Caching**: State managers cache local messages and profiles before triggering remote syncs, delivering a persistent offline-first experience.
 4. **Range constraints & Pagination**: Initial list loading feeds only the vital 20-30 conversational records.
 
 ---
 
-## 🛠 Feature Profile
+## ð  Feature Profile
 
 - **Background Video/Voice Calling**: Integrated RTC signalling that lives inside the global React Context. You can back out from a call to write messages, and a beautiful WhatsApp-style pulsing green calling line continues to tick beneath the main navigation bar.
 - **Micro-Animations**: Staggered transition arrays and slide-out logout menus engineered via `motion/react` for smooth, native-like user flows.
@@ -32,7 +32,7 @@ To support more than 50,000 active users comfortably on Supabase's free tier, da
 
 ---
 
-## 📁 System Registry Map
+## ð System Registry Map
 
 - `/src/providers`: Application context singletons (Supabase `AuthProvider`, global WebRTC `CallProvider`).
 - `/src/features`: Modular screens broken into focus zones (`chat`, `call`, `profile`, `search`, `reels`).
@@ -45,7 +45,7 @@ To support more than 50,000 active users comfortably on Supabase's free tier, da
 
 ---
 
-## 🚀 Getting Started
+## ð Getting Started
 
 ### 1. Installation
 ```bash
@@ -70,4 +70,4 @@ npm run build
 ```
 
 ---
-Crafted under high-precision directives for the GrixChat Mobile Ecosystem. 🌌
+Crafted under high-precision directives for the GrixChat Mobile Ecosystem. ð
