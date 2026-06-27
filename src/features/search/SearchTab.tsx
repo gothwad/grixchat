@@ -220,31 +220,60 @@ export default function SearchTab() {
   };
 
   const renderUserProfileRow = (profile: UserProfile, isFriend: boolean = false) => {
+    const AVATAR_COLORS = ['#E17076','#7BC862','#65AADD','#E78A2F','#956FE4','#3CAFE5','#F57244','#49A0E9'];
+    const getAvatarColor = (name: string) => AVATAR_COLORS[(name?.charCodeAt(0) || 0) % AVATAR_COLORS.length];
+    const nameToUse = profile.fullName || profile.username || 'GrixUser';
+    const avatarColor = getAvatarColor(nameToUse);
+    const initials = nameToUse[0].toUpperCase();
+    const isPlaceholder = !profile.photoURL || profile.photoURL.includes('149071.png') || profile.photoURL.includes('166258.png') || profile.photoURL.trim() === '';
+
     return (
       <div 
         key={profile.uid}
         onClick={() => navigate(`/user/${profile.uid}`)}
-        className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 group cursor-pointer select-none border-b border-[var(--border-color)]/5 last:border-b-0 border-l-[4px] border-l-transparent"
+        className="relative flex items-center gap-3 px-3 py-2 min-h-[72px] transition-all duration-205 group cursor-pointer select-none bg-[var(--bg-card)] hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/8"
       >
-        <Avatar 
-          url={profile.photoURL} 
-          type="direct" 
-          name={profile.fullName || profile.username || 'GrixUser'} 
-          isOnline={profile.isOnline}
-        />
-        
-        <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
-            {profile.fullName || profile.username || 'GrixChat User'}
+        {/* Avatar Container */}
+        <div className="relative shrink-0 w-[54px] h-[54px]">
+          {isPlaceholder ? (
+            <div 
+              className="w-full h-full rounded-full flex items-center justify-center text-white text-[22px] font-medium"
+              style={{ backgroundColor: avatarColor }}
+            >
+              {initials}
+            </div>
+          ) : (
+            <div className="w-full h-full rounded-full overflow-hidden border border-[var(--border-color)]/20 shadow-sm flex items-center justify-center bg-[var(--border-color)]/5">
+              <img 
+                src={profile.photoURL} 
+                className="w-full h-full object-cover rounded-full"
+                referrerPolicy="no-referrer"
+                alt={nameToUse}
+              />
+            </div>
+          )}
+          {profile.isOnline && (
+            <div className="absolute bottom-0.5 right-0.5 w-[10px] h-[10px] bg-green-500 border-2 border-[var(--bg-card)] rounded-full z-10" />
+          )}
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5">
+          <h3 className="text-[16px] truncate font-medium text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
+            {nameToUse}
           </h3>
-          <p className="text-[13px] text-[var(--text-secondary)] opacity-75 mt-0.5 font-medium">
+          <p className="text-[15px] text-[var(--text-secondary)] opacity-75 mt-0.5 truncate">
             @{profile.username || 'username'}
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200" />
+        {/* Action / Arrow Area */}
+        <div className="flex items-center gap-1.5 shrink-0 mr-1">
+          <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-20 group-hover:opacity-70 group-hover:translate-x-0.5 transition-all duration-200" />
         </div>
+
+        {/* Separator Line */}
+        <div className="absolute bottom-0 left-[78px] right-0 h-[0.5px] bg-[var(--border-color)]/25 pointer-events-none" />
       </div>
     );
   };
@@ -309,24 +338,27 @@ export default function SearchTab() {
               {/* Only show requests folder if not browsing search keyword results */}
               <div 
                 onClick={() => navigate('/chats/requests')}
-                className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10 transition-all duration-205 border-b border-[var(--border-color)]/5 group cursor-pointer select-none border-l-[4px] border-l-transparent"
+                className="relative flex items-center gap-3 px-3 py-2 min-h-[72px] transition-all duration-205 group cursor-pointer select-none bg-[var(--bg-card)] hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/8"
               >
-                <div className="relative shrink-0">
-                  <div className="w-12 h-12 rounded-full bg-[#0494f4]/10 dark:bg-zinc-800/60 flex items-center justify-center text-[#0494f4] group-hover:scale-[1.02] transition-transform border border-[var(--border-color)]/15">
-                    <Users size={19} className="text-[#0494f4]" />
+                <div className="relative shrink-0 w-[54px] h-[54px]">
+                  <div className="w-full h-full rounded-full bg-[#0494f4]/10 dark:bg-zinc-800/60 flex items-center justify-center text-[#0494f4] group-hover:scale-[1.02] transition-transform border border-[var(--border-color)]/15">
+                    <Users size={22} className="text-[#0494f4] stroke-[2.2]" />
                   </div>
                 </div>
-                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                  <h3 className="text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
+                <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5">
+                  <h3 className="text-[16px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
                     Pending Requests
                   </h3>
-                  <p className="text-[13px] truncate text-[var(--text-secondary)] mt-0.5 font-medium opacity-75">
+                  <p className="text-[15px] truncate text-[var(--text-secondary)] mt-0.5 font-normal opacity-75">
                     Incoming friend requests
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-15 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all duration-200" />
+                <div className="flex items-center gap-1.5 shrink-0 mr-1">
+                  <ChevronRight size={18} className="text-[var(--text-secondary)] opacity-20 group-hover:opacity-70 group-hover:translate-x-0.5 transition-all duration-200" />
                 </div>
+
+                {/* Separator Line */}
+                <div className="absolute bottom-0 left-[78px] right-0 h-[0.5px] bg-[var(--border-color)]/25 pointer-events-none" />
               </div>
 
               {contactsLoading ? (

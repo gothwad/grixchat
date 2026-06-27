@@ -164,6 +164,25 @@ const ChatItemRow: React.FC<{
     }
   };
 
+  const AVATAR_COLORS = ['#E17076','#7BC862','#65AADD','#E78A2F','#956FE4','#3CAFE5','#F57244','#49A0E9'];
+  const getAvatarColor = (name: string) => AVATAR_COLORS[(name?.charCodeAt(0) || 0) % AVATAR_COLORS.length];
+  const nameToUse = chat.user || chat.fullName || '?';
+  const avatarColor = getAvatarColor(nameToUse);
+  const initials = chat.type === 'group' 
+    ? (nameToUse.trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?')
+    : nameToUse[0].toUpperCase();
+
+  const isPlaceholder = !chat.avatar || chat.avatar.includes('149071.png') || chat.avatar.includes('166258.png') || chat.avatar.includes('166258') || chat.avatar.trim() === '';
+
+  const isMuted = (chat as any).isMuted || (chat as any).muted;
+
+  const DoubleTick = () => (
+    <svg width="16" height="11" viewBox="0 0 16 11" className="shrink-0">
+      <path d="M11 1L5 9L2 6" stroke="var(--text-secondary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <path d="M15 1L9 9L7.5 7.2" stroke="var(--text-secondary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    </svg>
+  );
+
   return (
     <div
       onTouchStart={startPress}
@@ -174,73 +193,110 @@ const ChatItemRow: React.FC<{
       onMouseUp={cancelPress}
       onMouseLeave={cancelPress}
       onClick={handleClick}
-      className={`relative flex items-center gap-3 px-3 py-2.5 transition-all duration-205 cursor-pointer select-none border-b border-[var(--border-color)]/5 last:border-b-0 border-l-[4px] border-l-transparent ${
+      className={`relative flex items-center gap-3 px-3 py-2 min-h-[72px] transition-all duration-205 cursor-pointer select-none ${
         isSelected 
-          ? 'bg-[var(--primary)]/24' 
-          : 'bg-[var(--bg-card)] hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/10'
+          ? 'bg-[var(--primary)]/10' 
+          : 'bg-[var(--bg-card)] hover:bg-[var(--border-color)]/5 active:bg-[var(--border-color)]/8'
       }`}
     >
-      <div className="relative shrink-0">
-        <Avatar url={chat.avatar} type={chat.type} name={chat.user} isOnline={chat.isOnline} />
+      {/* Avatar Container */}
+      <div className="relative shrink-0 w-[54px] h-[54px]">
+        {isPlaceholder ? (
+          <div 
+            className="w-full h-full rounded-full flex items-center justify-center text-white text-[22px] font-medium"
+            style={{ backgroundColor: avatarColor }}
+          >
+            {initials}
+          </div>
+        ) : (
+          <div className="w-full h-full rounded-full overflow-hidden border border-[var(--border-color)]/20 shadow-sm flex items-center justify-center bg-[var(--border-color)]/5">
+            <img 
+              src={chat.avatar} 
+              className="w-full h-full object-cover rounded-full"
+              referrerPolicy="no-referrer"
+              alt={nameToUse}
+            />
+          </div>
+        )}
+        {chat.isOnline && (
+          <div className="absolute bottom-0.5 right-0.5 w-[10px] h-[10px] bg-green-500 border-2 border-[var(--bg-card)] rounded-full z-10" />
+        )}
         {isSelected && (
-          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[var(--primary)] border-2 border-[var(--bg-card)] flex items-center justify-center shadow-md z-20 animate-scale-in">
-            <svg 
-              className="w-3 h-3 text-white" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="4" 
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
+          <div className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center z-20 animate-scale-in">
+            <div className="w-6 h-6 rounded-full bg-[var(--primary)] border-2 border-[var(--bg-card)] flex items-center justify-center shadow-lg">
+              <svg 
+                className="w-3.5 h-3.5 text-white" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="4" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
           </div>
         )}
       </div>
-      <div className="flex-1 min-w-0 flex flex-col justify-center">
-        <div className="flex justify-between items-baseline mb-0.5">
-          <h3 className={`text-[14.5px] truncate font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors flex items-center gap-1.5 ${chat.unread ? 'font-bold' : ''}`}>
-            {isPinned && <Pin size={13} className="text-[#0494f4] fill-[#0494f4] shrink-0" />}
-            <span>{chat.user}</span>
-          </h3>
-          <span className={`text-[10.5px] whitespace-nowrap ${chat.unread ? 'text-[var(--primary)] font-semibold' : 'text-[var(--text-secondary)] opacity-60'}`}>
+
+      {/* Content Area */}
+      <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5">
+        {/* Row 1: Name and Time */}
+        <div className="flex justify-between items-baseline mb-1">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3 className={`text-[16px] truncate text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors ${chat.unread ? 'font-semibold' : 'font-medium'}`}>
+              {chat.user}
+            </h3>
+            {isMuted && <VolumeX size={14} className="text-[var(--text-secondary)] opacity-70 shrink-0" />}
+            {isPinned && <Pin size={14} className="text-[var(--text-secondary)] opacity-70 fill-current shrink-0" />}
+          </div>
+          <span className={`text-[13px] whitespace-nowrap shrink-0 ml-2 ${chat.unread ? 'text-[var(--primary)] font-medium' : 'text-[var(--text-secondary)] opacity-60'}`}>
             {chat.time}
           </span>
         </div>
+
+        {/* Row 2: Message/Draft/Typing and Status badge */}
         <div className="flex justify-between items-center gap-2">
           <div className="flex-1 min-w-0">
             {isTyping ? (
-              <span className="text-[var(--primary)] font-bold animate-pulse flex items-center gap-1.5 select-none text-[13px]">
-                <span>typing</span>
-                <span className="inline-flex gap-[2px]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] animate-bounce [animation-delay:-0.3s]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] animate-bounce [animation-delay:-0.15s]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] animate-bounce" />
-                </span>
+              <span className="text-[var(--primary)] font-medium text-[15px]">
+                typing...
               </span>
             ) : (
-              <p className={`text-[13px] truncate flex-1 leading-snug p-0 m-0 ${chat.unread ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-secondary)] opacity-75'}`}>
+              <div className={`text-[15px] truncate ${chat.unread ? 'text-[var(--text-primary)] font-normal' : 'text-[var(--text-secondary)] opacity-75'}`}>
                 {isDraft ? (
                   <>
-                    <span className="text-rose-500 dark:text-rose-400 font-bold mr-1">Draft:</span>
-                    <span className="text-[var(--text-primary)] dark:text-zinc-200">{displayLastMsg}</span>
+                    <span className="text-[#E53935] font-semibold mr-1">Draft:</span>
+                    <span className="text-[var(--text-primary)]">{displayLastMsg}</span>
                   </>
                 ) : (
-                  chat.lastMsg
+                  <>
+                    {chat.lastMsgStatus === 'Sent' && <span className="text-[var(--text-secondary)] opacity-80 mr-1">You: </span>}
+                    {displayLastMsg}
+                  </>
                 )}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {chat.unread && (
-              <div className="min-w-[18px] h-[18px] px-1.5 bg-[var(--primary)] rounded-full flex items-center justify-center shadow-sm">
-                <span className="text-[9.5px] text-white font-extrabold leading-none">
-                  {chat.unreadCount && chat.unreadCount > 4 ? '4+' : chat.unreadCount}
-                </span>
               </div>
             )}
           </div>
+
+          {/* Right Side Status Area */}
+          <div className="flex items-center gap-2 shrink-0">
+            {chat.unread && chat.unreadCount && chat.unreadCount > 0 ? (
+              <div className={`min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center shadow-sm ${isMuted ? 'bg-[var(--text-secondary)]/50' : 'bg-[var(--primary)]'}`}>
+                <span className="text-[12px] text-white font-semibold leading-none">
+                  {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+                </span>
+              </div>
+            ) : isPinned ? (
+              <Pin size={16} className="text-[var(--text-secondary)]/60 fill-current shrink-0" />
+            ) : chat.lastMsgStatus === 'Sent' ? (
+              <DoubleTick />
+            ) : null}
+          </div>
         </div>
       </div>
+
+      {/* Separator Line */}
+      <div className="absolute bottom-0 left-[78px] right-0 h-[0.5px] bg-[var(--border-color)]/25 pointer-events-none" />
     </div>
   );
 };
