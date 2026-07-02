@@ -1,7 +1,0 @@
-node_modules/
-build/
-coverage/
-.DS_Store
-*.log
-.env*
-!.env.example
